@@ -111,7 +111,7 @@
 
             <div v-else class="coord-result-body">
               <div class="coord-result-summary">
-                <span>RequestID: {{ selectedAnalysis.response_body.responseID }}</span>
+                <span>请求序号: {{ selectedAnalysis.response_body.responseID }}</span>
                 <span>任务: {{ selectedAnalysis.missions.length }}</span>
                 <span>资源: {{ selectedAnalysis.resources.length }}</span>
               </div>
@@ -305,17 +305,20 @@ const hasDecomposeExecuted = (commandId) => Boolean(analysisResultMap.value?.[co
 const resolveCommandStatusText = (commandId) => (hasDecomposeExecuted(commandId) ? '已处理' : '待理解');
 const resolveCommandStatusTone = (commandId) => (hasDecomposeExecuted(commandId) ? 'done' : 'pending');
 
-const summarizeDependencyGroup = (label, ids = []) => (
-  Array.isArray(ids) && ids.length ? `${label}${ids.join(',')}` : ''
-);
-
 const formatMissionDependencies = (dependencies = {}) => {
-  const parts = [
-    summarizeDependencyGroup('命令:', dependencies.commands),
-    summarizeDependencyGroup('任务:', dependencies.missions),
-    summarizeDependencyGroup('资源:', dependencies.resources),
-  ].filter(Boolean);
-  return parts.length ? parts.join(' / ') : '无';
+  const mapGroup = (label, ids = []) => (
+    Array.isArray(ids) ? ids.filter((id) => id !== null && id !== undefined).map((id) => `${label}${id}`) : []
+  );
+
+  const items = [
+    ...mapGroup('命令', dependencies.commands),
+    ...mapGroup('任务', dependencies.missions),
+    ...mapGroup('资源', dependencies.resources),
+    ...mapGroup('方案', dependencies.plans),
+    ...mapGroup('临机方案', dependencies.instant_plans),
+  ];
+
+  return items.length ? items.join('，') : '无';
 };
 
 watch(selectedCommandId, () => {
@@ -709,8 +712,14 @@ const saveEditMission = () => {
 }
 
 .coord-tab.active {
-  border-color: var(--coord-border);
-  background: linear-gradient(180deg, var(--coord-accent-soft), rgba(0, 49, 72, 0.03));
+  border-color: rgba(0, 236, 212, 0.9);
+  background: linear-gradient(180deg, rgba(0, 236, 212, 0.28), rgba(0, 130, 149, 0.34));
+  color: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px rgba(170, 255, 247, 0.42),
+    0 0 0 2px rgba(0, 236, 212, 0.18),
+    0 8px 18px rgba(0, 186, 173, 0.18);
+  transform: translateY(-1px);
 }
 
 .coord-detail-toggle {
@@ -778,12 +787,18 @@ const saveEditMission = () => {
 }
 
 .coord-list-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  padding: 0.12rem 0.5rem;
-  font-size: 0.8rem;
+  padding: 0.14rem 0.58rem;
+  font-size: 0.86rem;
+  min-height: 30px;
+  line-height: 1.2;
   font-weight: 700;
   background: rgba(0, 222, 200, 0.16);
   color: #95fff5;
+  vertical-align: middle;
 }
 
 .coord-list-tag.resource {
@@ -826,18 +841,19 @@ const saveEditMission = () => {
 }
 
 .coord-display-label {
-  color: rgba(207, 236, 241, 0.92);
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  color: rgba(153, 218, 227, 0.9);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .coord-display-value {
   color: rgba(241, 254, 255, 0.98);
-  font-size: 1rem;
+  font-size: 1.08rem;
   line-height: 1.55;
   text-indent: 0;
   word-break: break-word;
+  font-weight: 600;
 }
 
 .coord-point-block {
