@@ -33,6 +33,17 @@ export function useTaskUnderstandingState({ moduleApi }) {
   const resolveCommandStatusText = (commandId) => (hasDecomposeExecuted(commandId) ? '已处理' : '待理解');
   const resolveCommandStatusTone = (commandId) => (hasDecomposeExecuted(commandId) ? 'done' : 'pending');
 
+  const formatDateTimeCn = (value) => {
+    const text = String(value || '').trim();
+    const matched = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{2}:\d{2}:\d{2}))?$/);
+    if (!matched) {
+      return text;
+    }
+    const [, year, month, day, time] = matched;
+    const dateText = `${year}年${Number(month)}月${Number(day)}日`;
+    return time ? `${dateText} ${time}` : dateText;
+  };
+
   const formatMissionDependencies = (dependencies = {}) => {
     const mapGroup = (label, ids = []) => (
       Array.isArray(ids) ? ids.filter((id) => id !== null && id !== undefined).map((id) => `${label}${id}`) : []
@@ -199,6 +210,7 @@ export function useTaskUnderstandingState({ moduleApi }) {
     hasAnalysisResult,
     resolveCommandStatusText,
     resolveCommandStatusTone,
+    formatDateTimeCn,
     formatMissionDependencies,
     handleForward,
     handleAssociate,

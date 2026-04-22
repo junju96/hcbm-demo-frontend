@@ -28,63 +28,80 @@
         <section class="coord-right-pane">
           <article v-if="selectedCommand" class="coord-panel coord-command-panel">
             <header class="coord-command-header">
-              <div>
-                <div class="coord-pane-title">{{ selectedCommand.name }}</div>
-                <div class="coord-pane-subtitle">{{ selectedCommand.title }}</div>
+              <div class="coord-command-title-group">
+                <div class="coord-command-title-main">{{ selectedCommand.name }}</div>
+              </div>
+              <div class="coord-command-head-side">
+                <span class="coord-command-badge coord-command-badge-head" :class="resolveCommandStatusTone(selectedCommand.commandId)">
+                  {{ resolveCommandStatusText(selectedCommand.commandId) }}
+                </span>
               </div>
             </header>
 
-            <div class="coord-meta-grid">
-              <div class="coord-meta-cell">
-                <span class="coord-meta-label">发令单位</span>
-                <span class="coord-meta-value">{{ selectedCommand.sender }}</span>
+            <section class="coord-overview-wrap">
+              <div class="coord-section-title">命令概要</div>
+
+              <div class="coord-overview-grid">
+                <div class="coord-meta-cell coord-meta-cell-subject">
+                  <span class="coord-meta-label">命令主题</span>
+                  <span class="coord-meta-value">{{ selectedCommand.title }}</span>
+                </div>
               </div>
-              <div class="coord-meta-cell">
-                <span class="coord-meta-label">接收时间</span>
-                <span class="coord-meta-value">{{ selectedCommand.receivedAt }}</span>
+
+              <div class="coord-meta-grid">
+                <div class="coord-meta-cell">
+                  <span class="coord-meta-label">发令单位</span>
+                  <span class="coord-meta-value">{{ selectedCommand.sender }}</span>
+                </div>
+                <div class="coord-meta-cell">
+                  <span class="coord-meta-label">接收时间</span>
+                  <span class="coord-meta-value">{{ formatDateTimeCn(selectedCommand.receivedAt) }}</span>
+                </div>
+                <div class="coord-meta-cell">
+                  <span class="coord-meta-label">优先级</span>
+                  <span class="coord-meta-value high">{{ selectedCommand.priority }}</span>
+                </div>
+                <div class="coord-meta-cell">
+                  <span class="coord-meta-label">命令编号</span>
+                  <span class="coord-meta-value">{{ selectedCommand.commandId }}</span>
+                </div>
               </div>
-              <div class="coord-meta-cell">
-                <span class="coord-meta-label">优先级</span>
-                <span class="coord-meta-value high">{{ selectedCommand.priority }}</span>
-              </div>
-              <div class="coord-meta-cell">
-                <span class="coord-meta-label">命令编号</span>
-                <span class="coord-meta-value">{{ selectedCommand.commandId }}</span>
-              </div>
-            </div>
+            </section>
 
             <div class="coord-command-content-wrap">
-              <div class="coord-meta-label">命令详情</div>
+              <div class="coord-section-title">命令详情</div>
               <div class="coord-command-content">{{ selectedCommand.content }}</div>
             </div>
 
             <footer class="coord-command-actions">
+              <div class="coord-command-actions-group">
+                <button
+                  class="coord-btn"
+                  type="button"
+                  v-bind="buildCommandActionAttrs('coordination:forward-command', '转发命令')"
+                  @click="handleForward"
+                >
+                  转发
+                </button>
+                <button
+                  class="coord-btn"
+                  type="button"
+                  v-bind="buildCommandActionAttrs('coordination:associate-command', '关联命令')"
+                  @click="handleAssociate"
+                >
+                  关联
+                </button>
+                <button
+                  class="coord-btn danger"
+                  type="button"
+                  v-bind="buildCommandActionAttrs('coordination:delete-command', '删除命令')"
+                  @click="handleDelete"
+                >
+                  删除
+                </button>
+              </div>
               <button
-                class="coord-btn"
-                type="button"
-                v-bind="buildCommandActionAttrs('coordination:forward-command', '转发命令')"
-                @click="handleForward"
-              >
-                转发
-              </button>
-              <button
-                class="coord-btn"
-                type="button"
-                v-bind="buildCommandActionAttrs('coordination:associate-command', '关联命令')"
-                @click="handleAssociate"
-              >
-                关联
-              </button>
-              <button
-                class="coord-btn danger"
-                type="button"
-                v-bind="buildCommandActionAttrs('coordination:delete-command', '删除命令')"
-                @click="handleDelete"
-              >
-                删除
-              </button>
-              <button
-                class="coord-btn primary"
+                class="coord-btn primary coord-command-primary"
                 type="button"
                 :disabled="parsing"
                 v-bind="buildCommandActionAttrs('coordination:decompose-command', '执行任务理解')"
@@ -212,26 +229,26 @@
                       </div>
                     </template>
                     <template v-else>
-                      <div class="coord-display-grid">
-                        <div class="coord-display-row">
-                          <span class="coord-display-label">内容</span>
-                          <span class="coord-display-value">{{ mission.mission_detail.content }}</span>
+                      <div class="coord-detail-grid">
+                        <div class="coord-detail-item full">
+                          <div class="coord-detail-key">内容</div>
+                          <div class="coord-detail-text">{{ mission.mission_detail.content }}</div>
                         </div>
-                        <div class="coord-display-row">
-                          <span class="coord-display-label">任务区域</span>
-                          <span class="coord-display-value">{{ mission.mission_detail.target }}</span>
+                        <div class="coord-detail-item">
+                          <div class="coord-detail-key">任务区域</div>
+                          <div class="coord-detail-text">{{ mission.mission_detail.target }}</div>
                         </div>
-                        <div class="coord-display-row">
-                          <span class="coord-display-label">开始时间</span>
-                          <span class="coord-display-value">{{ mission.mission_detail.time }}</span>
+                        <div class="coord-detail-item">
+                          <div class="coord-detail-key">开始时间</div>
+                          <div class="coord-detail-text">{{ formatDateTimeCn(mission.mission_detail.time) }}</div>
                         </div>
-                        <div class="coord-display-row">
-                          <span class="coord-display-label">结束时间</span>
-                          <span class="coord-display-value">{{ mission.mission_detail.duration }}</span>
+                        <div class="coord-detail-item">
+                          <div class="coord-detail-key">结束时间</div>
+                          <div class="coord-detail-text">{{ mission.mission_detail.duration }}</div>
                         </div>
-                        <div class="coord-display-row">
-                          <span class="coord-display-label">依赖</span>
-                          <span class="coord-display-value">{{ formatMissionDependencies(mission.dependencies) }}</span>
+                        <div class="coord-detail-item">
+                          <div class="coord-detail-key">依赖</div>
+                          <div class="coord-detail-text">{{ formatMissionDependencies(mission.dependencies) }}</div>
                         </div>
                       </div>
                     </template>
@@ -250,18 +267,18 @@
                     <span class="coord-list-tag resource">资源 {{ resource.resource_id }}</span>
                     <span class="coord-list-title">{{ resource.resource_name }}</span>
                   </div>
-                  <div v-if="detailsExpanded" class="coord-display-grid">
-                    <div class="coord-display-row">
-                      <span class="coord-display-label">资源类型</span>
-                      <span class="coord-display-value">{{ resource.resource_type }}</span>
+                  <div v-if="detailsExpanded" class="coord-detail-grid">
+                    <div class="coord-detail-item">
+                      <div class="coord-detail-key">资源类型</div>
+                      <div class="coord-detail-text">{{ resource.resource_type }}</div>
                     </div>
-                    <div class="coord-display-row">
-                      <span class="coord-display-label">区域属性</span>
-                      <span class="coord-display-value">{{ resource.resource_detail.type }}</span>
+                    <div class="coord-detail-item">
+                      <div class="coord-detail-key">区域属性</div>
+                      <div class="coord-detail-text">{{ resource.resource_detail.type }}</div>
                     </div>
-                    <div class="coord-display-row">
-                      <span class="coord-display-label">坐标点数</span>
-                      <span class="coord-display-value">{{ resource.resource_detail.location.length }}</span>
+                    <div class="coord-detail-item">
+                      <div class="coord-detail-key">坐标点数</div>
+                      <div class="coord-detail-text">{{ resource.resource_detail.location.length }}</div>
                     </div>
 
                     <div class="coord-point-block">
@@ -337,6 +354,7 @@ const {
   hasAnalysisResult,
   resolveCommandStatusText,
   resolveCommandStatusTone,
+  formatDateTimeCn,
   formatMissionDependencies,
   handleForward,
   handleAssociate,
@@ -547,11 +565,55 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 .coord-command-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 0.8rem;
 }
 
+.coord-command-title-group {
+  min-width: 0;
+}
+
+.coord-command-head-side {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.coord-command-title-main {
+  color: #f7fdff;
+  font-size: 1.22rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+
+.coord-command-badge-head {
+  padding: 0.22rem 0.62rem;
+  font-size: 0.76rem;
+  border: 1px solid transparent;
+}
+
+.coord-command-badge-head.pending {
+  border-color: rgba(229, 168, 11, 0.36);
+}
+
+.coord-command-badge-head.done {
+  border-color: rgba(0, 222, 200, 0.36);
+}
+
+.coord-overview-wrap {
+  margin-top: 0.72rem;
+}
+
+.coord-overview-grid {
+  margin-top: 0.4rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
 .coord-meta-grid {
-  margin-top: 0.8rem;
+  margin-top: 0.5rem;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.55rem;
@@ -559,23 +621,36 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 
 .coord-meta-cell {
   border-radius: 10px;
-  border: 1px solid var(--coord-border-soft);
-  background: rgba(0, 16, 22, 0.62);
-  padding: 0.52rem 0.62rem;
+  border: 1px solid rgba(0, 206, 186, 0.32);
+  background: rgba(0, 16, 22, 0.7);
+  padding: 0.52rem 0.58rem;
+  min-height: 92px;
+}
+
+.coord-meta-cell-subject {
+  min-height: 0;
+  padding: 0.5rem 0.58rem;
+  background: rgba(0, 20, 28, 0.72);
+}
+
+.coord-meta-cell-subject .coord-meta-value {
+  font-size: 1rem;
 }
 
 .coord-meta-label {
-  color: rgba(191, 237, 243, 0.88);
-  font-size: 0.82rem;
-  font-weight: 600;
+  color: rgba(196, 243, 248, 0.96);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .coord-meta-value {
   display: block;
   margin-top: 0.26rem;
-  color: var(--coord-text);
-  font-size: 0.93rem;
-  font-weight: 600;
+  color: #ecfbff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .coord-meta-value.high {
@@ -583,7 +658,16 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 }
 
 .coord-command-content-wrap {
-  margin-top: 0.78rem;
+  margin-top: 0.9rem;
+  padding-top: 0.78rem;
+  border-top: 1px solid rgba(0, 222, 200, 0.16);
+}
+
+.coord-section-title {
+  color: #eefcff;
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 .coord-command-content {
@@ -597,15 +681,30 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   min-height: 120px;
   white-space: pre-wrap;
   word-break: break-word;
-  text-indent: 2em;
-  font-size: 1rem;
+  text-indent: 1.5em;
+  font-size: 0.96rem;
 }
 
 .coord-command-actions {
-  margin-top: 0.74rem;
+  margin-top: 0.78rem;
   display: flex;
-  gap: 0.55rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
   flex-wrap: wrap;
+  padding-top: 0.52rem;
+  border-top: 1px solid rgba(0, 222, 200, 0.16);
+}
+
+.coord-command-actions-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.52rem;
+  flex-wrap: wrap;
+}
+
+.coord-command-primary {
+  min-width: 132px;
 }
 
 .coord-btn,
@@ -720,7 +819,7 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   flex-wrap: wrap;
   gap: 0.65rem;
   color: rgba(204, 247, 243, 0.85);
-  font-size: 0.93rem;
+  font-size: 0.86rem;
 }
 
 .coord-result-summary span {
@@ -728,7 +827,7 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   border: 1px solid rgba(0, 222, 200, 0.28);
   background: rgba(0, 222, 200, 0.09);
   color: #c8fffa;
-  padding: 0.18rem 0.62rem;
+  padding: 0.16rem 0.58rem;
   font-weight: 700;
 }
 
@@ -736,15 +835,43 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   margin-top: 0.62rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.72rem;
   min-height: fit-content;
 }
 
 .coord-list-row {
+  position: relative;
   border-radius: 10px;
-  border: 1px solid var(--coord-border-soft);
-  background: rgba(0, 16, 22, 0.62);
+  border: 1px solid rgba(0, 208, 188, 0.32);
+  background:
+    linear-gradient(180deg, rgba(0, 222, 200, 0.05), rgba(0, 222, 200, 0.015)),
+    rgba(0, 16, 22, 0.68);
   padding: 0.54rem 0.64rem;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 222, 200, 0.05),
+    0 6px 14px rgba(0, 0, 0, 0.16);
+}
+
+.coord-list-row:nth-child(even) {
+  background:
+    linear-gradient(180deg, rgba(0, 222, 200, 0.03), rgba(0, 222, 200, 0.01)),
+    rgba(1, 14, 20, 0.72);
+}
+
+.coord-list-row + .coord-list-row::before {
+  content: '';
+  position: absolute;
+  top: -0.42rem;
+  left: 0.62rem;
+  right: 0.62rem;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 222, 200, 0),
+    rgba(0, 222, 200, 0.34) 18%,
+    rgba(0, 222, 200, 0.34) 82%,
+    rgba(0, 222, 200, 0)
+  );
 }
 
 .coord-list-row.editing {
@@ -758,7 +885,7 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 .coord-list-main {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.34rem;
   min-width: 0;
 }
 
@@ -767,9 +894,9 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  padding: 0.14rem 0.58rem;
-  font-size: 0.86rem;
-  min-height: 30px;
+  padding: 0.1rem 0.46rem;
+  font-size: 0.8rem;
+  min-height: 25px;
   line-height: 1.2;
   font-weight: 700;
   background: rgba(0, 222, 200, 0.16);
@@ -785,7 +912,7 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 .coord-list-title {
   color: var(--coord-text);
   font-weight: 700;
-  font-size: 1.08rem;
+  font-size: 0.92rem;
   line-height: 1.4;
 }
 
@@ -809,31 +936,66 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   gap: 0.36rem;
 }
 
+.coord-detail-grid {
+  margin-top: 0.42rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.46rem;
+}
+
+.coord-detail-item {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 222, 200, 0.22);
+  background: rgba(2, 20, 27, 0.68);
+  padding: 0.44rem 0.52rem;
+}
+
+.coord-detail-item.full {
+  grid-column: 1 / -1;
+}
+
+.coord-detail-key {
+  color: rgba(153, 218, 227, 0.92);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.coord-detail-text {
+  margin-top: 0.2rem;
+  color: rgba(241, 254, 255, 0.98);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  word-break: break-word;
+  font-weight: 650;
+}
+
 .coord-display-row {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-columns: 78px minmax(0, 1fr);
   align-items: start;
-  gap: 0.5rem;
+  gap: 0.44rem;
 }
 
 .coord-display-label {
   color: rgba(153, 218, 227, 0.9);
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 
 .coord-display-value {
   color: rgba(241, 254, 255, 0.98);
-  font-size: 1.08rem;
-  line-height: 1.55;
+  font-size: 0.92rem;
+  line-height: 1.5;
   text-indent: 0;
   word-break: break-word;
   font-weight: 600;
 }
 
 .coord-point-block {
-  margin-top: 0.32rem;
+  margin-top: 0.1rem;
+  grid-column: 1 / -1;
   border-radius: 10px;
   border: 1px solid rgba(0, 222, 200, 0.24);
   background: rgba(2, 18, 26, 0.62);
@@ -879,8 +1041,8 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 .coord-mini-btn {
   min-height: 32px;
   min-width: 72px;
-  padding: 0 0.72rem;
-  font-size: 0.9rem;
+  padding: 0 0.66rem;
+  font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -901,7 +1063,7 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 
 .coord-edit-label {
   color: rgba(182, 255, 252, 0.88);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -914,8 +1076,20 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   background: rgba(7, 30, 34, 0.52);
   color: var(--coord-text);
   padding: 0 0.66rem;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
+}
+
+.coord-result-panel .coord-tab {
+  min-height: 34px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 0 0.82rem;
+}
+
+.coord-result-panel .coord-detail-toggle {
+  min-height: 34px;
+  font-size: 0.78rem;
 }
 
 .coord-edit-input:focus {
@@ -939,6 +1113,10 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
     grid-template-columns: 220px minmax(0, 1fr);
   }
 
+  .coord-command-title-main {
+    font-size: 1.18rem;
+  }
+
   .coord-meta-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -947,6 +1125,19 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 @media (max-width: 900px) {
   .coord-layout {
     grid-template-columns: 1fr;
+  }
+
+  .coord-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coord-command-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .coord-command-actions {
+    justify-content: flex-start;
   }
 
   .coord-meta-grid {
