@@ -1,0 +1,159 @@
+:root {
+  font-family: "Noto Sans SC", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: #f5ffff;
+  background-color: #02090b;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --theme-bg: #02090b;
+  --theme-bg-elevated: #031215;
+  --theme-panel: rgba(3, 15, 17, 0.82);
+  --theme-panel-strong: rgba(3, 18, 21, 0.92);
+  --theme-surface: rgba(7, 20, 22, 0.94);
+  --theme-surface-soft: rgba(6, 26, 29, 0.76);
+  --theme-section: rgba(255, 255, 255, 0.04);
+  --theme-section-strong: rgba(255, 255, 255, 0.08);
+  --theme-border: rgba(0, 208, 188, 0.18);
+  --theme-border-strong: rgba(0, 222, 200, 0.36);
+  --theme-accent: #00dec8;
+  --theme-accent-strong: #00d5c0;
+  --theme-accent-soft: rgba(0, 213, 192, 0.14);
+  --theme-icon-idle: #b6fffc;
+  --theme-highlight: #bbfeff;
+  --theme-text: #f5ffff;
+  --theme-text-secondary: rgba(245, 255, 255, 0.8);
+  --theme-text-muted: rgba(182, 255, 252, 0.68);
+  --theme-danger: #d81b1b;
+  --theme-warning: #e5a80b;
+  --theme-battery: #23daff;
+  --theme-fuel: #03bc09;
+  --theme-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  --theme-title-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)), rgba(3, 18, 21, 0.92);
+  --theme-active-bg: linear-gradient(180deg, rgba(0, 213, 192, 0.16), rgba(0, 49, 72, 0.08)), rgba(3, 18, 21, 0.96);
+  --theme-active-bg-soft: linear-gradient(180deg, rgba(0, 213, 192, 0.08), rgba(0, 49, 72, 0.03)), rgba(3, 18, 21, 0.88);
+  --theme-control-idle-fill: linear-gradient(180deg, #5b6163 0%, #4d5355 100%);
+  --theme-control-idle-fill-hover: linear-gradient(180deg, #697072 0%, #5a6062 100%);
+  --theme-control-idle-fill-active: linear-gradient(180deg, rgba(0, 86, 91, 0.18) 0%, #5b6163 100%);
+  --theme-control-idle-border: #717577;
+  --theme-control-idle-border-hover: #8a8d8f;
+  --theme-control-idle-border-active: rgba(182, 255, 252, 0.42);
+  --theme-control-idle-text: rgba(255, 255, 255, 0.8);
+  --theme-control-active-fill: linear-gradient(180deg, #00565b 0%, #002a2b 100%);
+  --theme-control-active-border: #00dec8;
+  --theme-control-active-text: #ffffff;
+  --theme-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 18px rgba(0, 0, 0, 0.18);
+  --theme-control-active-shadow: inset 0 1px 0 rgba(182, 255, 252, 0.14), 0 10px 22px rgba(0, 0, 0, 0.22);
+  --theme-field-fill: #4d5355;
+  --theme-field-fill-hover: #5a6062;
+  --theme-field-focus-fill: #113638;
+  --theme-field-border: #717577;
+  --theme-field-border-hover: #8a8d8f;
+  --theme-field-focus-border: #00dec8;
+  --theme-field-text: rgba(255, 255, 255, 0.9);
+  --theme-field-placeholder: rgba(255, 255, 255, 0.46);
+  --theme-slider-track: #071111;
+  --theme-slider-track-border: rgba(0, 222, 200, 0.4);
+  --theme-page-bg:
+    radial-gradient(circle at top left, rgba(0, 213, 192, 0.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(0, 86, 91, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(4, 20, 23, 0.96), rgba(1, 7, 9, 0.98));
+  --theme-backdrop: linear-gradient(rgba(2, 13, 15, 0.72), rgba(2, 9, 11, 0.86)), url('/background.png');
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  min-width: 320px;
+  background: var(--theme-page-bg);
+  color: var(--theme-text);
+}
+
+a {
+  font-weight: 500;
+  color: var(--theme-highlight);
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+select {
+  color-scheme: dark;
+}
+
+option {
+  background-color: #4d5355;
+  color: #ffffff;
+}
+
+button {
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+input,
+textarea,
+select {
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+button:focus-visible {
+  outline: none;
+  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 3px rgba(0, 222, 200, 0.12);
+}
+
+::placeholder {
+  color: var(--theme-field-placeholder);
+}
+
+::selection {
+  background: rgba(0, 213, 192, 0.3);
+  color: var(--theme-text);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(3, 18, 21, 0.72);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(0, 213, 192, 0.28);
+  border: 2px solid rgba(3, 18, 21, 0.72);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 213, 192, 0.4);
+}
+
+.mission-demo-interaction-highlight {
+  outline: 2px solid rgba(0, 222, 200, 0.72);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 222, 200, 0.16), 0 0 24px rgba(0, 222, 200, 0.22);
+}
