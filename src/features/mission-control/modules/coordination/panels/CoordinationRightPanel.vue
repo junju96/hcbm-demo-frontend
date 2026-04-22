@@ -15,7 +15,9 @@
             >
               <div class="coord-command-item-top">
                 <span class="coord-command-name">{{ command.name }}</span>
-                <span class="coord-command-badge" :class="command.statusTone">{{ command.statusText }}</span>
+                <span class="coord-command-badge" :class="resolveCommandStatusTone(command.commandId)">
+                  {{ resolveCommandStatusText(command.commandId) }}
+                </span>
               </div>
               <div class="coord-command-title">{{ command.title }}</div>
             </button>
@@ -185,6 +187,10 @@ const analysisResultMap = ref({});
 const selectedCommand = computed(() => commands.find((item) => item.commandId === selectedCommandId.value) || null);
 const selectedAnalysis = computed(() => analysisResultMap.value[selectedCommandId.value] || null);
 const hasAnalysisResult = computed(() => Boolean(selectedAnalysis.value));
+
+const hasDecomposeExecuted = (commandId) => Boolean(analysisResultMap.value?.[commandId]);
+const resolveCommandStatusText = (commandId) => (hasDecomposeExecuted(commandId) ? '已处理' : '待理解');
+const resolveCommandStatusTone = (commandId) => (hasDecomposeExecuted(commandId) ? 'done' : 'pending');
 
 const summarizeDependencyGroup = (label, ids = []) => (
   Array.isArray(ids) && ids.length ? `${label}${ids.join(',')}` : ''
