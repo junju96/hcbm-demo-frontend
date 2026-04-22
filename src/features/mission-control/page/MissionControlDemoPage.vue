@@ -2,8 +2,8 @@
   <MissionControlDemoAuxLayout
     v-if="screenMode === 'aux'"
     :active-module-label="activeModuleManifest?.label || activeModuleId"
-    :active-module-summary="activeModuleManifest?.rightPanel?.summary || leftPanelHint"
-    :active-module-title="activeModuleManifest?.rightPanel?.title || activeModuleManifest?.label || activeModuleId"
+    :active-module-summary="''"
+    :active-module-title="resolvedAuxModuleTitle"
     :show-task-board="showAuxTaskBoard"
     :detail-panel-visible="taskBoardDetailPanelVisible"
     :detail-panel-balance-key="taskBoardDetailPanelBalanceKey"
@@ -24,6 +24,7 @@
       <MissionControlDemoLayout
         :modules="modules"
         :active-module-id="activeModuleId"
+        :module-button-active-id="coordinationCommandActive ? '' : activeModuleId"
         :left-panels="[]"
         :left-panel-visible="false"
         :left-panel-resizing="false"
@@ -44,6 +45,8 @@
         :on-open-system-settings="handleSystemSettings"
         :on-open-vehicle-catalog="handleVehicleCatalog"
         :on-open-vehicle-control="handleEmergency"
+        :on-open-coordination-command="handleOpenCoordinationCommand"
+        :coordination-command-active="coordinationCommandActive"
         :on-mode-switch="handleSwitchScreenMode"
         :mode-switch-label="modeSwitchLabel"
         :on-screen-switch="handleSwitchScreen"
@@ -113,7 +116,7 @@
         <component
           :is="activeRightPanelComponent"
           class="aux-insight-panel"
-          :key="`aux-right-${activeModuleId}`"
+          :key="`aux-right-${activeModuleId}-${coordinationRefreshToken}`"
           :module-api="moduleApi"
           :panel-definition="rightPanelDefinition"
           :module-manifest="activeModuleManifest"
@@ -130,6 +133,7 @@
     :class="{ 'mission-main-mode': screenMode === 'main' }"
     :modules="modules"
     :active-module-id="activeModuleId"
+    :module-button-active-id="coordinationCommandActive ? '' : activeModuleId"
     :left-panels="visibleLeftPanels"
     :left-panel-visible="leftPanelVisible"
     :left-panel-resizing="leftPanelResizing"
@@ -150,6 +154,8 @@
     :on-open-system-settings="handleSystemSettings"
     :on-open-vehicle-catalog="handleVehicleCatalog"
     :on-open-vehicle-control="handleEmergency"
+    :on-open-coordination-command="handleOpenCoordinationCommand"
+    :coordination-command-active="coordinationCommandActive"
     :on-mode-switch="handleSwitchScreenMode"
     :mode-switch-label="modeSwitchLabel"
     :on-screen-switch="handleSwitchScreen"
@@ -197,7 +203,7 @@
       <component
         :is="activeRightPanelComponent"
         v-else-if="activeRightPanelComponent"
-        :key="`${screenMode}-${activeModuleId}`"
+        :key="`${screenMode}-${activeModuleId}-${coordinationRefreshToken}`"
         :module-api="moduleApi"
         :panel-definition="rightPanelDefinition"
         :module-manifest="activeModuleManifest"
@@ -284,6 +290,9 @@ const {
   handleSwitchScreenMode,
   handleSwitchScreen,
   handleExit,
+  openCoordinationCommand,
+  coordinationCommandActive,
+  coordinationRefreshToken,
   modeSwitchLabel,
   screenSwitchLabel,
   taskBoardDetailPanelVisible,
@@ -302,6 +311,12 @@ const showAuxTaskBoard = computed(() => props.screenMode === 'aux');
 const showMainAiDock = computed(() => false);
 const showAuxAiDock = computed(() => props.screenMode === 'aux');
 const rightPanelDefinition = computed(() => activeModuleManifest.value?.rightPanel || null);
+const resolvedAuxModuleTitle = computed(() => {
+  if (coordinationCommandActive.value) {
+    return moduleApi.coordination?.activeSubviewTitle || '任务理解';
+  }
+  return activeModuleManifest.value?.rightPanel?.title || activeModuleManifest.value?.label || activeModuleId.value;
+});
 const mainVideoDockOpen = ref(false);
 const aiDockWidth = ref(340);
 const aiDockResizing = ref(false);
@@ -455,6 +470,15 @@ const handleAuxSidebarSelect = (panelId) => {
 
 const handleAuxSelectModule = (moduleId) => {
   openModuleById(moduleId);
+  if (props.screenMode === 'aux') {
+    nextTick(() => {
+      openTaskBoardDetailPanel();
+    });
+  }
+};
+
+const handleOpenCoordinationCommand = () => {
+  openCoordinationCommand();
   if (props.screenMode === 'aux') {
     nextTick(() => {
       openTaskBoardDetailPanel();

@@ -32,11 +32,20 @@
           v-for="module in modules"
           :key="module.id"
           class="tab-btn mission-tab-btn"
-          :class="{ active: activeModuleId === module.id }"
+          :class="{ active: resolvedModuleButtonActiveId === module.id }"
           type="button"
           @click="onSelectModule(module.id)"
         >
           {{ module.label }}
+        </button>
+        <button
+          v-if="onOpenCoordinationCommand"
+          class="tab-btn mission-tab-btn mission-command-btn"
+          :class="{ active: coordinationCommandActive }"
+          type="button"
+          @click="onOpenCoordinationCommand"
+        >
+          {{ coordinationCommandLabel }}
         </button>
       </div>
       <div class="mission-tab-actions">
@@ -203,6 +212,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  moduleButtonActiveId: {
+    type: String,
+    default: null,
+  },
   leftPanels: {
     type: Array,
     default: () => [],
@@ -282,6 +295,10 @@ const props = defineProps({
   onOpenVehicleControl: {
     type: Function,
     required: true,
+  },
+  onOpenCoordinationCommand: {
+    type: Function,
+    default: null,
   },
   onModeSwitch: {
     type: Function,
@@ -379,6 +396,14 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  coordinationCommandLabel: {
+    type: String,
+    default: '协同指控',
+  },
+  coordinationCommandActive: {
+    type: Boolean,
+    default: false,
+  },
   onToggleRightDrawer: {
     type: Function,
     default: null,
@@ -405,6 +430,10 @@ const mainAreaStyle = computed(() => ({
       : null,
   ].filter(Boolean).join(' '),
 }));
+
+const resolvedModuleButtonActiveId = computed(
+  () => (props.moduleButtonActiveId == null ? props.activeModuleId : props.moduleButtonActiveId)
+);
 </script>
 
 <style scoped src="../MissionControlPage.css"></style>

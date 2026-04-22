@@ -1,28 +1,46 @@
 <template>
   <div class="coord-left-shell">
-    <div class="coord-card">
-      <div class="coord-title">协同简报</div>
-      <textarea
-        v-model="brief"
-        class="coord-textarea"
-        placeholder="输入协同简报内容"
-      ></textarea>
-    </div>
+    <template v-if="commandActive">
+      <button
+        v-for="item in coordinationSubviews"
+        :key="item.id"
+        class="coord-card coord-subview-panel"
+        :class="{ active: activeSubviewId === item.id }"
+        type="button"
+        @click="selectSubview(item.id)"
+      >
+        <div class="coord-title">{{ item.title }}</div>
+        <div class="coord-panel-copy">
+          {{ activeSubviewId === item.id ? '当前已选中，右侧区域会显示对应标题。' : '点击后刷新右侧“协同右侧插件”区域。' }}
+        </div>
+      </button>
+    </template>
 
-    <div class="coord-card">
-      <div class="coord-title">快速测试</div>
-      <div class="coord-actions">
-        <button class="coord-btn" type="button" @click="sendBrief">发送到对话</button>
-        <button class="coord-btn" type="button" @click="moduleApi.layout.openLeftPanel('shared-map-ops')">
-          切到公共地图插件
-        </button>
+    <template v-else>
+      <div class="coord-card">
+        <div class="coord-title">协同简报</div>
+        <textarea
+          v-model="brief"
+          class="coord-textarea"
+          placeholder="输入协同简报内容"
+        ></textarea>
       </div>
-    </div>
+
+      <div class="coord-card">
+        <div class="coord-title">快速测试</div>
+        <div class="coord-actions">
+          <button class="coord-btn" type="button" @click="sendBrief">发送到对话</button>
+          <button class="coord-btn" type="button" @click="moduleApi.layout.openLeftPanel('shared-map-ops')">
+            切到公共地图插件
+          </button>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
   moduleApi: {
@@ -35,7 +53,17 @@ const props = defineProps({
   },
 });
 
+const coordinationSubviews = computed(() => props.moduleApi.coordination?.subviews || []);
+const commandActive = computed(() => Boolean(props.moduleApi.coordination?.commandActive));
+const activeSubviewId = computed(() => props.moduleApi.coordination?.activeSubviewId || '');
+const activeSubviewTitle = computed(
+  () => props.moduleApi.coordination?.activeSubviewTitle || '任务理解'
+);
 const brief = ref('协同模块用于测试切换模块时公共插件是否保持选中。');
+
+const selectSubview = (subviewId) => {
+  props.moduleApi.coordination?.selectSubview?.(subviewId);
+};
 
 const sendBrief = () => {
   props.moduleApi.chat.appendSystemMessage(`[${props.moduleManifest.label}] ${brief.value}`);
@@ -75,6 +103,27 @@ const sendBrief = () => {
   background: rgba(10, 18, 22, 0.88);
   color: #f8fafc;
   padding: 0.75rem 0.8rem;
+}
+
+.coord-subview-panel {
+  width: 100%;
+  min-height: 120px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.coord-subview-panel.active {
+  border-color: rgba(0, 222, 200, 0.56);
+  background: linear-gradient(135deg, rgba(0, 173, 181, 0.28) 0%, rgba(4, 34, 39, 0.96) 100%);
+  transform: translateY(-1px);
+}
+
+.coord-panel-copy {
+  margin-top: 0.75rem;
+  margin-top: 0.75rem;
+  color: rgba(226, 232, 240, 0.74);
+  line-height: 1.7;
 }
 
 .coord-actions {

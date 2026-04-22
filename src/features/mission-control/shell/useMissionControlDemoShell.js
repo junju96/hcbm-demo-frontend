@@ -10,6 +10,14 @@ import { useMissionAutomationBridge } from './useMissionAutomationBridge';
 import { useMissionInteractionRegistry } from './useMissionInteractionRegistry';
 
 const SHARED_MAP_PANEL_ID = 'shared-map-ops';
+const COORDINATION_BRIEF_PANEL_ID = 'coord-brief';
+
+const COORDINATION_SUBVIEWS = Object.freeze([
+  { id: 'task-understanding', title: '任务理解' },
+  { id: 'plan-design', title: '方案规划' },
+  { id: 'action-sequence', title: '行动序列' },
+  { id: 'resource-list', title: '资源清单' },
+]);
 
 const ROUTE_ROLE_BY_PATH = {
   '/mission-control': 'single',
@@ -173,6 +181,9 @@ export function useMissionControlDemoShell({ screenMode = 'single', routeRole = 
       progressTone: 'danger',
     }),
   ]);
+  const activeCoordinationSubviewId = ref(COORDINATION_SUBVIEWS[0].id);
+  const coordinationRefreshToken = ref(0);
+  const coordinationCommandActive = ref(false);
 
   const panelVisibility = reactive({
     single: true,
@@ -259,6 +270,10 @@ export function useMissionControlDemoShell({ screenMode = 'single', routeRole = 
   const leftPanelVisible = computed(() => panelVisibility[currentScreenKey.value]);
   const leftPanelTitle = computed(() => activeLeftPanel.value?.title || '工作区');
   const leftPanelHint = computed(() => activeLeftPanel.value?.hint || '');
+  const activeCoordinationSubview = computed(() => (
+    COORDINATION_SUBVIEWS.find((item) => item.id === activeCoordinationSubviewId.value)
+    || COORDINATION_SUBVIEWS[0]
+  ));
 
   const scrollToBottom = () => {
     const element = chatMessagesRef.value;
@@ -404,7 +419,26 @@ export function useMissionControlDemoShell({ screenMode = 'single', routeRole = 
     if (!nextModuleId || !moduleIds.includes(nextModuleId)) {
       return;
     }
+    coordinationCommandActive.value = false;
     activeModuleId.value = nextModuleId;
+  };
+
+  const selectCoordinationSubview = (subviewId) => {
+    const nextSubview = COORDINATION_SUBVIEWS.find((item) => item.id === String(subviewId || '').trim())
+      || COORDINATION_SUBVIEWS[0];
+    activeCoordinationSubviewId.value = nextSubview.id;
+    coordinationRefreshToken.value += 1;
+  };
+
+  const openCoordinationCommand = () => {
+    openModuleById('coordination');
+    coordinationCommandActive.value = true;
+    panelVisibility[currentScreenKey.value] = true;
+
+    nextTick(() => {
+      openLeftPanel(COORDINATION_BRIEF_PANEL_ID);
+      selectCoordinationSubview(activeCoordinationSubviewId.value);
+    });
   };
 
   const bumpWorkspace = () => {
@@ -808,6 +842,16 @@ export function useMissionControlDemoShell({ screenMode = 'single', routeRole = 
       registerAction: actionRegistry.registerAction,
       lastCommandResult: automationBridge.lastCommandResult,
     },
+    coordination: {
+      subviews: COORDINATION_SUBVIEWS,
+      commandActive: coordinationCommandActive,
+      activeSubviewId: activeCoordinationSubviewId,
+      activeSubview: activeCoordinationSubview,
+      activeSubviewTitle: computed(() => activeCoordinationSubview.value.title),
+      refreshToken: coordinationRefreshToken,
+      openCommandCenter: openCoordinationCommand,
+      selectSubview: selectCoordinationSubview,
+    },
   });
 
   return {
@@ -848,6 +892,9 @@ export function useMissionControlDemoShell({ screenMode = 'single', routeRole = 
     handleExit,
     handleSwitchScreenMode,
     handleSwitchScreen,
+    openCoordinationCommand,
+    coordinationCommandActive,
+    coordinationRefreshToken,
     taskBoardDetailPanelVisible: taskBoard.detailPanelVisible,
     taskBoardDetailPanelBalanceKey: taskBoard.detailLayoutBalanceKey,
     openTaskBoardDetailPanel: taskBoard.openDetailPanel,
