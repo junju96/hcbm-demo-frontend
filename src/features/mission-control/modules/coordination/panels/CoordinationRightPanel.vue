@@ -99,31 +99,33 @@
             <header class="coord-result-header">
               <div class="coord-pane-title">标准化结果</div>
               <div class="coord-tabs">
-                <button
-                  class="coord-tab"
-                  :class="{ active: resultView === 'missions' }"
-                  type="button"
-                  :disabled="!hasAnalysisResult"
-                  @click="resultView = 'missions'"
-                >
-                  任务列表
-                </button>
-                <button
-                  class="coord-tab"
-                  :class="{ active: resultView === 'resources' }"
-                  type="button"
-                  :disabled="!hasAnalysisResult"
-                  @click="resultView = 'resources'"
-                >
-                  资源列表
-                </button>
+                <div class="coord-tabs-group">
+                  <button
+                    class="coord-tab"
+                    :class="{ active: resultView === 'missions' }"
+                    type="button"
+                    :disabled="!hasAnalysisResult"
+                    @click="resultView = 'missions'"
+                  >
+                    任务列表
+                  </button>
+                  <button
+                    class="coord-tab"
+                    :class="{ active: resultView === 'resources' }"
+                    type="button"
+                    :disabled="!hasAnalysisResult"
+                    @click="resultView = 'resources'"
+                  >
+                    资源列表
+                  </button>
+                </div>
                 <button
                   class="coord-tab coord-detail-toggle"
                   type="button"
                   :disabled="!hasAnalysisResult"
                   @click="detailsExpanded = !detailsExpanded"
                 >
-                  {{ detailsExpanded ? '收起详细条目' : '展开详细条目' }}
+                  {{ detailsExpanded ? '收起面板' : '展开面板' }}
                 </button>
               </div>
             </header>
@@ -652,7 +654,15 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 
 .coord-tabs {
   display: flex;
-  gap: 0.4rem;
+  gap: 0;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.coord-tabs-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
 }
 
 .coord-tab.active {
@@ -667,7 +677,29 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 }
 
 .coord-detail-toggle {
-  margin-left: 0.15rem;
+  margin-left: 1.5rem;
+  min-height: 34px;
+  padding: 0.4rem 0.72rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 222, 200, 0.22);
+  background: rgba(10, 18, 22, 0.88);
+  color: #f8fafc;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.coord-detail-toggle:hover {
+  border-color: rgba(0, 222, 200, 0.34);
+  background: rgba(12, 24, 30, 0.9);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
+}
+
+.coord-detail-toggle:disabled {
+  opacity: 0.5;
+  box-shadow: none;
 }
 
 .coord-empty-state {
