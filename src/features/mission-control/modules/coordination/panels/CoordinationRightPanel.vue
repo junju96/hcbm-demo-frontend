@@ -117,14 +117,88 @@
               </div>
 
               <div v-if="resultView === 'missions'" class="coord-list">
-                <div v-for="mission in selectedAnalysis.missions" :key="mission.mission_id" class="coord-list-row">
-                  <div class="coord-list-main">
-                    <span class="coord-list-tag">任务 {{ mission.mission_id }}</span>
-                    <span class="coord-list-title">{{ mission.mission_name }}</span>
+                <div
+                  v-for="mission in selectedAnalysis.missions"
+                  :key="mission.mission_id"
+                  class="coord-list-row"
+                  :class="{ editing: editingMissionId === mission.mission_id }"
+                >
+                  <div class="coord-mission-row-head">
+                    <div class="coord-list-main">
+                      <span class="coord-list-tag">任务 {{ mission.mission_id }}</span>
+                      <span v-if="editingMissionId !== mission.mission_id" class="coord-list-title">{{ mission.mission_name }}</span>
+                    </div>
+
+                    <div class="coord-mission-row-actions">
+                      <button
+                        v-if="editingMissionId !== mission.mission_id"
+                        class="coord-btn coord-mini-btn"
+                        type="button"
+                        @click="startEditMission(mission)"
+                      >
+                        修改
+                      </button>
+                      <template v-else>
+                        <button class="coord-btn primary coord-mini-btn" type="button" @click="saveEditMission">
+                          保存
+                        </button>
+                        <button class="coord-btn coord-mini-btn" type="button" @click="cancelEditMission">
+                          取消
+                        </button>
+                      </template>
+                    </div>
                   </div>
-                  <div v-if="detailsExpanded" class="coord-list-detail">{{ mission.mission_detail.content }}</div>
-                  <div v-if="detailsExpanded" class="coord-list-sub">区域：{{ mission.mission_detail.target }} ｜ 时间：{{ mission.mission_detail.time }}</div>
-                  <div v-if="detailsExpanded" class="coord-list-sub">依赖：{{ formatMissionDependencies(mission.dependencies) }}</div>
+
+                  <template v-if="detailsExpanded || editingMissionId === mission.mission_id">
+                    <template v-if="editingMissionId === mission.mission_id">
+                      <div class="coord-edit-grid">
+                        <label class="coord-edit-row">
+                          <span class="coord-edit-label">任务名称</span>
+                          <input v-model="missionDraft.mission_name" class="coord-edit-input" type="text" />
+                        </label>
+                        <label class="coord-edit-row">
+                          <span class="coord-edit-label">内容</span>
+                          <input v-model="missionDraft.content" class="coord-edit-input" type="text" />
+                        </label>
+                        <label class="coord-edit-row">
+                          <span class="coord-edit-label">任务区域</span>
+                          <input v-model="missionDraft.target" class="coord-edit-input" type="text" />
+                        </label>
+                        <label class="coord-edit-row">
+                          <span class="coord-edit-label">开始时间</span>
+                          <input v-model="missionDraft.time" class="coord-edit-input" type="text" />
+                        </label>
+                        <label class="coord-edit-row">
+                          <span class="coord-edit-label">结束时间</span>
+                          <input v-model="missionDraft.duration" class="coord-edit-input" type="text" />
+                        </label>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <div class="coord-display-grid">
+                        <div class="coord-display-row">
+                          <span class="coord-display-label">内容</span>
+                          <span class="coord-display-value">{{ mission.mission_detail.content }}</span>
+                        </div>
+                        <div class="coord-display-row">
+                          <span class="coord-display-label">任务区域</span>
+                          <span class="coord-display-value">{{ mission.mission_detail.target }}</span>
+                        </div>
+                        <div class="coord-display-row">
+                          <span class="coord-display-label">开始时间</span>
+                          <span class="coord-display-value">{{ mission.mission_detail.time }}</span>
+                        </div>
+                        <div class="coord-display-row">
+                          <span class="coord-display-label">结束时间</span>
+                          <span class="coord-display-value">{{ mission.mission_detail.duration }}</span>
+                        </div>
+                        <div class="coord-display-row">
+                          <span class="coord-display-label">依赖</span>
+                          <span class="coord-display-value">{{ formatMissionDependencies(mission.dependencies) }}</span>
+                        </div>
+                      </div>
+                    </template>
+                  </template>
                 </div>
               </div>
 
@@ -134,8 +208,20 @@
                     <span class="coord-list-tag resource">资源 {{ resource.resource_id }}</span>
                     <span class="coord-list-title">{{ resource.resource_name }}</span>
                   </div>
-                  <div v-if="detailsExpanded" class="coord-list-detail">类型：{{ resource.resource_type }} ｜ 属性：{{ resource.resource_detail.type }}</div>
-                  <div v-if="detailsExpanded" class="coord-list-sub">坐标点：{{ resource.resource_detail.location.length }}</div>
+                  <div v-if="detailsExpanded" class="coord-display-grid">
+                    <div class="coord-display-row">
+                      <span class="coord-display-label">资源类型</span>
+                      <span class="coord-display-value">{{ resource.resource_type }}</span>
+                    </div>
+                    <div class="coord-display-row">
+                      <span class="coord-display-label">区域属性</span>
+                      <span class="coord-display-value">{{ resource.resource_detail.type }}</span>
+                    </div>
+                    <div class="coord-display-row">
+                      <span class="coord-display-label">坐标点数</span>
+                      <span class="coord-display-value">{{ resource.resource_detail.location.length }}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -183,6 +269,14 @@ const parsing = ref(false);
 const resultView = ref('missions');
 const detailsExpanded = ref(true);
 const analysisResultMap = ref({});
+const editingMissionId = ref(null);
+const missionDraft = ref({
+  mission_name: '',
+  content: '',
+  target: '',
+  time: '',
+  duration: '',
+});
 
 const selectedCommand = computed(() => commands.find((item) => item.commandId === selectedCommandId.value) || null);
 const selectedAnalysis = computed(() => analysisResultMap.value[selectedCommandId.value] || null);
@@ -207,6 +301,13 @@ const formatMissionDependencies = (dependencies = {}) => {
 
 watch(selectedCommandId, () => {
   resultView.value = 'missions';
+  editingMissionId.value = null;
+});
+
+watch(resultView, (view) => {
+  if (view !== 'missions') {
+    editingMissionId.value = null;
+  }
 });
 
 const handleForward = () => {
@@ -279,16 +380,70 @@ const parseSelectedCommand = async () => {
     `[任务理解] 命令 ${command.commandId} 解析完成，共提取 ${mockAnalysisByCommandId[command.commandId].missions.length} 个任务、${mockAnalysisByCommandId[command.commandId].resources.length} 个资源。`
   );
 };
+
+const startEditMission = (mission) => {
+  editingMissionId.value = mission.mission_id;
+  missionDraft.value = {
+    mission_name: mission.mission_name || '',
+    content: mission.mission_detail?.content || '',
+    target: mission.mission_detail?.target || '',
+    time: mission.mission_detail?.time || '',
+    duration: mission.mission_detail?.duration || '',
+  };
+};
+
+const cancelEditMission = () => {
+  editingMissionId.value = null;
+};
+
+const saveEditMission = () => {
+  const commandId = selectedCommandId.value;
+  const missionId = editingMissionId.value;
+  const current = analysisResultMap.value[commandId];
+  if (!commandId || !missionId || !current) {
+    return;
+  }
+
+  const nextMissions = (current.missions || []).map((mission) => {
+    if (mission.mission_id !== missionId) {
+      return mission;
+    }
+    return {
+      ...mission,
+      mission_name: missionDraft.value.mission_name,
+      mission_detail: {
+        ...mission.mission_detail,
+        content: missionDraft.value.content,
+        target: missionDraft.value.target,
+        time: missionDraft.value.time,
+        duration: missionDraft.value.duration,
+      },
+    };
+  });
+
+  analysisResultMap.value = {
+    ...analysisResultMap.value,
+    [commandId]: {
+      ...current,
+      missions: nextMissions,
+    },
+  };
+
+  props.moduleApi.chat.appendSystemMessage(
+    `[任务理解] 任务 ${missionId} 字段已更新（演示态，仅前端生效）。`
+  );
+  editingMissionId.value = null;
+};
 </script>
 
 <style scoped>
 .coord-right-shell {
-  --coord-border: rgba(0, 208, 188, 0.34);
-  --coord-border-soft: rgba(0, 208, 188, 0.2);
+  --coord-border: rgba(0, 208, 188, 0.4);
+  --coord-border-soft: rgba(0, 208, 188, 0.26);
   --coord-bg: rgba(1, 16, 22, 0.84);
   --coord-bg-strong: rgba(1, 12, 18, 0.92);
-  --coord-text: #e8fcff;
-  --coord-text-soft: rgba(214, 244, 248, 0.7);
+  --coord-text: #f1feff;
+  --coord-text-soft: rgba(226, 246, 248, 0.86);
   --coord-accent: #00dec8;
   --coord-accent-soft: rgba(0, 222, 200, 0.12);
   display: flex;
@@ -327,15 +482,17 @@ const parseSelectedCommand = async () => {
 
 .coord-pane-title {
   color: var(--coord-text);
-  font-size: 1.02rem;
-  font-weight: 700;
+  font-size: 1.24rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-shadow: 0 0 14px rgba(0, 222, 200, 0.16);
 }
 
 .coord-pane-subtitle {
   margin-top: 0.38rem;
   color: var(--coord-text-soft);
-  font-size: 0.9rem;
-  line-height: 1.65;
+  font-size: 0.98rem;
+  line-height: 1.7;
 }
 
 .coord-command-list {
@@ -353,14 +510,20 @@ const parseSelectedCommand = async () => {
   background: var(--coord-bg-strong);
   color: var(--coord-text);
   text-align: left;
-  padding: 0.56rem 0.62rem;
+  padding: 0.66rem 0.72rem;
   cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
 .coord-command-item.active {
   border-color: var(--coord-border);
   border-left-color: var(--coord-accent);
   background: linear-gradient(180deg, var(--coord-accent-soft), rgba(0, 49, 72, 0.03)), var(--coord-bg-strong);
+}
+
+.coord-command-item:hover {
+  border-color: rgba(0, 222, 200, 0.42);
+  transform: translateY(-1px);
 }
 
 .coord-command-item-top {
@@ -372,30 +535,31 @@ const parseSelectedCommand = async () => {
 
 .coord-command-name {
   font-weight: 700;
-  font-size: 0.86rem;
+  font-size: 0.96rem;
 }
 
 .coord-command-title {
-  margin-top: 0.3rem;
-  color: rgba(232, 252, 255, 0.8);
-  font-size: 0.82rem;
+  margin-top: 0.38rem;
+  color: rgba(236, 252, 255, 0.92);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .coord-command-badge {
   border-radius: 999px;
-  padding: 0.08rem 0.44rem;
-  font-size: 0.66rem;
+  padding: 0.16rem 0.56rem;
+  font-size: 0.74rem;
   font-weight: 700;
 }
 
 .coord-command-badge.pending {
-  background: rgba(229, 168, 11, 0.14);
-  color: #ffd56a;
+  background: rgba(229, 168, 11, 0.2);
+  color: #ffe28c;
 }
 
 .coord-command-badge.done {
-  background: rgba(0, 222, 200, 0.16);
-  color: #95fff5;
+  background: rgba(0, 222, 200, 0.2);
+  color: #b4fff8;
 }
 
 .coord-right-pane {
@@ -433,15 +597,16 @@ const parseSelectedCommand = async () => {
 }
 
 .coord-meta-label {
-  color: rgba(185, 235, 241, 0.7);
-  font-size: 0.74rem;
+  color: rgba(191, 237, 243, 0.88);
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 .coord-meta-value {
   display: block;
   margin-top: 0.26rem;
   color: var(--coord-text);
-  font-size: 0.84rem;
+  font-size: 0.93rem;
   font-weight: 600;
 }
 
@@ -465,7 +630,7 @@ const parseSelectedCommand = async () => {
   white-space: pre-wrap;
   word-break: break-word;
   text-indent: 2em;
-  font-size: 0.92rem;
+  font-size: 1rem;
 }
 
 .coord-command-actions {
@@ -477,23 +642,32 @@ const parseSelectedCommand = async () => {
 
 .coord-btn,
 .coord-tab {
-  min-height: 34px;
-  padding: 0 0.8rem;
+  min-height: 36px;
+  padding: 0 0.92rem;
   border-radius: 9px;
   border: 1px solid var(--coord-border-soft);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--coord-text);
   cursor: pointer;
+  font-size: 0.97rem;
+  font-weight: 700;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.coord-btn:hover,
+.coord-tab:hover {
+  border-color: rgba(0, 222, 200, 0.5);
+  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.12);
 }
 
 .coord-btn.primary {
   border-color: var(--coord-border);
-  background: linear-gradient(180deg, rgba(0, 86, 91, 0.36), rgba(0, 42, 43, 0.92));
+  background: linear-gradient(180deg, rgba(0, 110, 116, 0.44), rgba(0, 56, 58, 0.96));
 }
 
 .coord-btn.danger {
-  border-color: rgba(216, 27, 27, 0.34);
-  background: rgba(109, 46, 46, 0.56);
+  border-color: rgba(243, 98, 98, 0.52);
+  background: linear-gradient(180deg, rgba(143, 54, 54, 0.78), rgba(111, 38, 38, 0.84));
 }
 
 .coord-btn:disabled,
@@ -542,7 +716,16 @@ const parseSelectedCommand = async () => {
   flex-wrap: wrap;
   gap: 0.65rem;
   color: rgba(204, 247, 243, 0.85);
-  font-size: 0.84rem;
+  font-size: 0.93rem;
+}
+
+.coord-result-summary span {
+  border-radius: 999px;
+  border: 1px solid rgba(0, 222, 200, 0.28);
+  background: rgba(0, 222, 200, 0.09);
+  color: #c8fffa;
+  padding: 0.18rem 0.62rem;
+  font-weight: 700;
 }
 
 .coord-list {
@@ -560,16 +743,25 @@ const parseSelectedCommand = async () => {
   padding: 0.54rem 0.64rem;
 }
 
+.coord-list-row.editing {
+  border-color: rgba(0, 222, 200, 0.42);
+  background:
+    linear-gradient(180deg, rgba(0, 222, 200, 0.12), rgba(0, 222, 200, 0.05)),
+    rgba(6, 24, 28, 0.86);
+  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.14);
+}
+
 .coord-list-main {
   display: flex;
   align-items: center;
   gap: 0.45rem;
+  min-width: 0;
 }
 
 .coord-list-tag {
   border-radius: 999px;
   padding: 0.12rem 0.5rem;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
   background: rgba(0, 222, 200, 0.16);
   color: #95fff5;
@@ -583,7 +775,8 @@ const parseSelectedCommand = async () => {
 .coord-list-title {
   color: var(--coord-text);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1.08rem;
+  line-height: 1.4;
 }
 
 .coord-list-detail,
@@ -597,6 +790,97 @@ const parseSelectedCommand = async () => {
 
 .coord-list-sub {
   color: var(--coord-text-soft);
+}
+
+.coord-display-grid {
+  margin-top: 0.38rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.36rem;
+}
+
+.coord-display-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: start;
+  gap: 0.5rem;
+}
+
+.coord-display-label {
+  color: rgba(207, 236, 241, 0.92);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.coord-display-value {
+  color: rgba(241, 254, 255, 0.98);
+  font-size: 1rem;
+  line-height: 1.55;
+  text-indent: 0;
+  word-break: break-word;
+}
+
+.coord-mission-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.coord-mission-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 0 0 auto;
+}
+
+.coord-mini-btn {
+  min-height: 32px;
+  min-width: 72px;
+  padding: 0 0.72rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.coord-edit-grid {
+  margin-top: 0.38rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.48rem;
+}
+
+.coord-edit-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.coord-edit-label {
+  color: rgba(182, 255, 252, 0.88);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.coord-edit-input {
+  width: 100%;
+  min-height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 222, 200, 0.34);
+  background: rgba(7, 30, 34, 0.52);
+  color: var(--coord-text);
+  padding: 0 0.66rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.coord-edit-input:focus {
+  outline: none;
+  border-color: rgba(0, 222, 200, 0.68);
+  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.18);
 }
 
 .coord-placeholder {
