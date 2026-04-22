@@ -92,6 +92,14 @@
                 >
                   资源列表
                 </button>
+                <button
+                  class="coord-tab coord-detail-toggle"
+                  type="button"
+                  :disabled="!hasAnalysisResult"
+                  @click="detailsExpanded = !detailsExpanded"
+                >
+                  {{ detailsExpanded ? '收起详细条目' : '展开详细条目' }}
+                </button>
               </div>
             </header>
 
@@ -112,8 +120,9 @@
                     <span class="coord-list-tag">任务 {{ mission.mission_id }}</span>
                     <span class="coord-list-title">{{ mission.mission_name }}</span>
                   </div>
-                  <div class="coord-list-detail">{{ mission.mission_detail.content }}</div>
-                  <div class="coord-list-sub">区域：{{ mission.mission_detail.target }} ｜ 时间：{{ mission.mission_detail.time }}</div>
+                  <div v-if="detailsExpanded" class="coord-list-detail">{{ mission.mission_detail.content }}</div>
+                  <div v-if="detailsExpanded" class="coord-list-sub">区域：{{ mission.mission_detail.target }} ｜ 时间：{{ mission.mission_detail.time }}</div>
+                  <div v-if="detailsExpanded" class="coord-list-sub">依赖：{{ formatMissionDependencies(mission.dependencies) }}</div>
                 </div>
               </div>
 
@@ -123,8 +132,8 @@
                     <span class="coord-list-tag resource">资源 {{ resource.resource_id }}</span>
                     <span class="coord-list-title">{{ resource.resource_name }}</span>
                   </div>
-                  <div class="coord-list-detail">类型：{{ resource.resource_type }} ｜ 属性：{{ resource.resource_detail.type }}</div>
-                  <div class="coord-list-sub">坐标点：{{ resource.resource_detail.location.length }}</div>
+                  <div v-if="detailsExpanded" class="coord-list-detail">类型：{{ resource.resource_type }} ｜ 属性：{{ resource.resource_detail.type }}</div>
+                  <div v-if="detailsExpanded" class="coord-list-sub">坐标点：{{ resource.resource_detail.location.length }}</div>
                 </div>
               </div>
             </div>
@@ -143,6 +152,13 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import MissionRightPanelShell from '../../../shared/layout/MissionRightPanelShell.vue';
+import {
+  COORDINATION_API_URLS,
+  buildUpdateRequest,
+  buildUpdateResponse,
+  commandRecords,
+  createMockAnalysisByCommand,
+} from '../data/commandDataModel';
 
 const props = defineProps({
   moduleApi: {
@@ -157,237 +173,31 @@ const props = defineProps({
 
 const activeSubviewId = computed(() => props.moduleApi.coordination?.activeSubviewId || 'task-understanding');
 const activeSubviewTitle = computed(() => props.moduleApi.coordination?.activeSubviewTitle || '任务理解');
-
-const commands = [
-  {
-    commandId: 'CMD-20260401-001',
-    name: '命令 1',
-    title: '进攻战斗命令',
-    sender: '上级指挥中心',
-    receivedAt: '2026-03-29 08:30:00',
-    priority: '高',
-    statusText: '已处理',
-    statusTone: 'done',
-    content: 'D方在东部10km外设立了一个重要J事目标，请立即对该目标进行ZC确认，于2026年4月1日18:00查明该区域。主要任务为：1. 立即集结，进行战前准备。2. 根据Q报部门提供的坐标，J事目标所在区域为A。3. 利用隐蔽手段接近目标，在区域B实施ZC。4. ZC结束后，迅速撤离战场，返回基地。',
-  },
-  {
-    commandId: 'CMD-20260401-002',
-    name: '命令 2',
-    title: '目标打击指令',
-    sender: '联合火力中心',
-    receivedAt: '2026-03-29 09:15:00',
-    priority: '高',
-    statusText: '待理解',
-    statusTone: 'pending',
-    content: '对重点目标进行持续侦察与打击窗口准备。完成区域A态势确认后，组织前出至区域B隐蔽集结，做好打击引导与撤收准备。',
-  },
-  {
-    commandId: 'CMD-20260401-003',
-    name: '命令 3',
-    title: '区域封控命令',
-    sender: '战区联控组',
-    receivedAt: '2026-03-29 10:00:00',
-    priority: '中',
-    statusText: '待理解',
-    statusTone: 'pending',
-    content: '组织分队对区域C执行阶段性封控，建立巡检点位，保持通信回传，配合主任务保障行动。',
-  },
-];
-
-const mockAnalysisByCommandId = {
-  'CMD-20260401-001': {
-    request_body: {
-      RequestType: 'DECOMPOSE',
-      RequestID: '87654321',
-      RequestData: { CommandID: 'CMD-20260401-001' },
-    },
-    response_body: {
-      code: 200,
-      responseID: '87654321',
-      data: {
-        commandId: 'CMD-20260401-001',
-        Analys_results: {
-          mission_info: [1, 2, 3],
-          resource_info: [1, 2],
-        },
-      },
-    },
-    missions: [
-      {
-        mission_id: 1,
-        mission_name: '区域侦察命令-机动任务',
-        mission_type: 'MANEUVER_TASK',
-        mission_detail: {
-          content: '利用隐蔽手段，机动到B区域',
-          description: '利用隐蔽手段，机动到B区域，确认目标事J事目标',
-          target: '区域B',
-          time: '2026-03-30 18:00:00',
-          duration: '待定',
-        },
-      },
-      {
-        mission_id: 2,
-        mission_name: '区域侦察命令-侦查任务',
-        mission_type: 'RECON_TASK',
-        mission_detail: {
-          content: '侦查区域B',
-          description: '侦查区域B，确认目标事J事目标',
-          target: '区域B',
-          time: '2026-03-30 18:00:00',
-          duration: '待定',
-        },
-      },
-      {
-        mission_id: 3,
-        mission_name: '区域侦察命令-撤离任务',
-        mission_type: 'MANEUVER_TASK',
-        mission_detail: {
-          content: '迅速撤离战场，返回基地',
-          description: 'ZC结束后，迅速撤离战场，返回基地',
-          target: '基地',
-          time: '2026-03-30 18:00:00',
-          duration: '待定',
-        },
-      },
-    ],
-    resources: [
-      {
-        resource_id: 1,
-        resource_name: '区域A',
-        resource_type: 'REGION',
-        resource_detail: {
-          type: 'neutral',
-          location: [
-            { point: 'region_point_1', latitude: '115.704931', longitude: '40.281571', altitude: '2.123' },
-            { point: 'region_point_2', latitude: '114.704931', longitude: '41.281571', altitude: '3.123' },
-          ],
-        },
-      },
-      {
-        resource_id: 2,
-        resource_name: '区域B',
-        resource_type: 'REGION',
-        resource_detail: {
-          type: 'neutral',
-          location: [
-            { point: 'region_point_1', latitude: '115.708035', longitude: '40.287294', altitude: '3.427' },
-            { point: 'region_point_2', latitude: '114.708925', longitude: '41.287294', altitude: '3.427' },
-          ],
-        },
-      },
-    ],
-  },
-  'CMD-20260401-002': {
-    request_body: {
-      RequestType: 'DECOMPOSE',
-      RequestID: '87654322',
-      RequestData: { CommandID: 'CMD-20260401-002' },
-    },
-    response_body: {
-      code: 200,
-      responseID: '87654322',
-      data: {
-        commandId: 'CMD-20260401-002',
-        Analys_results: {
-          mission_info: [1, 2],
-          resource_info: [1],
-        },
-      },
-    },
-    missions: [
-      {
-        mission_id: 1,
-        mission_name: '目标打击指令-侦察确认任务',
-        mission_type: 'RECON_TASK',
-        mission_detail: {
-          content: '完成区域A态势确认',
-          description: '对重点目标进行持续侦察，确认区域A目标态势',
-          target: '区域A',
-          time: '2026-03-29 10:00:00',
-          duration: '00:30:00',
-        },
-      },
-      {
-        mission_id: 2,
-        mission_name: '目标打击指令-隐蔽集结任务',
-        mission_type: 'MANEUVER_TASK',
-        mission_detail: {
-          content: '前出至区域B隐蔽集结',
-          description: '组织力量前出至区域B，做好打击引导与撤收准备',
-          target: '区域B',
-          time: '2026-03-29 11:00:00',
-          duration: '待定',
-        },
-      },
-    ],
-    resources: [
-      {
-        resource_id: 1,
-        resource_name: '区域A',
-        resource_type: 'REGION',
-        resource_detail: {
-          type: 'enemy',
-          location: [
-            { point: 'region_point_1', latitude: '115.800001', longitude: '40.300001', altitude: '5.100' },
-            { point: 'region_point_2', latitude: '115.820001', longitude: '40.310001', altitude: '5.120' },
-          ],
-        },
-      },
-    ],
-  },
-  'CMD-20260401-003': {
-    request_body: {
-      RequestType: 'DECOMPOSE',
-      RequestID: '87654323',
-      RequestData: { CommandID: 'CMD-20260401-003' },
-    },
-    response_body: {
-      code: 200,
-      responseID: '87654323',
-      data: {
-        commandId: 'CMD-20260401-003',
-        Analys_results: {
-          mission_info: [1],
-          resource_info: [1],
-        },
-      },
-    },
-    missions: [
-      {
-        mission_id: 1,
-        mission_name: '区域封控命令-巡检任务',
-        mission_type: 'PATROL_TASK',
-        mission_detail: {
-          content: '建立巡检点位并执行阶段巡检',
-          description: '组织分队对区域C执行阶段封控并巡检',
-          target: '区域C',
-          time: '2026-03-29 12:00:00',
-          duration: '02:00:00',
-        },
-      },
-    ],
-    resources: [
-      {
-        resource_id: 1,
-        resource_name: '区域C',
-        resource_type: 'REGION',
-        resource_detail: {
-          type: 'neutral',
-          location: [{ point: 'region_point_1', latitude: '115.910001', longitude: '40.110001', altitude: '2.200' }],
-        },
-      },
-    ],
-  },
-};
+const commands = commandRecords;
+const mockAnalysisByCommandId = createMockAnalysisByCommand();
 
 const selectedCommandId = ref(commands[0]?.commandId || '');
 const parsing = ref(false);
 const resultView = ref('missions');
+const detailsExpanded = ref(true);
 const analysisResultMap = ref({});
 
 const selectedCommand = computed(() => commands.find((item) => item.commandId === selectedCommandId.value) || null);
 const selectedAnalysis = computed(() => analysisResultMap.value[selectedCommandId.value] || null);
 const hasAnalysisResult = computed(() => Boolean(selectedAnalysis.value));
+
+const summarizeDependencyGroup = (label, ids = []) => (
+  Array.isArray(ids) && ids.length ? `${label}${ids.join(',')}` : ''
+);
+
+const formatMissionDependencies = (dependencies = {}) => {
+  const parts = [
+    summarizeDependencyGroup('命令:', dependencies.commands),
+    summarizeDependencyGroup('任务:', dependencies.missions),
+    summarizeDependencyGroup('资源:', dependencies.resources),
+  ].filter(Boolean);
+  return parts.length ? parts.join(' / ') : '无';
+};
 
 watch(selectedCommandId, () => {
   resultView.value = 'missions';
@@ -399,12 +209,43 @@ const handleForward = () => {
 };
 
 const handleAssociate = () => {
-  props.moduleApi.chat.appendSystemMessage(`[任务理解] 已关联命令：${selectedCommand.value?.name || ''}`);
+  const command = selectedCommand.value;
+  if (!command) {
+    return;
+  }
+  const selected = selectedAnalysis.value;
+  const request = buildUpdateRequest({
+    operation: 'associate',
+    commandIds: [command.cmd_id],
+    missionIds: selected?.missions?.map((item) => item.mission_id) || [],
+    resourceIds: selected?.resources?.map((item) => item.resource_id) || [],
+  });
+  const response = buildUpdateResponse({
+    operation: 'associate',
+    requestId: request.RequestID,
+  });
+  props.moduleApi.chat.appendSystemMessage(
+    `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 关联命令（RequestID=${request.RequestID}，result=${response.data.result}）。`
+  );
   props.moduleApi.chat.open();
 };
 
 const handleDelete = () => {
-  props.moduleApi.chat.appendSystemMessage(`[任务理解] 删除操作仅做演示，未真正删除：${selectedCommand.value?.name || ''}`);
+  const command = selectedCommand.value;
+  if (!command) {
+    return;
+  }
+  const request = buildUpdateRequest({
+    operation: 'delete',
+    commandIds: [command.cmd_id],
+  });
+  const response = buildUpdateResponse({
+    operation: 'delete',
+    requestId: request.RequestID,
+  });
+  props.moduleApi.chat.appendSystemMessage(
+    `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 删除命令（RequestID=${request.RequestID}，result=${response.data.result}），当前仍为演示模式未真实删除。`
+  );
   props.moduleApi.chat.open();
 };
 
@@ -415,7 +256,9 @@ const parseSelectedCommand = async () => {
   }
 
   parsing.value = true;
-  props.moduleApi.chat.appendSystemMessage(`[任务理解] 已发送命令 ${command.commandId} 到后端解析（当前为假数据模拟）。`);
+  props.moduleApi.chat.appendSystemMessage(
+    `[任务理解] 已发送命令 ${command.commandId} 到 ${COORDINATION_API_URLS.decompose}（当前为假数据模拟）。`
+  );
 
   await new Promise((resolve) => window.setTimeout(resolve, 800));
 
@@ -446,6 +289,9 @@ const parseSelectedCommand = async () => {
   width: 100%;
   height: auto;
   min-height: 100%;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--coord-text);
 }
 
 .coord-layout {
@@ -475,13 +321,14 @@ const parseSelectedCommand = async () => {
 
 .coord-pane-title {
   color: var(--coord-text);
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 700;
 }
 
 .coord-pane-subtitle {
   margin-top: 0.38rem;
   color: var(--coord-text-soft);
+  font-size: 0.9rem;
   line-height: 1.65;
 }
 
@@ -500,7 +347,7 @@ const parseSelectedCommand = async () => {
   background: var(--coord-bg-strong);
   color: var(--coord-text);
   text-align: left;
-  padding: 0.72rem 0.76rem;
+  padding: 0.56rem 0.62rem;
   cursor: pointer;
 }
 
@@ -519,18 +366,19 @@ const parseSelectedCommand = async () => {
 
 .coord-command-name {
   font-weight: 700;
+  font-size: 0.86rem;
 }
 
 .coord-command-title {
-  margin-top: 0.45rem;
-  color: rgba(232, 252, 255, 0.84);
-  font-size: 0.9rem;
+  margin-top: 0.3rem;
+  color: rgba(232, 252, 255, 0.8);
+  font-size: 0.82rem;
 }
 
 .coord-command-badge {
   border-radius: 999px;
-  padding: 0.16rem 0.54rem;
-  font-size: 0.72rem;
+  padding: 0.08rem 0.44rem;
+  font-size: 0.66rem;
   font-weight: 700;
 }
 
@@ -580,14 +428,14 @@ const parseSelectedCommand = async () => {
 
 .coord-meta-label {
   color: rgba(185, 235, 241, 0.7);
-  font-size: 0.76rem;
+  font-size: 0.74rem;
 }
 
 .coord-meta-value {
   display: block;
   margin-top: 0.26rem;
   color: var(--coord-text);
-  font-size: 0.87rem;
+  font-size: 0.84rem;
   font-weight: 600;
 }
 
@@ -610,6 +458,8 @@ const parseSelectedCommand = async () => {
   min-height: 120px;
   white-space: pre-wrap;
   word-break: break-word;
+  text-indent: 2em;
+  font-size: 0.92rem;
 }
 
 .coord-command-actions {
@@ -651,6 +501,7 @@ const parseSelectedCommand = async () => {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .coord-tabs {
@@ -661,6 +512,10 @@ const parseSelectedCommand = async () => {
 .coord-tab.active {
   border-color: var(--coord-border);
   background: linear-gradient(180deg, var(--coord-accent-soft), rgba(0, 49, 72, 0.03));
+}
+
+.coord-detail-toggle {
+  margin-left: 0.15rem;
 }
 
 .coord-empty-state {
@@ -681,7 +536,7 @@ const parseSelectedCommand = async () => {
   flex-wrap: wrap;
   gap: 0.65rem;
   color: rgba(204, 247, 243, 0.85);
-  font-size: 0.82rem;
+  font-size: 0.84rem;
 }
 
 .coord-list {
@@ -696,7 +551,7 @@ const parseSelectedCommand = async () => {
   border-radius: 10px;
   border: 1px solid var(--coord-border-soft);
   background: rgba(0, 16, 22, 0.62);
-  padding: 0.58rem 0.68rem;
+  padding: 0.54rem 0.64rem;
 }
 
 .coord-list-main {
@@ -722,6 +577,7 @@ const parseSelectedCommand = async () => {
 .coord-list-title {
   color: var(--coord-text);
   font-weight: 700;
+  font-size: 0.95rem;
 }
 
 .coord-list-detail,
@@ -729,6 +585,8 @@ const parseSelectedCommand = async () => {
   margin-top: 0.3rem;
   color: rgba(223, 246, 248, 0.82);
   line-height: 1.55;
+  text-indent: 1.6em;
+  font-size: 0.9rem;
 }
 
 .coord-list-sub {
