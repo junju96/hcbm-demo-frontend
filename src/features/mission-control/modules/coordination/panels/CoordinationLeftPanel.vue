@@ -6,6 +6,7 @@
         :key="item.id"
         class="coord-card coord-subview-panel"
         :class="{ active: activeSubviewId === item.id }"
+        v-bind="buildSubviewTargetAttrs(item)"
         type="button"
         @click="selectSubview(item.id)"
       >
@@ -41,6 +42,9 @@
 
 <script setup>
 import { computed, ref } from 'vue';
+import {
+  createInteractionTargetAttrs,
+} from '../../../shared/interaction/createInteractionTarget';
 
 const props = defineProps({
   moduleApi: {
@@ -51,15 +55,27 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  panelDefinition: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
 const coordinationSubviews = computed(() => props.moduleApi.coordination?.subviews || []);
 const commandActive = computed(() => Boolean(props.moduleApi.coordination?.commandActive));
 const activeSubviewId = computed(() => props.moduleApi.coordination?.activeSubviewId || '');
-const activeSubviewTitle = computed(
-  () => props.moduleApi.coordination?.activeSubviewTitle || '任务理解'
-);
 const brief = ref('协同模块用于测试切换模块时公共插件是否保持选中。');
+
+const buildSubviewTargetAttrs = (item) => createInteractionTargetAttrs({
+  targetId: `coordination:subview:${item?.id || ''}`,
+  targetType: 'subview-entry',
+  label: item?.title || '',
+  route: '/mission-control/aux',
+  moduleId: 'coordination',
+  panelId: 'coord-brief',
+  sourceComponent: 'CoordinationLeftPanel',
+  actions: ['coordination:switch-subview'],
+});
 
 const selectSubview = (subviewId) => {
   props.moduleApi.coordination?.selectSubview?.(subviewId);

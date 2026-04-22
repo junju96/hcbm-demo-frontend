@@ -10,6 +10,7 @@
               :key="command.commandId"
               class="coord-command-item"
               :class="{ active: selectedCommandId === command.commandId }"
+              v-bind="buildCommandTargetAttrs(command)"
               type="button"
               @click="selectedCommandId = command.commandId"
             >
@@ -58,13 +59,35 @@
             </div>
 
             <footer class="coord-command-actions">
-              <button class="coord-btn" type="button" @click="handleForward">转发</button>
-              <button class="coord-btn" type="button" @click="handleAssociate">关联</button>
-              <button class="coord-btn danger" type="button" @click="handleDelete">删除</button>
+              <button
+                class="coord-btn"
+                type="button"
+                v-bind="buildCommandActionAttrs('coordination:forward-command', '转发命令')"
+                @click="handleForward"
+              >
+                转发
+              </button>
+              <button
+                class="coord-btn"
+                type="button"
+                v-bind="buildCommandActionAttrs('coordination:associate-command', '关联命令')"
+                @click="handleAssociate"
+              >
+                关联
+              </button>
+              <button
+                class="coord-btn danger"
+                type="button"
+                v-bind="buildCommandActionAttrs('coordination:delete-command', '删除命令')"
+                @click="handleDelete"
+              >
+                删除
+              </button>
               <button
                 class="coord-btn primary"
                 type="button"
                 :disabled="parsing"
+                v-bind="buildCommandActionAttrs('coordination:decompose-command', '执行任务理解')"
                 @click="parseSelectedCommand"
               >
                 {{ parsing ? '解析中...' : hasAnalysisResult ? '重新任务理解' : '任务理解' }}
@@ -122,6 +145,7 @@
                   :key="mission.mission_id"
                   class="coord-list-row"
                   :class="{ editing: editingMissionId === mission.mission_id }"
+                  v-bind="buildMissionTargetAttrs(mission)"
                 >
                   <div class="coord-mission-row-head">
                     <div class="coord-list-main">
@@ -134,15 +158,26 @@
                         v-if="editingMissionId !== mission.mission_id"
                         class="coord-btn coord-mini-btn"
                         type="button"
+                        v-bind="buildMissionActionAttrs('coordination:edit-mission', '修改任务', mission)"
                         @click="startEditMission(mission)"
                       >
                         修改
                       </button>
                       <template v-else>
-                        <button class="coord-btn primary coord-mini-btn" type="button" @click="saveEditMission">
+                        <button
+                          class="coord-btn primary coord-mini-btn"
+                          type="button"
+                          v-bind="buildMissionActionAttrs('coordination:save-mission', '保存任务修改', mission)"
+                          @click="saveEditMission"
+                        >
                           保存
                         </button>
-                        <button class="coord-btn coord-mini-btn" type="button" @click="cancelEditMission">
+                        <button
+                          class="coord-btn coord-mini-btn"
+                          type="button"
+                          v-bind="buildMissionActionAttrs('coordination:cancel-edit-mission', '取消任务修改', mission)"
+                          @click="cancelEditMission"
+                        >
                           取消
                         </button>
                       </template>
@@ -203,7 +238,12 @@
               </div>
 
               <div v-else class="coord-list">
-                <div v-for="resource in selectedAnalysis.resources" :key="resource.resource_id" class="coord-list-row">
+                <div
+                  v-for="resource in selectedAnalysis.resources"
+                  :key="resource.resource_id"
+                  class="coord-list-row"
+                  v-bind="buildResourceTargetAttrs(resource)"
+                >
                   <div class="coord-list-main">
                     <span class="coord-list-tag resource">资源 {{ resource.resource_id }}</span>
                     <span class="coord-list-title">{{ resource.resource_name }}</span>
@@ -257,15 +297,13 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import MissionRightPanelShell from '../../../shared/layout/MissionRightPanelShell.vue';
 import {
-  COORDINATION_API_URLS,
-  buildUpdateRequest,
-  buildUpdateResponse,
-  commandRecords,
-  createMockAnalysisByCommand,
-} from '../data/commandDataModel';
+  createInteractionActionAttrs,
+  createInteractionTargetAttrs,
+} from '../../../shared/interaction/createInteractionTarget';
+import { useTaskUnderstandingState } from '../state/useTaskUnderstandingState';
 
 const props = defineProps({
   moduleApi: {
@@ -276,186 +314,92 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  panelDefinition: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
 const activeSubviewId = computed(() => props.moduleApi.coordination?.activeSubviewId || 'task-understanding');
 const activeSubviewTitle = computed(() => props.moduleApi.coordination?.activeSubviewTitle || '任务理解');
-const commands = commandRecords;
-const mockAnalysisByCommandId = createMockAnalysisByCommand();
+const {
+  commands,
+  selectedCommandId,
+  parsing,
+  resultView,
+  detailsExpanded,
+  editingMissionId,
+  missionDraft,
+  selectedCommand,
+  selectedAnalysis,
+  hasAnalysisResult,
+  resolveCommandStatusText,
+  resolveCommandStatusTone,
+  formatMissionDependencies,
+  handleForward,
+  handleAssociate,
+  handleDelete,
+  parseSelectedCommand,
+  startEditMission,
+  cancelEditMission,
+  saveEditMission,
+} = useTaskUnderstandingState({ moduleApi: props.moduleApi });
 
-const selectedCommandId = ref(commands[0]?.commandId || '');
-const parsing = ref(false);
-const resultView = ref('missions');
-const detailsExpanded = ref(true);
-const analysisResultMap = ref({});
-const editingMissionId = ref(null);
-const missionDraft = ref({
-  mission_name: '',
-  content: '',
-  target: '',
-  time: '',
-  duration: '',
+const resolveCommandTargetId = (command) => `coordination:command:${command?.commandId || ''}`;
+const resolveMissionTargetId = (mission) => `coordination:mission:${mission?.mission_id || ''}`;
+const resolveResourceTargetId = (resource) => `coordination:resource:${resource?.resource_id || ''}`;
+
+const buildCommandTargetAttrs = (command) => createInteractionTargetAttrs({
+  targetId: resolveCommandTargetId(command),
+  targetType: 'command-item',
+  label: command?.name || '',
+  route: '/mission-control/aux',
+  moduleId: 'coordination',
+  panelId: 'coord-brief',
+  sourceComponent: 'CoordinationRightPanel',
+  textPreview: command?.title || '',
+  actions: [
+    'coordination:forward-command',
+    'coordination:associate-command',
+    'coordination:delete-command',
+    'coordination:decompose-command',
+  ],
 });
 
-const selectedCommand = computed(() => commands.find((item) => item.commandId === selectedCommandId.value) || null);
-const selectedAnalysis = computed(() => analysisResultMap.value[selectedCommandId.value] || null);
-const hasAnalysisResult = computed(() => Boolean(selectedAnalysis.value));
-
-const hasDecomposeExecuted = (commandId) => Boolean(analysisResultMap.value?.[commandId]);
-const resolveCommandStatusText = (commandId) => (hasDecomposeExecuted(commandId) ? '已处理' : '待理解');
-const resolveCommandStatusTone = (commandId) => (hasDecomposeExecuted(commandId) ? 'done' : 'pending');
-
-const formatMissionDependencies = (dependencies = {}) => {
-  const mapGroup = (label, ids = []) => (
-    Array.isArray(ids) ? ids.filter((id) => id !== null && id !== undefined).map((id) => `${label}${id}`) : []
-  );
-
-  const items = [
-    ...mapGroup('命令', dependencies.commands),
-    ...mapGroup('任务', dependencies.missions),
-    ...mapGroup('资源', dependencies.resources),
-    ...mapGroup('方案', dependencies.plans),
-    ...mapGroup('临机方案', dependencies.instant_plans),
-  ];
-
-  return items.length ? items.join('，') : '无';
-};
-
-watch(selectedCommandId, () => {
-  resultView.value = 'missions';
-  editingMissionId.value = null;
+const buildCommandActionAttrs = (actionId, label) => createInteractionActionAttrs({
+  actionId,
+  label,
+  targetId: resolveCommandTargetId(selectedCommand.value),
 });
 
-watch(resultView, (view) => {
-  if (view !== 'missions') {
-    editingMissionId.value = null;
-  }
+const buildMissionTargetAttrs = (mission) => createInteractionTargetAttrs({
+  targetId: resolveMissionTargetId(mission),
+  targetType: 'mission-item',
+  label: mission?.mission_name || '',
+  route: '/mission-control/aux',
+  moduleId: 'coordination',
+  panelId: 'coord-brief',
+  sourceComponent: 'CoordinationRightPanel',
+  textPreview: mission?.mission_detail?.content || '',
+  actions: ['coordination:edit-mission', 'coordination:save-mission', 'coordination:cancel-edit-mission'],
 });
 
-const handleForward = () => {
-  props.moduleApi.chat.appendSystemMessage(`[任务理解] 已转发命令：${selectedCommand.value?.name || ''}`);
-  props.moduleApi.chat.open();
-};
+const buildMissionActionAttrs = (actionId, label, mission) => createInteractionActionAttrs({
+  actionId,
+  label,
+  targetId: resolveMissionTargetId(mission),
+});
 
-const handleAssociate = () => {
-  const command = selectedCommand.value;
-  if (!command) {
-    return;
-  }
-  const selected = selectedAnalysis.value;
-  const request = buildUpdateRequest({
-    operation: 'associate',
-    commandIds: [command.cmd_id],
-    missionIds: selected?.missions?.map((item) => item.mission_id) || [],
-    resourceIds: selected?.resources?.map((item) => item.resource_id) || [],
-  });
-  const response = buildUpdateResponse({
-    operation: 'associate',
-    requestId: request.RequestID,
-  });
-  props.moduleApi.chat.appendSystemMessage(
-    `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 关联命令（RequestID=${request.RequestID}，result=${response.data.result}）。`
-  );
-  props.moduleApi.chat.open();
-};
-
-const handleDelete = () => {
-  const command = selectedCommand.value;
-  if (!command) {
-    return;
-  }
-  const request = buildUpdateRequest({
-    operation: 'delete',
-    commandIds: [command.cmd_id],
-  });
-  const response = buildUpdateResponse({
-    operation: 'delete',
-    requestId: request.RequestID,
-  });
-  props.moduleApi.chat.appendSystemMessage(
-    `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 删除命令（RequestID=${request.RequestID}，result=${response.data.result}），当前仍为演示模式未真实删除。`
-  );
-  props.moduleApi.chat.open();
-};
-
-const parseSelectedCommand = async () => {
-  const command = selectedCommand.value;
-  if (!command || parsing.value) {
-    return;
-  }
-
-  parsing.value = true;
-  props.moduleApi.chat.appendSystemMessage(
-    `[任务理解] 已发送命令 ${command.commandId} 到 ${COORDINATION_API_URLS.decompose}（当前为假数据模拟）。`
-  );
-
-  await new Promise((resolve) => window.setTimeout(resolve, 800));
-
-  analysisResultMap.value = {
-    ...analysisResultMap.value,
-    [command.commandId]: mockAnalysisByCommandId[command.commandId],
-  };
-
-  parsing.value = false;
-  resultView.value = 'missions';
-  props.moduleApi.chat.appendSystemMessage(
-    `[任务理解] 命令 ${command.commandId} 解析完成，共提取 ${mockAnalysisByCommandId[command.commandId].missions.length} 个任务、${mockAnalysisByCommandId[command.commandId].resources.length} 个资源。`
-  );
-};
-
-const startEditMission = (mission) => {
-  editingMissionId.value = mission.mission_id;
-  missionDraft.value = {
-    mission_name: mission.mission_name || '',
-    content: mission.mission_detail?.content || '',
-    target: mission.mission_detail?.target || '',
-    time: mission.mission_detail?.time || '',
-    duration: mission.mission_detail?.duration || '',
-  };
-};
-
-const cancelEditMission = () => {
-  editingMissionId.value = null;
-};
-
-const saveEditMission = () => {
-  const commandId = selectedCommandId.value;
-  const missionId = editingMissionId.value;
-  const current = analysisResultMap.value[commandId];
-  if (!commandId || !missionId || !current) {
-    return;
-  }
-
-  const nextMissions = (current.missions || []).map((mission) => {
-    if (mission.mission_id !== missionId) {
-      return mission;
-    }
-    return {
-      ...mission,
-      mission_name: missionDraft.value.mission_name,
-      mission_detail: {
-        ...mission.mission_detail,
-        content: missionDraft.value.content,
-        target: missionDraft.value.target,
-        time: missionDraft.value.time,
-        duration: missionDraft.value.duration,
-      },
-    };
-  });
-
-  analysisResultMap.value = {
-    ...analysisResultMap.value,
-    [commandId]: {
-      ...current,
-      missions: nextMissions,
-    },
-  };
-
-  props.moduleApi.chat.appendSystemMessage(
-    `[任务理解] 任务 ${missionId} 字段已更新（演示态，仅前端生效）。`
-  );
-  editingMissionId.value = null;
-};
+const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
+  targetId: resolveResourceTargetId(resource),
+  targetType: 'resource-item',
+  label: resource?.resource_name || '',
+  route: '/mission-control/aux',
+  moduleId: 'coordination',
+  panelId: 'coord-brief',
+  sourceComponent: 'CoordinationRightPanel',
+  textPreview: resource?.resource_type || '',
+});
 </script>
 
 <style scoped>
