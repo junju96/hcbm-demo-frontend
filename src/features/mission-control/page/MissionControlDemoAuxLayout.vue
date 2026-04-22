@@ -35,13 +35,16 @@
 
       <section ref="secondaryShellRef" class="aux-secondary-shell">
         <section
-          v-if="showTaskBoard"
+          v-if="showTaskBoard && taskBoardVisible"
           class="aux-stage aux-board-stage"
           :style="taskBoardStyle"
         >
           <div class="aux-stage-head aux-stage-head-with-actions">
             <div class="aux-stage-head-copy">
               <div class="aux-stage-title">多车任务看板</div>
+            </div>
+            <div class="aux-stage-head-actions">
+              <button class="aux-pane-toggle" type="button" @click="collapseTaskBoard">收起面板</button>
             </div>
           </div>
           <div class="aux-stage-body">
@@ -52,7 +55,16 @@
         </section>
 
         <button
-          v-if="showTaskBoard && detailPanelVisible"
+          v-else-if="showTaskBoard"
+          class="aux-detail-trigger"
+          type="button"
+          @click="expandTaskBoard"
+        >
+          多车任务看板
+        </button>
+
+        <button
+          v-if="showTaskBoard && taskBoardVisible && detailPanelVisible"
           class="aux-splitter aux-row-splitter"
           type="button"
           aria-label="调整多车任务看板高度"
@@ -188,6 +200,7 @@ const props = defineProps({
 
 const leftStageWidth = ref(340);
 const expandedBoardHeight = ref(360);
+const taskBoardVisible = ref(true);
 const secondaryShellRef = ref(null);
 const columnResizing = ref(false);
 const rowResizing = ref(false);
@@ -235,7 +248,7 @@ const getBalancedBoardHeight = () => {
 
 const normalizeLayout = () => {
   leftStageWidth.value = clampLeftStageWidth(leftStageWidth.value);
-  if (props.showTaskBoard && props.detailPanelVisible) {
+  if (props.showTaskBoard && taskBoardVisible.value && props.detailPanelVisible) {
     expandedBoardHeight.value = getBalancedBoardHeight();
     return;
   }
@@ -297,7 +310,7 @@ const startColumnResize = (event) => {
 };
 
 const startRowResize = (event) => {
-  if (!props.showTaskBoard) {
+  if (!props.showTaskBoard || !taskBoardVisible.value) {
     return;
   }
 
@@ -349,7 +362,7 @@ const taskBoardStyle = computed(() => {
 });
 
 watch(
-  () => [props.showTaskBoard, props.detailPanelVisible],
+  () => [props.showTaskBoard, props.detailPanelVisible, taskBoardVisible.value],
   () => {
     queueNormalizeLayout();
   },
@@ -359,12 +372,28 @@ watch(
 watch(
   () => props.detailPanelBalanceKey,
   () => {
-    if (!props.showTaskBoard || !props.detailPanelVisible) {
+    if (!props.showTaskBoard || !taskBoardVisible.value || !props.detailPanelVisible) {
       return;
     }
     expandedBoardHeight.value = getBalancedBoardHeight();
   }
 );
+
+const collapseTaskBoard = () => {
+  taskBoardVisible.value = false;
+  stopRowResize();
+  queueNormalizeLayout();
+};
+
+const expandTaskBoard = () => {
+  taskBoardVisible.value = true;
+  queueNormalizeLayout();
+  nextTick(() => {
+    if (props.showTaskBoard && props.detailPanelVisible) {
+      expandedBoardHeight.value = getBalancedBoardHeight();
+    }
+  });
+};
 
 onMounted(() => {
   if (typeof window !== 'undefined') {
@@ -377,7 +406,7 @@ onMounted(() => {
 
     if (typeof ResizeObserver !== 'undefined' && secondaryShellRef.value) {
       secondaryShellResizeObserver = new ResizeObserver(() => {
-        if (props.showTaskBoard && props.detailPanelVisible) {
+        if (props.showTaskBoard && taskBoardVisible.value && props.detailPanelVisible) {
           expandedBoardHeight.value = getBalancedBoardHeight();
           return;
         }
