@@ -221,6 +221,25 @@
                       <span class="coord-display-label">坐标点数</span>
                       <span class="coord-display-value">{{ resource.resource_detail.location.length }}</span>
                     </div>
+
+                    <div class="coord-point-block">
+                      <div class="coord-point-head">
+                        <span>点位</span>
+                        <span>纬度</span>
+                        <span>经度</span>
+                        <span>高度</span>
+                      </div>
+                      <div
+                        v-for="point in resource.resource_detail.location"
+                        :key="`${resource.resource_id}-${point.point}`"
+                        class="coord-point-row"
+                      >
+                        <span>{{ point.point }}</span>
+                        <span>{{ point.latitude }}</span>
+                        <span>{{ point.longitude }}</span>
+                        <span>{{ point.altitude }}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -819,6 +838,36 @@ const saveEditMission = () => {
   line-height: 1.55;
   text-indent: 0;
   word-break: break-word;
+}
+
+.coord-point-block {
+  margin-top: 0.32rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 222, 200, 0.24);
+  background: rgba(2, 18, 26, 0.62);
+  overflow: hidden;
+}
+
+.coord-point-head,
+.coord-point-row {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr 0.8fr;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.46rem 0.56rem;
+}
+
+.coord-point-head {
+  background: rgba(0, 222, 200, 0.1);
+  color: #b9fffa;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.coord-point-row {
+  border-top: 1px solid rgba(0, 222, 200, 0.12);
+  color: rgba(227, 248, 251, 0.92);
+  font-size: 0.84rem;
 }
 
 .coord-mission-row-head {

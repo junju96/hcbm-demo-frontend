@@ -239,6 +239,8 @@ export const resourceRecords = Object.freeze([
       location: [
         { point: 'region_point_1', latitude: '115.704931', longitude: '40.281571', altitude: '2.123' },
         { point: 'region_point_2', latitude: '114.704931', longitude: '41.281571', altitude: '3.123' },
+        { point: 'region_point_3', latitude: '116.704931', longitude: '42.281571', altitude: '4.123' },
+        { point: 'region_point_4', latitude: '117.704931', longitude: '44.281571', altitude: '6.123' },
       ],
     },
   },
@@ -251,6 +253,8 @@ export const resourceRecords = Object.freeze([
       location: [
         { point: 'region_point_1', latitude: '115.708035', longitude: '40.287294', altitude: '3.427' },
         { point: 'region_point_2', latitude: '114.708925', longitude: '41.287294', altitude: '3.427' },
+        { point: 'region_point_3', latitude: '116.704931', longitude: '42.281571', altitude: '4.123' },
+        { point: 'region_point_4', latitude: '117.704931', longitude: '44.281571', altitude: '6.123' },
       ],
     },
   },
