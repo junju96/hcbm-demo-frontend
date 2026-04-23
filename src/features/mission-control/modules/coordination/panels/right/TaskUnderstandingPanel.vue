@@ -3,7 +3,7 @@
     <div class="coord-layout">
       <aside class="coord-panel coord-left-pane">
         <div class="coord-pane-title">命令列表</div>
-        <div class="coord-command-list">
+        <div v-if="commands.length" class="coord-command-list">
           <button
             v-for="command in commands"
             :key="command.commandId"
@@ -21,6 +21,9 @@
             </div>
             <div class="coord-command-title">{{ command.title }}</div>
           </button>
+        </div>
+        <div v-else class="coord-empty-state coord-left-empty-state">
+          当前没有可展示的命令，请等待新命令下发或重新初始化数据。
         </div>
       </aside>
 
@@ -94,7 +97,7 @@
                 class="coord-btn danger"
                 type="button"
                 v-bind="buildCommandActionAttrs('coordination:delete-command', '删除命令')"
-                @click="handleDelete"
+                @click="openDeleteDialog"
               >
                 删除
               </button>
@@ -108,7 +111,11 @@
             >
               {{ parsing ? '解析中...' : hasAnalysisResult ? '重新任务理解' : '任务理解' }}
             </button>
-          </footer>
+            </footer>
+          </article>
+        <article v-else class="coord-panel coord-command-panel coord-command-empty-panel">
+          <div class="coord-pane-title">任务理解</div>
+          <div class="coord-pane-subtitle">当前没有命令数据，命令概要、命令详情和操作区已自动清空。</div>
         </article>
 
         <article class="coord-panel coord-result-panel">
@@ -146,7 +153,11 @@
             </div>
           </header>
 
-          <div v-if="!hasAnalysisResult" class="coord-empty-state">
+          <div v-if="!commands.length" class="coord-empty-state">
+            当前无命令数据，标准化结果面板暂不显示任务列表和资源列表。
+          </div>
+
+          <div v-else-if="!hasAnalysisResult" class="coord-empty-state">
             点击上方“任务理解”后，在这里展示结构化任务与资源列表。
           </div>
 
@@ -305,10 +316,24 @@
         </article>
       </section>
     </div>
+
+    <div v-if="deleteDialogVisible" class="coord-dialog-mask" @click.self="closeDeleteDialog">
+      <div class="coord-dialog">
+        <div class="coord-dialog-title">删除确认</div>
+        <div class="coord-dialog-text">
+          是否删除当前命令“{{ selectedCommand?.name || '' }}”？删除后会同步清理本地数据库中的该命令及其解析结果。
+        </div>
+        <div class="coord-dialog-actions">
+          <button class="coord-btn coord-mini-btn" type="button" @click="closeDeleteDialog">取消</button>
+          <button class="coord-btn danger coord-mini-btn" type="button" @click="confirmDeleteCommand">确定</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import {
   createInteractionActionAttrs,
   createInteractionTargetAttrs,
@@ -347,12 +372,32 @@ const {
   formatMissionDependencies,
   handleForward,
   handleAssociate,
-  handleDelete,
+  removeSelectedCommand,
   parseSelectedCommand,
   startEditMission,
   cancelEditMission,
   saveEditMission,
 } = useTaskUnderstandingState({ moduleApi: props.moduleApi });
+
+const deleteDialogVisible = ref(false);
+
+const openDeleteDialog = () => {
+  if (!selectedCommand.value) {
+    return;
+  }
+  deleteDialogVisible.value = true;
+};
+
+const closeDeleteDialog = () => {
+  deleteDialogVisible.value = false;
+};
+
+const confirmDeleteCommand = () => {
+  const deleted = removeSelectedCommand();
+  if (deleted) {
+    closeDeleteDialog();
+  }
+};
 
 const resolveCommandTargetId = (command) => `coordination:command:${command?.commandId || ''}`;
 const resolveMissionTargetId = (mission) => `coordination:mission:${mission?.mission_id || ''}`;
@@ -450,6 +495,7 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 .coord-left-pane { display: flex; flex-direction: column; padding: 0.9rem; }
 .coord-pane-title { color: var(--coord-text); font-size: 1.24rem; font-weight: 800; letter-spacing: 0.01em; text-shadow: 0 0 14px rgba(0, 222, 200, 0.16); }
 .coord-command-list { margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.62rem; min-height: fit-content; }
+.coord-left-empty-state { margin-top: 0.8rem; }
 .coord-command-item { border-radius: 12px; border: 1px solid var(--coord-border-soft); border-left: 3px solid rgba(0, 222, 200, 0.36); background: var(--coord-bg-strong); color: var(--coord-text); text-align: left; padding: 0.66rem 0.72rem; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, transform 160ms ease; }
 .coord-command-item.active { border-color: var(--coord-border); border-left-color: var(--coord-accent); background: linear-gradient(180deg, var(--coord-accent-soft), rgba(0, 49, 72, 0.03)), var(--coord-bg-strong); }
 .coord-command-item:hover { border-color: rgba(0, 222, 200, 0.42); transform: translateY(-1px); }
@@ -462,6 +508,7 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 
 .coord-right-pane { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; min-height: fit-content; }
 .coord-command-panel, .coord-result-panel { padding: 0.95rem; min-width: 0; }
+.coord-command-empty-panel { min-height: 220px; justify-content: center; display: flex; flex-direction: column; }
 
 .coord-command-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem; }
 .coord-command-title-main { color: #f7fdff; font-size: 1.22rem; font-weight: 800; line-height: 1.25; letter-spacing: 0.01em; }
@@ -539,6 +586,50 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 
 .coord-result-panel .coord-tab { min-height: 34px; font-size: 0.88rem; font-weight: 700; padding: 0 0.82rem; }
 .coord-result-panel .coord-detail-toggle { min-height: 34px; font-size: 0.78rem; }
+
+.coord-dialog-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 10, 14, 0.58);
+  backdrop-filter: blur(4px);
+}
+
+.coord-dialog {
+  width: min(420px, calc(100vw - 32px));
+  border-radius: 16px;
+  border: 1px solid rgba(0, 208, 188, 0.42);
+  background:
+    linear-gradient(180deg, rgba(0, 213, 192, 0.08), rgba(0, 49, 72, 0.02)),
+    rgba(5, 18, 24, 0.96);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 222, 200, 0.06),
+    0 18px 40px rgba(0, 0, 0, 0.36);
+  padding: 1rem;
+}
+
+.coord-dialog-title {
+  color: #f1feff;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.coord-dialog-text {
+  margin-top: 0.58rem;
+  color: rgba(226, 246, 248, 0.88);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.coord-dialog-actions {
+  margin-top: 0.82rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.52rem;
+}
 
 @media (max-width: 1200px) {
   .coord-layout { grid-template-columns: 220px minmax(0, 1fr); }

@@ -3,7 +3,7 @@
     <div class="coord-resource-layout">
       <aside class="coord-panel coord-resource-left">
         <div class="coord-pane-title">资源列表</div>
-        <div class="coord-resource-list">
+        <div v-if="resources.length" class="coord-resource-list">
           <button
             v-for="resource in resources"
             :key="resource.resource_id"
@@ -19,6 +19,9 @@
             </div>
             <div class="coord-resource-sub">{{ resource.resource_type }}</div>
           </button>
+        </div>
+        <div v-else class="coord-resource-empty-state">
+          当前没有可展示的资源，请先完成命令解析或检查本地数据。
         </div>
       </aside>
 
@@ -65,18 +68,38 @@
           </div>
         </div>
       </section>
+
+      <section v-else class="coord-panel coord-resource-right coord-resource-empty-panel">
+        <div class="coord-pane-title">资源清单</div>
+        <div class="coord-resource-empty-copy">当前没有已解析的资源数据，右侧详情区已自动清空。</div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { createInteractionTargetAttrs } from '../../../../shared/interaction/createInteractionTarget';
-import { resourceRecords } from '../../data/commandDataModel';
+import { commandRecords, resourceRecords } from '../../data/commandDataModel';
+import { loadTaskUnderstandingDb } from '../../state/taskUnderstandingLocalDb';
 
-const resources = resourceRecords;
+const taskDb = loadTaskUnderstandingDb({ mockCommands: commandRecords });
+const resourceIdSet = new Set(
+  Object.values(taskDb.analysisResultMap || {})
+    .flatMap((item) => item?.resources || [])
+    .map((item) => item?.resource_id)
+    .filter((id) => id !== null && id !== undefined)
+);
+
+const resources = resourceRecords.filter((item) => resourceIdSet.has(item.resource_id));
 const selectedResourceId = ref(resources[0]?.resource_id || null);
 const selectedResource = computed(() => resources.find((item) => item.resource_id === selectedResourceId.value) || null);
+
+watch(selectedResource, (value) => {
+  if (!value) {
+    selectedResourceId.value = resources[0]?.resource_id || null;
+  }
+}, { immediate: true });
 
 const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   targetId: `coordination:resource:${resource?.resource_id || ''}`,
@@ -122,6 +145,13 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   padding: 0.9rem;
 }
 
+.coord-resource-empty-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 240px;
+}
+
 .coord-pane-title {
   color: var(--coord-text);
   font-size: 1.14rem;
@@ -133,6 +163,16 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   display: flex;
   flex-direction: column;
   gap: 0.52rem;
+}
+
+.coord-resource-empty-state,
+.coord-resource-empty-copy {
+  margin-top: 0.72rem;
+  border-radius: 12px;
+  border: 1px dashed var(--coord-border-soft);
+  color: rgba(226, 246, 248, 0.86);
+  padding: 0.86rem 0.9rem;
+  line-height: 1.7;
 }
 
 .coord-resource-item {

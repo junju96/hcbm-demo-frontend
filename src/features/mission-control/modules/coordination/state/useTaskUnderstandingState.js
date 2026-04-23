@@ -119,10 +119,10 @@ export function useTaskUnderstandingState({ moduleApi }) {
     moduleApi.chat.open();
   };
 
-  const handleDelete = () => {
+  const removeSelectedCommand = () => {
     const command = selectedCommand.value;
     if (!command) {
-      return;
+      return false;
     }
     const request = buildUpdateRequest({
       operation: 'delete',
@@ -136,6 +136,14 @@ export function useTaskUnderstandingState({ moduleApi }) {
       `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 删除命令（RequestID=${request.RequestID}，result=${response.data.result}），当前仍为演示模式未真实删除。`
     );
     moduleApi.chat.open();
+    commands.value = commands.value.filter((item) => item.commandId !== command.commandId);
+    const nextAnalysisMap = { ...analysisResultMap.value };
+    delete nextAnalysisMap[command.commandId];
+    analysisResultMap.value = nextAnalysisMap;
+    selectedCommandId.value = commands.value[0]?.commandId || '';
+    editingMissionId.value = null;
+    resultView.value = 'missions';
+    return true;
   };
 
   const parseSelectedCommand = async () => {
@@ -235,7 +243,7 @@ export function useTaskUnderstandingState({ moduleApi }) {
     formatMissionDependencies,
     handleForward,
     handleAssociate,
-    handleDelete,
+    removeSelectedCommand,
     parseSelectedCommand,
     startEditMission,
     cancelEditMission,
