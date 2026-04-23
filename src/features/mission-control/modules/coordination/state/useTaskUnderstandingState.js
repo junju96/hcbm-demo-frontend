@@ -6,16 +6,21 @@ import {
   commandRecords,
   createMockAnalysisByCommand,
 } from '../data/commandDataModel';
+import {
+  loadTaskUnderstandingDb,
+  saveTaskUnderstandingDb,
+} from './taskUnderstandingLocalDb';
 
 export function useTaskUnderstandingState({ moduleApi }) {
-  const commands = commandRecords;
+  const initialDb = loadTaskUnderstandingDb({ mockCommands: commandRecords });
+  const commands = ref(initialDb.commands);
   const mockAnalysisByCommandId = createMockAnalysisByCommand();
 
-  const selectedCommandId = ref(commands[0]?.commandId || '');
+  const selectedCommandId = ref(initialDb.selectedCommandId || commands.value[0]?.commandId || '');
   const parsing = ref(false);
   const resultView = ref('missions');
   const detailsExpanded = ref(true);
-  const analysisResultMap = ref({});
+  const analysisResultMap = ref(initialDb.analysisResultMap || {});
   const editingMissionId = ref(null);
   const missionDraft = ref({
     mission_name: '',
@@ -25,13 +30,17 @@ export function useTaskUnderstandingState({ moduleApi }) {
     duration: '',
   });
 
-  const selectedCommand = computed(() => commands.find((item) => item.commandId === selectedCommandId.value) || null);
+  const selectedCommand = computed(() => commands.value.find((item) => item.commandId === selectedCommandId.value) || null);
   const selectedAnalysis = computed(() => analysisResultMap.value[selectedCommandId.value] || null);
   const hasAnalysisResult = computed(() => Boolean(selectedAnalysis.value));
 
   const hasDecomposeExecuted = (commandId) => Boolean(analysisResultMap.value?.[commandId]);
   const resolveCommandStatusText = (commandId) => (hasDecomposeExecuted(commandId) ? '已处理' : '待理解');
   const resolveCommandStatusTone = (commandId) => (hasDecomposeExecuted(commandId) ? 'done' : 'pending');
+
+  if (selectedCommandId.value && !commands.value.some((item) => item.commandId === selectedCommandId.value)) {
+    selectedCommandId.value = commands.value[0]?.commandId || '';
+  }
 
   const formatDateTimeCn = (value) => {
     const text = String(value || '').trim();
@@ -70,6 +79,18 @@ export function useTaskUnderstandingState({ moduleApi }) {
       editingMissionId.value = null;
     }
   });
+
+  watch(
+    [commands, analysisResultMap, selectedCommandId],
+    () => {
+      saveTaskUnderstandingDb({
+        commands: commands.value,
+        analysisResultMap: analysisResultMap.value,
+        selectedCommandId: selectedCommandId.value,
+      });
+    },
+    { deep: true }
+  );
 
   const handleForward = () => {
     moduleApi.chat.appendSystemMessage(`[任务理解] 已转发命令：${selectedCommand.value?.name || ''}`);
