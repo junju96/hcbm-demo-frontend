@@ -32,6 +32,44 @@ npm install
 npm run dev
 ```
 
+前端启动后，终端会输出本地访问地址，通常是：
+
+- `http://localhost:5173/`
+- 如果端口被占用，Vite 会自动顺延到 `5174 / 5175 / 5176 ...`
+
+### 页面重启
+
+如果只是想重启页面开发服务：
+
+1. 在当前运行 `vite` 的终端里按 `Ctrl + C`
+2. 重新执行：
+
+```bash
+cd demo/frontend
+npm run dev
+```
+
+如果想固定端口启动：
+
+```bash
+cd demo/frontend
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+### 端口占用排查
+
+如果提示端口已被占用，可以先查看占用进程：
+
+```bash
+lsof -i :5173
+```
+
+然后结束该进程：
+
+```bash
+kill -9 <PID>
+```
+
 构建校验：
 
 ```bash
