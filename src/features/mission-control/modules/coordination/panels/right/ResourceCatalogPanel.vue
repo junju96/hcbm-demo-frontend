@@ -55,7 +55,15 @@
 
       <!-- 右侧详情 -->
       <section class="coord-panel coord-resource-right" v-if="selectedResource">
-        <ResourceDetailPanel :resource="selectedResource" />
+        <div class="res-debug-header">
+          <span class="res-debug-name">{{ selectedResource.resource_name }}</span>
+          <span class="res-debug-chip">{{ tagLabel(selectedResource.resource_tag) }}</span>
+        </div>
+        <div class="res-debug-meta">
+          <div>编号: {{ selectedResource.resource_id }}</div>
+          <div>类型: {{ RESOURCE_TYPE_LABELS[selectedResource.resource_type] || selectedResource.resource_type }}</div>
+          <div>关联命令: {{ (selectedResource.connections?.connected_commands || []).join('、') || '无' }}</div>
+        </div>
       </section>
 
       <section v-else class="coord-panel coord-resource-right coord-resource-empty-panel">
@@ -351,6 +359,11 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   color: rgba(196, 243, 248, 0.7);
   font-size: 0.76rem;
 }
+
+.res-debug-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+.res-debug-name { color: var(--coord-text); font-size: 1.12rem; font-weight: 800; }
+.res-debug-chip { border-radius: 999px; padding: 0.12rem 0.52rem; font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(0, 222, 200, 0.4); background: rgba(0, 222, 200, 0.12); color: #b4fff8; }
+.res-debug-meta { display: flex; flex-direction: column; gap: 0.4rem; color: rgba(214, 237, 242, 0.92); font-size: 0.9rem; }
 
 @media (max-width: 980px) {
   .coord-resource-layout {
