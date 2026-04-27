@@ -170,7 +170,7 @@
           <div v-if="detailsExpanded" class="coord-detail-grid">
             <div class="coord-detail-item">
               <div class="coord-detail-key">资源类型</div>
-              <div class="coord-detail-text">{{ resource.resource_type }}</div>
+              <div class="coord-detail-text">{{ RESOURCE_TYPE_LABELS[resource.resource_type] || resource.resource_type }}</div>
             </div>
             <div class="coord-detail-item">
               <div class="coord-detail-key">资源标签</div>
@@ -213,7 +213,7 @@ import {
   createInteractionActionAttrs,
   createInteractionTargetAttrs,
 } from '../../../../shared/interaction/createInteractionTarget';
-import { RESOURCE_TAG_LABELS } from '../../data/commandDataModel';
+import { RESOURCE_TAG_LABELS, RESOURCE_TYPE_LABELS } from '../../data/commandDataModel';
 
 const props = defineProps({
   commands: { type: Array, required: true },

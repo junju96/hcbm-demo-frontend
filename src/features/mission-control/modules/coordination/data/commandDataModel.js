@@ -245,6 +245,84 @@ export const RESOURCE_TAG_LABELS = Object.freeze({
   [RESOURCE_TAGS.SUPPORT]: '保障',
 });
 
+export const RESOURCE_TYPE_LABELS = Object.freeze({
+  REGION: '区域',
+  UGV: '无人车',
+  UAV: '无人机',
+  RELAY_UGV: '通信无人车',
+  AMMUNITION: '弹药',
+  LOITERING_MUNITION: '巡飞弹',
+  FPV_DRONE: 'FPV无人机',
+  LAND_SENSOR: '地面传感器',
+  AIRBORNE_SENSOR: '机载传感器',
+  SATELLITE: '卫星',
+  SUPPLY_POINT: '补给点',
+  MOBILE_SUPPORT_PLATFORM: '机动支援平台',
+  AIR_SUPPORT_PLATFORM: '空中支援平台',
+  MOBILE_COMMUNICATION_PLATFORM: '机动通信平台',
+});
+
+export const RESOURCE_FIELD_LABELS = Object.freeze({
+  // 平台类型
+  MEDIUM_TRACKED_PLATFORM: '中型履带平台',
+  AIR_PLATFORM: '空中平台',
+  WHEELED_SUPPORT_PLATFORM: '轮式支援平台',
+  // 运行状态
+  online: '在线',
+  maintenance: '维护中',
+  offline: '离线',
+  // 地形适应
+  complex_ground: '复杂地面',
+  airborne: '空中',
+  road_and_field: '公路野外',
+  // 敌我类型
+  neutral: '中立',
+  enemy: '敌方',
+  friendly: '友方',
+  unknown: '未知',
+  // 威胁等级
+  low: '低',
+  medium: '中',
+  high: '高',
+  // 运动状态
+  static: '静止',
+  moving: '移动',
+  // 意图
+  none: '无',
+  // 处理等级
+  // low/medium/high/unknown 与威胁等级共用
+  // 武器类型
+  MACHINE_GUN: '机枪',
+  AUTOCANNON_40MM: '40mm自动炮',
+  LOITERING_MUNITION: '巡飞弹',
+  FPV: 'FPV',
+  // 弹药状态
+  ready: '就绪',
+  standby: '待命',
+  // 杀伤效能类型
+  armor_penetration: '穿甲',
+  fragment_and_penetration: '破片穿甲',
+  fragmentation: '破片',
+  // 保障类别
+  supply: '补给',
+  maintenance_and_supply: '维修补给',
+  air_delivery: '空中投送',
+  communication_relay: '通信中继',
+  // 侦察方式中的英文
+  link_status_monitoring: '链路监测',
+  // 在线状态（侦察）
+  'offline-十分钟前在线': '离线(10分钟前)',
+  // 机动能力 / 当前状态的英文片段
+  '固定点': '固定点',
+});
+
+export const translateResourceField = (value) => {
+  if (value === null || value === undefined) return '—';
+  const str = String(value);
+  if (str === '') return '—';
+  return RESOURCE_FIELD_LABELS[str] ?? str;
+};
+
 export const resourceRecords = Object.freeze([
   // === TS_TARGET 态势目标 ===
   {

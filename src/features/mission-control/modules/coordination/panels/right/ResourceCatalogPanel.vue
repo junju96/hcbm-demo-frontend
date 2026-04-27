@@ -41,7 +41,7 @@
               <span class="coord-resource-name">{{ resource.resource_name }}</span>
             </div>
             <div class="coord-resource-sub">
-              <span class="coord-resource-type">{{ resource.resource_type }}</span>
+              <span class="coord-resource-type">{{ RESOURCE_TYPE_LABELS[resource.resource_type] || resource.resource_type }}</span>
               <span v-if="resourceSubtitle(resource)" class="coord-resource-extra">
                 {{ resourceSubtitle(resource) }}
               </span>
@@ -74,6 +74,7 @@ import {
   resourceRecords,
   RESOURCE_TAGS,
   RESOURCE_TAG_LABELS,
+  RESOURCE_TYPE_LABELS,
 } from '../../data/commandDataModel';
 import { loadTaskUnderstandingDb } from '../../state/taskUnderstandingLocalDb';
 import ResourceDetailPanel from './ResourceDetailPanel.vue';

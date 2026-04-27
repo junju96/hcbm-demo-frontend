@@ -34,11 +34,11 @@
         <div class="res-detail-kv-grid">
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">敌我类型</span>
-            <span class="res-detail-kv-val">{{ detail.type }}</span>
+            <span class="res-detail-kv-val">{{ t(detail.type) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">威胁等级</span>
-            <span class="res-detail-kv-val" :class="`threat-${detail.threat_level}`">{{ detail.threat_level }}</span>
+            <span class="res-detail-kv-val" :class="`threat-${detail.threat_level}`">{{ t(detail.threat_level) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">威胁值</span>
@@ -46,15 +46,15 @@
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">运动状态</span>
-            <span class="res-detail-kv-val">{{ detail.motion }}</span>
+            <span class="res-detail-kv-val">{{ t(detail.motion) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">意图</span>
-            <span class="res-detail-kv-val">{{ detail.intent }}</span>
+            <span class="res-detail-kv-val">{{ t(detail.intent) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">处理等级</span>
-            <span class="res-detail-kv-val">{{ detail.handle_tier }}</span>
+            <span class="res-detail-kv-val">{{ t(detail.handle_tier) }}</span>
           </div>
           <div class="res-detail-kv wide">
             <span class="res-detail-kv-key">建议处置</span>
@@ -93,11 +93,11 @@
         <div class="res-detail-kv-grid cols-3">
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">平台类型</span>
-            <span class="res-detail-kv-val">{{ detail.platform_type }}</span>
+            <span class="res-detail-kv-val">{{ t(detail.platform_type) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">运行状态</span>
-            <span class="res-detail-kv-val" :class="`status-${detail.running_status}`">{{ detail.running_status }}</span>
+            <span class="res-detail-kv-val" :class="`status-${detail.running_status}`">{{ t(detail.running_status) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">当前任务</span>
@@ -126,7 +126,7 @@
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">地形适应</span>
-            <span class="res-detail-kv-val">{{ detail.mobility?.terrain_adaptability }}</span>
+            <span class="res-detail-kv-val">{{ t(detail.mobility?.terrain_adaptability) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">打击射程</span>
@@ -134,7 +134,7 @@
           </div>
           <div class="res-detail-kv wide">
             <span class="res-detail-kv-key">武器类型</span>
-            <span class="res-detail-kv-val">{{ (detail.strike_capability?.weapon_types || []).join('、') || '无' }}</span>
+            <span class="res-detail-kv-val">{{ (detail.strike_capability?.weapon_types || []).map(t).join('、') || '无' }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">侦察射程</span>
@@ -142,7 +142,7 @@
           </div>
           <div class="res-detail-kv wide">
             <span class="res-detail-kv-key">侦察方式</span>
-            <span class="res-detail-kv-val">{{ (detail.recon_capability?.methods || []).join('、') || '无' }}</span>
+            <span class="res-detail-kv-val">{{ (detail.recon_capability?.methods || []).map(t).join('、') || '无' }}</span>
           </div>
         </div>
       </div>
@@ -159,11 +159,11 @@
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">武器类型</span>
-            <span class="res-detail-kv-val">{{ detail.weapon_type }}</span>
+            <span class="res-detail-kv-val">{{ t(detail.weapon_type) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">弹药状态</span>
-            <span class="res-detail-kv-val" :class="`status-${detail.ammo_status}`">{{ detail.ammo_status }}</span>
+            <span class="res-detail-kv-val" :class="`status-${detail.ammo_status}`">{{ t(detail.ammo_status) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">打击范围</span>
@@ -175,7 +175,7 @@
           </div>
           <div class="res-detail-kv wide">
             <span class="res-detail-kv-key">杀伤效能</span>
-            <span class="res-detail-kv-val">{{ detail.lethality?.effect_type }} — {{ detail.lethality?.effect_value }}</span>
+            <span class="res-detail-kv-val">{{ t(detail.lethality?.effect_type) }} — {{ detail.lethality?.effect_value }}</span>
           </div>
         </div>
       </div>
@@ -188,7 +188,7 @@
         <div class="res-detail-kv-grid cols-2">
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">侦察方式</span>
-            <span class="res-detail-kv-val">{{ (detail.recon_methods || []).join('、') }}</span>
+            <span class="res-detail-kv-val">{{ (detail.recon_methods || []).map(t).join('、') }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">侦察范围</span>
@@ -196,7 +196,7 @@
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">在线状态</span>
-            <span class="res-detail-kv-val" :class="`status-${detail.online_status}`">{{ detail.online_status }}</span>
+            <span class="res-detail-kv-val" :class="`status-${detail.online_status}`">{{ t(detail.online_status) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">所属平台</span>
@@ -229,11 +229,11 @@
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">当前状态</span>
-            <span class="res-detail-kv-val" :class="`status-${detail.current_status}`">{{ detail.current_status }}</span>
+            <span class="res-detail-kv-val" :class="`status-${detail.current_status}`">{{ t(detail.current_status) }}</span>
           </div>
           <div class="res-detail-kv">
             <span class="res-detail-kv-key">保障类别</span>
-            <span class="res-detail-kv-val">{{ detail.support_category }}</span>
+            <span class="res-detail-kv-val">{{ t(detail.support_category) }}</span>
           </div>
         </div>
       </div>
@@ -265,7 +265,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import { RESOURCE_TAG_LABELS } from '../../data/commandDataModel';
+import { RESOURCE_TAG_LABELS, translateResourceField } from '../../data/commandDataModel';
 
 const props = defineProps({
   resource: { type: Object, required: true },
@@ -426,6 +426,8 @@ const connectedPlansText = computed(() => {
   color: #ecfbff;
   font-size: 0.9rem;
   font-weight: 700;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .res-detail-kv-val.threat-low { color: #a8ff8a; }
