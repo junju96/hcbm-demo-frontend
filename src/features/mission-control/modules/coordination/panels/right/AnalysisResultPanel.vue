@@ -163,6 +163,9 @@
           <div class="coord-list-main">
             <span class="coord-list-tag resource">资源 {{ resource.resource_id }}</span>
             <span class="coord-list-title">{{ resource.resource_name }}</span>
+            <span class="coord-resource-chip-mini" :class="`tag-${resource.resource_tag}`">
+              {{ tagLabel(resource.resource_tag) }}
+            </span>
           </div>
           <div v-if="detailsExpanded" class="coord-detail-grid">
             <div class="coord-detail-item">
@@ -170,15 +173,16 @@
               <div class="coord-detail-text">{{ resource.resource_type }}</div>
             </div>
             <div class="coord-detail-item">
-              <div class="coord-detail-key">区域属性</div>
-              <div class="coord-detail-text">{{ resource.resource_detail.type }}</div>
+              <div class="coord-detail-key">资源标签</div>
+              <div class="coord-detail-text">{{ resource.resource_tag }}</div>
             </div>
             <div class="coord-detail-item">
-              <div class="coord-detail-key">坐标点数</div>
-              <div class="coord-detail-text">{{ resource.resource_detail.location.length }}</div>
+              <div class="coord-detail-key">关键信息</div>
+              <div class="coord-detail-text">{{ resourceSummary(resource) }}</div>
             </div>
 
-            <div class="coord-point-block">
+            <!-- 坐标点位（仅态势目标展示） -->
+            <div v-if="resource.resource_detail?.location?.length" class="coord-point-block">
               <div class="coord-point-head">
                 <span>点位</span>
                 <span>纬度</span>
@@ -209,6 +213,7 @@ import {
   createInteractionActionAttrs,
   createInteractionTargetAttrs,
 } from '../../../../shared/interaction/createInteractionTarget';
+import { RESOURCE_TAG_LABELS } from '../../data/commandDataModel';
 
 const props = defineProps({
   commands: { type: Array, required: true },
@@ -268,6 +273,26 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   sourceComponent: 'AnalysisResultPanel',
   textPreview: resource?.resource_type || '',
 });
+
+const tagLabel = (tag) => RESOURCE_TAG_LABELS[tag] || tag;
+
+const resourceSummary = (resource) => {
+  const detail = resource?.resource_detail;
+  switch (resource?.resource_tag) {
+    case 'TS_TARGET':
+      return `敌我: ${detail?.type || '—'} / 威胁: ${detail?.threat_level || '—'}`;
+    case 'EQUIPMENT':
+      return `状态: ${detail?.running_status || '—'} / 任务: ${detail?.current_task || '—'}`;
+    case 'FIREPOWER':
+      return `数量: ${detail?.quantity ?? '—'} / 状态: ${detail?.ammo_status || '—'}`;
+    case 'RECON':
+      return `状态: ${detail?.online_status || '—'} / 覆盖: ${detail?.coverage_focus || '—'}`;
+    case 'SUPPORT':
+      return `状态: ${detail?.current_status || '—'} / 能力: ${detail?.support_capability || '—'}`;
+    default:
+      return '';
+  }
+};
 </script>
 
 <style scoped>
@@ -306,6 +331,13 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 .coord-list-tag { display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; padding: 0.1rem 0.46rem; font-size: 0.8rem; min-height: 25px; line-height: 1.2; font-weight: 700; background: rgba(0, 222, 200, 0.16); color: #95fff5; }
 .coord-list-tag.resource { background: rgba(116, 219, 74, 0.16); color: #c1ffab; }
 .coord-list-title { color: var(--coord-text); font-weight: 700; font-size: 0.92rem; line-height: 1.4; }
+
+.coord-resource-chip-mini { border-radius: 999px; padding: 0.06rem 0.38rem; font-size: 0.7rem; font-weight: 700; margin-left: 0.2rem; }
+.coord-resource-chip-mini.tag-TS_TARGET { background: rgba(255, 183, 77, 0.16); color: #ffd180; }
+.coord-resource-chip-mini.tag-EQUIPMENT { background: rgba(77, 182, 255, 0.16); color: #a8d8ff; }
+.coord-resource-chip-mini.tag-FIREPOWER { background: rgba(255, 82, 82, 0.16); color: #ffadad; }
+.coord-resource-chip-mini.tag-RECON { background: rgba(156, 77, 255, 0.16); color: #d4b3ff; }
+.coord-resource-chip-mini.tag-SUPPORT { background: rgba(77, 255, 136, 0.16); color: #b3ffcc; }
 
 .coord-detail-grid { margin-top: 0.42rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.46rem; }
 .coord-detail-item { border-radius: 10px; border: 1px solid rgba(0, 222, 200, 0.22); background: rgba(2, 20, 27, 0.68); padding: 0.44rem 0.52rem; }

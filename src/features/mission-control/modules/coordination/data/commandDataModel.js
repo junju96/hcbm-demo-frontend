@@ -229,13 +229,37 @@ export const missionRecords = Object.freeze([
   },
 ]);
 
+export const RESOURCE_TAGS = Object.freeze({
+  TS_TARGET: 'TS_TARGET',
+  EQUIPMENT: 'EQUIPMENT',
+  FIREPOWER: 'FIREPOWER',
+  RECON: 'RECON',
+  SUPPORT: 'SUPPORT',
+});
+
+export const RESOURCE_TAG_LABELS = Object.freeze({
+  [RESOURCE_TAGS.TS_TARGET]: '态势目标',
+  [RESOURCE_TAGS.EQUIPMENT]: '装备',
+  [RESOURCE_TAGS.FIREPOWER]: '火力',
+  [RESOURCE_TAGS.RECON]: '侦察',
+  [RESOURCE_TAGS.SUPPORT]: '保障',
+});
+
 export const resourceRecords = Object.freeze([
+  // === TS_TARGET 态势目标 ===
   {
     resource_id: 1,
     resource_name: '区域A',
+    resource_tag: RESOURCE_TAGS.TS_TARGET,
     resource_type: 'REGION',
     resource_detail: {
       type: 'neutral',
+      threat_level: 'low',
+      value: 100,
+      motion: 'static',
+      intent: 'none',
+      handle_tier: 'low',
+      suggestion: '无',
       location: [
         { point: 'region_point_1', latitude: '115.704931', longitude: '40.281571', altitude: '2.123' },
         { point: 'region_point_2', latitude: '114.704931', longitude: '41.281571', altitude: '3.123' },
@@ -243,13 +267,26 @@ export const resourceRecords = Object.freeze([
         { point: 'region_point_4', latitude: '117.704931', longitude: '44.281571', altitude: '6.123' },
       ],
     },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [],
+      connected_instant_plans: [],
+      connected_resources: [],
+    },
   },
   {
     resource_id: 2,
     resource_name: '区域B',
+    resource_tag: RESOURCE_TAGS.TS_TARGET,
     resource_type: 'REGION',
     resource_detail: {
       type: 'neutral',
+      threat_level: 'medium',
+      value: 60,
+      motion: 'static',
+      intent: 'none',
+      handle_tier: 'medium',
+      suggestion: '建议前出侦察确认',
       location: [
         { point: 'region_point_1', latitude: '115.708035', longitude: '40.287294', altitude: '3.427' },
         { point: 'region_point_2', latitude: '114.708925', longitude: '41.287294', altitude: '3.427' },
@@ -257,22 +294,378 @@ export const resourceRecords = Object.freeze([
         { point: 'region_point_4', latitude: '117.704931', longitude: '44.281571', altitude: '6.123' },
       ],
     },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [],
+      connected_instant_plans: [],
+      connected_resources: [],
+    },
   },
   {
     resource_id: 3,
     resource_name: '区域C',
+    resource_tag: RESOURCE_TAGS.TS_TARGET,
     resource_type: 'REGION',
     resource_detail: {
       type: 'neutral',
+      threat_level: 'unknown',
+      value: 'unknown',
+      motion: 'unknown',
+      intent: 'unknown',
+      handle_tier: 'unknown',
+      suggestion: '无',
       location: [{ point: 'region_point_1', latitude: '115.910001', longitude: '40.110001', altitude: '2.200' }],
+    },
+    connections: {
+      connected_commands: [3],
+      connected_plans: [],
+      connected_instant_plans: [],
+      connected_resources: [],
+    },
+  },
+
+  // === EQUIPMENT 装备资源 ===
+  {
+    resource_id: 101,
+    resource_name: '无人车A',
+    resource_tag: RESOURCE_TAGS.EQUIPMENT,
+    resource_type: 'UGV',
+    resource_detail: {
+      platform_type: 'MEDIUM_TRACKED_PLATFORM',
+      running_status: 'online',
+      payload_modules: ['40mm自动炮', '光电侦察组件', '导航定位模块'],
+      mobility: { max_range_km: 12, max_speed_kmh: 45, terrain_adaptability: 'complex_ground' },
+      strike_capability: { max_range_km: 2.5, weapon_types: ['40mm穿甲弹', '40mm高爆弹'] },
+      recon_capability: { max_range_km: 3, methods: ['白光', '红外'] },
+      current_task: '执行中-北侧通道侦察',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [1],
+      connected_instant_plans: [],
+      connected_resources: [201, 301, 401],
+    },
+  },
+  {
+    resource_id: 102,
+    resource_name: '无人车B',
+    resource_tag: RESOURCE_TAGS.EQUIPMENT,
+    resource_type: 'UGV',
+    resource_detail: {
+      platform_type: 'MEDIUM_TRACKED_PLATFORM',
+      running_status: 'online',
+      payload_modules: ['巡飞弹发射模块', '白光侦察组件', '任务计算单元'],
+      mobility: { max_range_km: 12, max_speed_kmh: 42, terrain_adaptability: 'complex_ground' },
+      strike_capability: { max_range_km: 4, weapon_types: ['巡飞弹'] },
+      recon_capability: { max_range_km: 1.5, methods: ['热像', '白光'] },
+      current_task: '空闲',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [2],
+      connected_instant_plans: [],
+      connected_resources: [203, 302, 404],
+    },
+  },
+  {
+    resource_id: 103,
+    resource_name: '巡逻无人机',
+    resource_tag: RESOURCE_TAGS.EQUIPMENT,
+    resource_type: 'UAV',
+    resource_detail: {
+      platform_type: 'AIR_PLATFORM',
+      running_status: 'maintenance',
+      payload_modules: ['白光吊舱', '热像吊舱', '数据回传模块'],
+      mobility: { max_range_km: 3, max_speed_kmh: 80, terrain_adaptability: 'airborne' },
+      strike_capability: { max_range_km: 0, weapon_types: [] },
+      recon_capability: { max_range_km: 4, methods: ['热像', '白光'] },
+      current_task: '机务检查中-19分钟',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [],
+      connected_instant_plans: [],
+      connected_resources: [302, 403],
+    },
+  },
+  {
+    resource_id: 104,
+    resource_name: '通信无人车',
+    resource_tag: RESOURCE_TAGS.EQUIPMENT,
+    resource_type: 'RELAY_UGV',
+    resource_detail: {
+      platform_type: 'WHEELED_SUPPORT_PLATFORM',
+      running_status: 'online',
+      payload_modules: ['通信中继模块', '北斗授时模块', '链路管理模块'],
+      mobility: { max_range_km: 12, max_speed_kmh: 38, terrain_adaptability: 'road_and_field' },
+      strike_capability: { max_range_km: 0, weapon_types: [] },
+      recon_capability: { max_range_km: 1, methods: ['link_status_monitoring'] },
+      current_task: '执行中-区域B通信中继',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [3],
+      connected_instant_plans: ['adjust-plan-1'],
+      connected_resources: [401, 404],
+    },
+  },
+
+  // === FIREPOWER 火力资源 ===
+  {
+    resource_id: 201,
+    resource_name: '7.62x54mm穿甲弹',
+    resource_tag: RESOURCE_TAGS.FIREPOWER,
+    resource_type: 'AMMUNITION',
+    resource_detail: {
+      quantity: 120,
+      weapon_type: 'MACHINE_GUN',
+      belonging_equipment: { resource_id: 101, resource_name: '无人车A' },
+      lethality: { effect_type: 'armor_penetration', effect_value: '8mm' },
+      strike_range_km: 1.5,
+      ammo_status: 'ready',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [],
+      connected_instant_plans: [],
+      connected_resources: [101],
+    },
+  },
+  {
+    resource_id: 202,
+    resource_name: '40mm穿甲弹',
+    resource_tag: RESOURCE_TAGS.FIREPOWER,
+    resource_type: 'AMMUNITION',
+    resource_detail: {
+      quantity: 80,
+      weapon_type: 'AUTOCANNON_40MM',
+      belonging_equipment: { resource_id: 101, resource_name: '无人车A' },
+      lethality: { effect_type: 'armor_penetration', effect_value: '120mm' },
+      strike_range_km: 2.5,
+      ammo_status: 'ready',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [1],
+      connected_instant_plans: [],
+      connected_resources: [101],
+    },
+  },
+  {
+    resource_id: 203,
+    resource_name: '巡飞弹',
+    resource_tag: RESOURCE_TAGS.FIREPOWER,
+    resource_type: 'LOITERING_MUNITION',
+    resource_detail: {
+      quantity: 4,
+      weapon_type: 'LOITERING_MUNITION',
+      belonging_equipment: { resource_id: 102, resource_name: '无人车B' },
+      lethality: { effect_type: 'fragment_and_penetration', effect_value: '300m；破片10m；穿甲' },
+      strike_range_km: 4,
+      ammo_status: 'ready',
+    },
+    connections: {
+      connected_commands: [2],
+      connected_plans: [3],
+      connected_instant_plans: [],
+      connected_resources: [102, 301],
+    },
+  },
+  {
+    resource_id: 204,
+    resource_name: 'FPV',
+    resource_tag: RESOURCE_TAGS.FIREPOWER,
+    resource_type: 'FPV_DRONE',
+    resource_detail: {
+      quantity: 6,
+      weapon_type: 'FPV',
+      belonging_equipment: { resource_id: 'ally-uav-group-1', resource_name: '友邻-无人机群' },
+      lethality: { effect_type: 'fragmentation', effect_value: '300m；破片10m' },
+      strike_range_km: 20,
+      ammo_status: 'standby',
+    },
+    connections: {
+      connected_commands: [2],
+      connected_plans: [],
+      connected_instant_plans: [],
+      connected_resources: ['ally-uav-group-1'],
+    },
+  },
+
+  // === RECON 侦察资源 ===
+  {
+    resource_id: 301,
+    resource_name: '周视镜A',
+    resource_tag: RESOURCE_TAGS.RECON,
+    resource_type: 'LAND_SENSOR',
+    resource_detail: {
+      recon_methods: ['热像', '白光'],
+      resource_platform: { resource_id: 101, resource_name: '无人车A' },
+      recon_range_km: 2.5,
+      online_status: 'online',
+      coverage_focus: '区域A南缘',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [1],
+      connected_instant_plans: [],
+      connected_resources: [101, 202],
+    },
+  },
+  {
+    resource_id: 302,
+    resource_name: '周视镜B',
+    resource_tag: RESOURCE_TAGS.RECON,
+    resource_type: 'LAND_SENSOR',
+    resource_detail: {
+      recon_methods: ['热像', '白光'],
+      resource_platform: { resource_id: 102, resource_name: '无人车B' },
+      recon_range_km: 2.5,
+      online_status: 'online',
+      coverage_focus: '无',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [2],
+      connected_instant_plans: [],
+      connected_resources: [102, 203],
+    },
+  },
+  {
+    resource_id: 303,
+    resource_name: '无人机侦察载荷',
+    resource_tag: RESOURCE_TAGS.RECON,
+    resource_type: 'AIRBORNE_SENSOR',
+    resource_detail: {
+      recon_methods: ['热像', '白光'],
+      resource_platform: { resource_id: 103, resource_name: '巡逻无人机' },
+      recon_range_km: 4,
+      online_status: 'online',
+      coverage_focus: '区域B上空',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [],
+      connected_instant_plans: [],
+      connected_resources: [103],
+    },
+  },
+  {
+    resource_id: 304,
+    resource_name: '卫星',
+    resource_tag: RESOURCE_TAGS.RECON,
+    resource_type: 'SATELLITE',
+    resource_detail: {
+      recon_methods: ['白光'],
+      resource_platform: { resource_id: 'ally-satellite-1', resource_name: '友邻-侦查卫星' },
+      recon_range_km: null,
+      online_status: 'offline-十分钟前在线',
+      coverage_focus: '任务区域广域复核',
+    },
+    connections: {
+      connected_commands: [1, 2],
+      connected_plans: [],
+      connected_instant_plans: [],
+      connected_resources: ['ally-satellite-1'],
+    },
+  },
+
+  // === SUPPORT 保障资源 ===
+  {
+    resource_id: 401,
+    resource_name: '补给点A',
+    resource_tag: RESOURCE_TAGS.SUPPORT,
+    resource_type: 'SUPPLY_POINT',
+    resource_detail: {
+      support_unit: '补给点A',
+      support_capability: '连级',
+      deployment_location: { location_name: '前沿补给区1', latitude: '39.864200', longitude: '118.208500', altitude: '95.000' },
+      mobility_capability: '固定点',
+      current_status: 'online',
+      support_category: 'supply',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [1],
+      connected_instant_plans: [],
+      connected_resources: [1, 104],
+    },
+  },
+  {
+    resource_id: 402,
+    resource_name: '保障车A',
+    resource_tag: RESOURCE_TAGS.SUPPORT,
+    resource_type: 'MOBILE_SUPPORT_PLATFORM',
+    resource_detail: {
+      support_unit: '保障车A',
+      support_capability: '4t',
+      deployment_location: { location_name: '机动保障线A', latitude: '39.870100', longitude: '118.226400', altitude: '106.000' },
+      mobility_capability: '200km',
+      current_status: '保障对象-无人车A',
+      support_category: 'maintenance_and_supply',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [1],
+      connected_instant_plans: [],
+      connected_resources: [101, 202],
+    },
+  },
+  {
+    resource_id: 403,
+    resource_name: '8旋翼无人机D',
+    resource_tag: RESOURCE_TAGS.SUPPORT,
+    resource_type: 'AIR_SUPPORT_PLATFORM',
+    resource_detail: {
+      support_unit: '8旋翼无人机D',
+      support_capability: '500kg',
+      deployment_location: { location_name: '后方起降点D', latitude: '39.851600', longitude: '118.194300', altitude: '88.000' },
+      mobility_capability: '4km',
+      current_status: 'online',
+      support_category: 'air_delivery',
+    },
+    connections: {
+      connected_commands: [1],
+      connected_plans: [],
+      connected_instant_plans: [],
+      connected_resources: [103],
+    },
+  },
+  {
+    resource_id: 404,
+    resource_name: '通信中继站',
+    resource_tag: RESOURCE_TAGS.SUPPORT,
+    resource_type: 'MOBILE_COMMUNICATION_PLATFORM',
+    resource_detail: {
+      support_unit: '通信中继站',
+      support_capability: '通讯中继12km',
+      deployment_location: { latitude: '39.879500', longitude: '118.241800', altitude: '132.000' },
+      mobility_capability: '12km',
+      current_status: 'online',
+      support_category: 'communication_relay',
+    },
+    connections: {
+      connected_commands: [1, 2],
+      connected_plans: [3],
+      connected_instant_plans: [],
+      connected_resources: [101, 102, 104],
     },
   },
 ]);
 
 const analysisIndexByCommandId = Object.freeze({
-  'CMD-20260401-001': { missionIds: [1, 2, 3], resourceIds: [1, 2] },
-  'CMD-20260401-002': { missionIds: [1, 2], resourceIds: [1] },
-  'CMD-20260401-003': { missionIds: [1], resourceIds: [3] },
+  'CMD-20260401-001': {
+    missionIds: [1, 2, 3],
+    resourceIds: [1, 2, 101, 102, 103, 104, 201, 202, 301, 302, 303, 304, 401, 402, 403, 404],
+  },
+  'CMD-20260401-002': {
+    missionIds: [1, 2],
+    resourceIds: [203, 204, 304, 404],
+  },
+  'CMD-20260401-003': {
+    missionIds: [1],
+    resourceIds: [3],
+  },
 });
 
 export const buildDecomposeRequest = (commandId, requestId = nowId()) => ({
