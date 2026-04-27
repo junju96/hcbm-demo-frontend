@@ -213,7 +213,7 @@ import {
   createInteractionActionAttrs,
   createInteractionTargetAttrs,
 } from '../../../../shared/interaction/createInteractionTarget';
-import { RESOURCE_TAG_LABELS, RESOURCE_TYPE_LABELS } from '../../data/commandDataModel';
+import { RESOURCE_TAG_LABELS, RESOURCE_TYPE_LABELS, translateResourceField } from '../../data/commandDataModel';
 
 const props = defineProps({
   commands: { type: Array, required: true },
@@ -275,20 +275,21 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 });
 
 const tagLabel = (tag) => RESOURCE_TAG_LABELS[tag] || tag;
+const t = translateResourceField;
 
 const resourceSummary = (resource) => {
   const detail = resource?.resource_detail;
   switch (resource?.resource_tag) {
     case 'TS_TARGET':
-      return `敌我: ${detail?.type || '—'} / 威胁: ${detail?.threat_level || '—'}`;
+      return `敌我: ${t(detail?.type)} / 威胁: ${t(detail?.threat_level)}`;
     case 'EQUIPMENT':
-      return `状态: ${detail?.running_status || '—'} / 任务: ${detail?.current_task || '—'}`;
+      return `状态: ${t(detail?.running_status)} / 任务: ${detail?.current_task || '—'}`;
     case 'FIREPOWER':
-      return `数量: ${detail?.quantity ?? '—'} / 状态: ${detail?.ammo_status || '—'}`;
+      return `数量: ${detail?.quantity ?? '—'} / 状态: ${t(detail?.ammo_status)}`;
     case 'RECON':
-      return `状态: ${detail?.online_status || '—'} / 覆盖: ${detail?.coverage_focus || '—'}`;
+      return `状态: ${t(detail?.online_status)} / 覆盖: ${detail?.coverage_focus || '—'}`;
     case 'SUPPORT':
-      return `状态: ${detail?.current_status || '—'} / 能力: ${detail?.support_capability || '—'}`;
+      return `状态: ${t(detail?.current_status)} / 能力: ${detail?.support_capability || '—'}`;
     default:
       return '';
   }
