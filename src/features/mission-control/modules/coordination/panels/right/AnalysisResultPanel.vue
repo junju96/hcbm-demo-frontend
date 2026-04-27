@@ -174,7 +174,7 @@
             </div>
             <div class="coord-detail-item">
               <div class="coord-detail-key">资源标签</div>
-              <div class="coord-detail-text">{{ resource.resource_tag }}</div>
+              <div class="coord-detail-text">{{ tagLabel(resource.resource_tag) }}</div>
             </div>
             <div class="coord-detail-item">
               <div class="coord-detail-key">关键信息</div>
