@@ -28,7 +28,7 @@
     </div>
 
     <!-- TS_TARGET 态势目标 -->
-    <template v-if="resource.resource_tag === 'TS_TARGET'">
+    <div v-if="resource.resource_tag === 'TS_TARGET'" class="res-detail-type-section">
       <div class="res-detail-section">
         <div class="res-detail-section-title">态势属性</div>
         <div class="res-detail-kv-grid">
@@ -84,10 +84,10 @@
           </div>
         </div>
       </div>
-    </template>
+    </div>
 
     <!-- EQUIPMENT 装备 -->
-    <template v-if="resource.resource_tag === 'EQUIPMENT'">
+    <div v-if="resource.resource_tag === 'EQUIPMENT'" class="res-detail-type-section">
       <div class="res-detail-section">
         <div class="res-detail-section-title">平台信息</div>
         <div class="res-detail-kv-grid cols-3">
@@ -146,10 +146,10 @@
           </div>
         </div>
       </div>
-    </template>
+    </div>
 
     <!-- FIREPOWER 火力 -->
-    <template v-if="resource.resource_tag === 'FIREPOWER'">
+    <div v-if="resource.resource_tag === 'FIREPOWER'" class="res-detail-type-section">
       <div class="res-detail-section">
         <div class="res-detail-section-title">火力参数</div>
         <div class="res-detail-kv-grid cols-3">
@@ -179,10 +179,10 @@
           </div>
         </div>
       </div>
-    </template>
+    </div>
 
     <!-- RECON 侦察 -->
-    <template v-if="resource.resource_tag === 'RECON'">
+    <div v-if="resource.resource_tag === 'RECON'" class="res-detail-type-section">
       <div class="res-detail-section">
         <div class="res-detail-section-title">侦察参数</div>
         <div class="res-detail-kv-grid cols-2">
@@ -208,10 +208,10 @@
           </div>
         </div>
       </div>
-    </template>
+    </div>
 
     <!-- SUPPORT 保障 -->
-    <template v-if="resource.resource_tag === 'SUPPORT'">
+    <div v-if="resource.resource_tag === 'SUPPORT'" class="res-detail-type-section">
       <div class="res-detail-section">
         <div class="res-detail-section-title">保障参数</div>
         <div class="res-detail-kv-grid cols-2">
@@ -259,7 +259,7 @@
           </div>
         </div>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
