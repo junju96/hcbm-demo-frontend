@@ -1,5 +1,6 @@
 const TASK_DB_STORAGE_KEY = 'coordination.task-understanding.db.v1';
 const TASK_DB_SESSION_BOOT_KEY = 'coordination.task-understanding.session.booted.v1';
+const TASK_DB_DATA_VERSION = 2;
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -21,6 +22,7 @@ const normalizeDbRecord = (value, fallbackCommandId = '') => {
         : {},
     selectedCommandId: typeof record.selectedCommandId === 'string' ? record.selectedCommandId : fallbackCommandId,
     updatedAt: record.updatedAt || '',
+    dataVersion: typeof record.dataVersion === 'number' ? record.dataVersion : 1,
   };
 };
 
@@ -29,6 +31,7 @@ const buildSeedRecord = ({ mockCommands = [], selectedCommandId = '' }) => ({
   analysisResultMap: {},
   selectedCommandId: selectedCommandId || mockCommands[0]?.commandId || '',
   updatedAt: new Date().toISOString(),
+  dataVersion: TASK_DB_DATA_VERSION,
 });
 
 export const loadTaskUnderstandingDb = ({ mockCommands = [] } = {}) => {
@@ -53,7 +56,16 @@ export const loadTaskUnderstandingDb = ({ mockCommands = [] } = {}) => {
     return seed;
   }
 
-  return normalizeDbRecord(safeParseJson(raw, {}), fallbackCommandId);
+  const record = normalizeDbRecord(safeParseJson(raw, {}), fallbackCommandId);
+
+  // 数据模型版本不匹配时自动重置为种子数据
+  if (record.dataVersion !== TASK_DB_DATA_VERSION) {
+    const seed = buildSeedRecord({ mockCommands, selectedCommandId: fallbackCommandId });
+    window.localStorage.setItem(TASK_DB_STORAGE_KEY, JSON.stringify(seed));
+    return seed;
+  }
+
+  return record;
 };
 
 export const saveTaskUnderstandingDb = (record) => {
@@ -62,6 +74,7 @@ export const saveTaskUnderstandingDb = (record) => {
   }
   const safeRecord = normalizeDbRecord(record);
   safeRecord.updatedAt = new Date().toISOString();
+  safeRecord.dataVersion = TASK_DB_DATA_VERSION;
   window.localStorage.setItem(TASK_DB_STORAGE_KEY, JSON.stringify(safeRecord));
 };
 
