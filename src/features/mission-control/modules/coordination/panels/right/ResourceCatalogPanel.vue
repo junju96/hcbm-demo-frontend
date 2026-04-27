@@ -86,7 +86,7 @@
             <div class="res-detail-kv-grid">
               <div class="res-detail-kv"><span class="res-detail-kv-key">敌我类型</span><span class="res-detail-kv-val">{{ t(detail.type) }}</span></div>
               <div class="res-detail-kv"><span class="res-detail-kv-key">威胁等级</span><span class="res-detail-kv-val" :class="`threat-${detail.threat_level}`">{{ t(detail.threat_level) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">威胁值</span><span class="res-detail-kv-val">{{ detail.value }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">威胁值</span><span class="res-detail-kv-val">{{ t(detail.value) }}</span></div>
               <div class="res-detail-kv"><span class="res-detail-kv-key">运动状态</span><span class="res-detail-kv-val">{{ t(detail.motion) }}</span></div>
               <div class="res-detail-kv"><span class="res-detail-kv-key">意图</span><span class="res-detail-kv-val">{{ t(detail.intent) }}</span></div>
               <div class="res-detail-kv"><span class="res-detail-kv-key">处理等级</span><span class="res-detail-kv-val">{{ t(detail.handle_tier) }}</span></div>
@@ -263,15 +263,15 @@ const resourceSubtitle = (resource) => {
   const detail = resource.resource_detail;
   switch (resource.resource_tag) {
     case 'TS_TARGET':
-      return detail?.type ? `敌我: ${detail.type}` : '';
+      return detail?.type ? `敌我: ${t(detail.type)}` : '';
     case 'EQUIPMENT':
-      return detail?.running_status ? `状态: ${detail.running_status}` : '';
+      return detail?.running_status ? `状态: ${t(detail.running_status)}` : '';
     case 'FIREPOWER':
       return detail?.quantity !== undefined ? `数量: ${detail.quantity}` : '';
     case 'RECON':
-      return detail?.online_status ? `状态: ${detail.online_status}` : '';
+      return detail?.online_status ? `状态: ${t(detail.online_status)}` : '';
     case 'SUPPORT':
-      return detail?.current_status ? `状态: ${detail.current_status}` : '';
+      return detail?.current_status ? `状态: ${t(detail.current_status)}` : '';
     default:
       return '';
   }
