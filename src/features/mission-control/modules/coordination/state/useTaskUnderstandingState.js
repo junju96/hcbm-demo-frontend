@@ -11,6 +11,27 @@ import {
   saveTaskUnderstandingDb,
 } from './taskUnderstandingLocalDb';
 
+const COORDINATION_BASE_URL = 'http://localhost:28600';
+
+const joinApiUrl = (path) => {
+  const base = COORDINATION_BASE_URL.replace(/\/+$/, '');
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  return `${base}/${normalizedPath}`;
+};
+
+const safeFetch = async (url, options) => {
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      return { ok: false, error: `HTTP ${response.status}`, data: null };
+    }
+    const data = await response.json();
+    return { ok: true, error: null, data };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Network error', data: null };
+  }
+};
+
 function useMissionEditor() {
   const editingMissionId = ref(null);
   const missionDraft = ref({
@@ -160,50 +181,138 @@ export function useTaskUnderstandingState({ moduleApi }) {
     { deep: true }
   );
 
+  // ========== 远程 API 调用 ==========
+
+  const fetchCommandDecompose = async (commandId) => {
+    const requestBody = {
+      RequestType: 'DECOMPOSE',
+      RequestID: String(Date.now()).slice(-8),
+      RequestData: { CommandID: commandId },
+    };
+
+    const result = await safeFetch(joinApiUrl(COORDINATION_API_URLS.decompose), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!result.ok) {
+      return { ok: false, error: result.error, data: null };
+    }
+
+    const responseData = result.data;
+    const missions = responseData?.data?.missions || [];
+    const resources = responseData?.data?.resources || [];
+
+    return {
+      ok: true,
+      data: {
+        endpoint: COORDINATION_API_URLS.decompose,
+        request_body: requestBody,
+        response_body: responseData,
+        missions,
+        resources,
+      },
+    };
+  };
+
+  const fetchCommandUpdate = async (operation, commandIds, missionIds, resourceIds) => {
+    const requestBody = buildUpdateRequest({
+      operation,
+      commandIds,
+      missionIds,
+      resourceIds,
+    });
+
+    const result = await safeFetch(joinApiUrl(COORDINATION_API_URLS.update), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!result.ok) {
+      return { ok: false, error: result.error, data: null };
+    }
+
+    return { ok: true, data: result.data };
+  };
+
+  // ========== 业务操作 ==========
+
   const handleForward = () => {
     moduleApi.chat.appendSystemMessage(`[任务理解] 已转发命令：${selectedCommand.value?.name || ''}`);
     moduleApi.chat.open();
   };
 
-  const handleAssociate = () => {
+  const handleAssociate = async () => {
     const command = selectedCommand.value;
     if (!command) {
       return;
     }
     const selected = selectedAnalysis.value;
-    const request = buildUpdateRequest({
-      operation: 'associate',
-      commandIds: [command.cmd_id],
-      missionIds: selected?.missions?.map((item) => item.mission_id) || [],
-      resourceIds: selected?.resources?.map((item) => item.resource_id) || [],
-    });
-    const response = buildUpdateResponse({
-      operation: 'associate',
-      requestId: request.RequestID,
-    });
-    moduleApi.chat.appendSystemMessage(
-      `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 关联命令（RequestID=${request.RequestID}，result=${response.data.result}）。`
+    const missionIds = selected?.missions?.map((item) => item.mission_id) || [];
+    const resourceIds = selected?.resources?.map((item) => item.resource_id) || [];
+
+    const remoteResult = await fetchCommandUpdate(
+      'associate',
+      [command.cmd_id],
+      missionIds,
+      resourceIds
     );
+
+    if (remoteResult.ok) {
+      const response = remoteResult.data;
+      moduleApi.chat.appendSystemMessage(
+        `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 关联命令（RequestID=${response?.responseID}，result=${response?.data?.result}）。`
+      );
+    } else {
+      // Fallback: 本地模拟
+      const request = buildUpdateRequest({
+        operation: 'associate',
+        commandIds: [command.cmd_id],
+        missionIds,
+        resourceIds,
+      });
+      const response = buildUpdateResponse({
+        operation: 'associate',
+        requestId: request.RequestID,
+      });
+      moduleApi.chat.appendSystemMessage(
+        `[任务理解] 后端服务不可用，已 fallback 到本地模拟：调用 ${COORDINATION_API_URLS.update} 关联命令（RequestID=${request.RequestID}，result=${response.data.result}）。`
+      );
+    }
     moduleApi.chat.open();
   };
 
-  const removeSelectedCommand = () => {
+  const removeSelectedCommand = async () => {
     const command = selectedCommand.value;
     if (!command) {
       return false;
     }
-    const request = buildUpdateRequest({
-      operation: 'delete',
-      commandIds: [command.cmd_id],
-    });
-    const response = buildUpdateResponse({
-      operation: 'delete',
-      requestId: request.RequestID,
-    });
-    moduleApi.chat.appendSystemMessage(
-      `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 删除命令（RequestID=${request.RequestID}，result=${response.data.result}），当前仍为演示模式未真实删除。`
-    );
+
+    const remoteResult = await fetchCommandUpdate('delete', [command.cmd_id]);
+
+    if (remoteResult.ok) {
+      const response = remoteResult.data;
+      moduleApi.chat.appendSystemMessage(
+        `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 删除命令（RequestID=${response?.responseID}，result=${response?.data?.result}）。`
+      );
+    } else {
+      // Fallback: 本地模拟
+      const request = buildUpdateRequest({
+        operation: 'delete',
+        commandIds: [command.cmd_id],
+      });
+      const response = buildUpdateResponse({
+        operation: 'delete',
+        requestId: request.RequestID,
+      });
+      moduleApi.chat.appendSystemMessage(
+        `[任务理解] 后端服务不可用，已 fallback 到本地模拟：调用 ${COORDINATION_API_URLS.update} 删除命令（RequestID=${request.RequestID}，result=${response.data.result}）。`
+      );
+    }
     moduleApi.chat.open();
+
     commands.value = commands.value.filter((item) => item.commandId !== command.commandId);
     const nextAnalysisMap = { ...analysisResultMap.value };
     delete nextAnalysisMap[command.commandId];
@@ -221,22 +330,38 @@ export function useTaskUnderstandingState({ moduleApi }) {
     }
 
     parsing.value = true;
-    moduleApi.chat.appendSystemMessage(
-      `[任务理解] 已发送命令 ${command.commandId} 到 ${COORDINATION_API_URLS.decompose}（当前为假数据模拟）。`
-    );
 
-    await new Promise((resolve) => window.setTimeout(resolve, 800));
+    const remoteResult = await fetchCommandDecompose(command.commandId);
 
-    analysisResultMap.value = {
-      ...analysisResultMap.value,
-      [command.commandId]: mockAnalysisByCommandId[command.commandId],
-    };
+    if (remoteResult.ok) {
+      // 使用后端返回的真实数据
+      analysisResultMap.value = {
+        ...analysisResultMap.value,
+        [command.commandId]: remoteResult.data,
+      };
+      moduleApi.chat.appendSystemMessage(
+        `[任务理解] 命令 ${command.commandId} 已通过后端服务解析完成，共提取 ${remoteResult.data.missions.length} 个任务、${remoteResult.data.resources.length} 个资源。`
+      );
+    } else {
+      // Fallback: 本地假数据模拟
+      moduleApi.chat.appendSystemMessage(
+        `[任务理解] 后端服务不可用（${remoteResult.error}），已 fallback 到本地假数据模拟。`
+      );
+
+      await new Promise((resolve) => window.setTimeout(resolve, 800));
+
+      analysisResultMap.value = {
+        ...analysisResultMap.value,
+        [command.commandId]: mockAnalysisByCommandId[command.commandId],
+      };
+
+      moduleApi.chat.appendSystemMessage(
+        `[任务理解] 命令 ${command.commandId} 本地模拟解析完成，共提取 ${mockAnalysisByCommandId[command.commandId].missions.length} 个任务、${mockAnalysisByCommandId[command.commandId].resources.length} 个资源。`
+      );
+    }
 
     parsing.value = false;
     resultView.value = 'missions';
-    moduleApi.chat.appendSystemMessage(
-      `[任务理解] 命令 ${command.commandId} 解析完成，共提取 ${mockAnalysisByCommandId[command.commandId].missions.length} 个任务、${mockAnalysisByCommandId[command.commandId].resources.length} 个资源。`
-    );
   };
 
   const saveEditMission = () => {
