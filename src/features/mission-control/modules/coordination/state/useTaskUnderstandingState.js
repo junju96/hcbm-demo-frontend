@@ -5,6 +5,8 @@ import {
   buildUpdateResponse,
   commandRecords,
   createMockAnalysisByCommand,
+  missionRecords,
+  resourceRecords,
 } from '../data/commandDataModel';
 import {
   loadTaskUnderstandingDb,
@@ -110,6 +112,8 @@ export function useTaskUnderstandingState({ moduleApi }) {
   const initialDb = loadTaskUnderstandingDb({ mockCommands: commandRecords });
   const commands = ref(initialDb.commands);
   const mockAnalysisByCommandId = createMockAnalysisByCommand();
+  const allMissions = ref(missionRecords);
+  const allResources = ref(resourceRecords);
 
   const selectedCommandId = ref(initialDb.selectedCommandId || commands.value[0]?.commandId || '');
   const parsing = ref(false);
@@ -244,41 +248,57 @@ export function useTaskUnderstandingState({ moduleApi }) {
     moduleApi.chat.open();
   };
 
-  const handleAssociate = async () => {
+  const handleAssociate = async (missionIds, resourceIds) => {
     const command = selectedCommand.value;
     if (!command) {
       return;
     }
-    const selected = selectedAnalysis.value;
-    const missionIds = selected?.missions?.map((item) => item.mission_id) || [];
-    const resourceIds = selected?.resources?.map((item) => item.resource_id) || [];
+
+    const safeMissionIds = Array.isArray(missionIds) ? missionIds : [];
+    const safeResourceIds = Array.isArray(resourceIds) ? resourceIds : [];
+
+    // 更新前端状态：同步命令的 connections
+    const nextCommands = commands.value.map((cmd) => {
+      if (cmd.commandId !== command.commandId) {
+        return cmd;
+      }
+      return {
+        ...cmd,
+        connections: {
+          ...cmd.connections,
+          connected_missions: safeMissionIds,
+          connected_resources: safeResourceIds,
+        },
+      };
+    });
+    commands.value = nextCommands;
 
     const remoteResult = await fetchCommandUpdate(
       'associate',
       [command.cmd_id],
-      missionIds,
-      resourceIds
+      safeMissionIds,
+      safeResourceIds
     );
 
     if (remoteResult.ok) {
       const response = remoteResult.data;
       moduleApi.chat.appendSystemMessage(
-        `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 关联命令（RequestID=${response?.responseID}，result=${response?.data?.result}）。`
+        `[任务理解] 已调用 ${COORDINATION_API_URLS.update} 关联命令（RequestID=${response?.responseID}，result=${response?.data?.result}），关联 ${safeMissionIds.length} 个任务、${safeResourceIds.length} 个资源。`
       );
     } else {
       // Fallback: 本地模拟
       const request = buildUpdateRequest({
         operation: 'associate',
         commandIds: [command.cmd_id],
-        missionIds,
-        resourceIds,
+        missionIds: safeMissionIds,
+        resourceIds: safeResourceIds,
       });
       const response = buildUpdateResponse({
         operation: 'associate',
         requestId: request.RequestID,
       });
       moduleApi.chat.appendSystemMessage(
-        `[任务理解] 后端服务不可用，已 fallback 到本地模拟：调用 ${COORDINATION_API_URLS.update} 关联命令（RequestID=${request.RequestID}，result=${response.data.result}）。`
+        `[任务理解] 后端服务不可用，已 fallback 到本地模拟：调用 ${COORDINATION_API_URLS.update} 关联命令（RequestID=${request.RequestID}，result=${response.data.result}），关联 ${safeMissionIds.length} 个任务、${safeResourceIds.length} 个资源。`
       );
     }
     moduleApi.chat.open();
@@ -391,6 +411,8 @@ export function useTaskUnderstandingState({ moduleApi }) {
     handleAssociate,
     removeSelectedCommand,
     parseSelectedCommand,
+    allMissions,
+    allResources,
     editingMissionId: missionEditor.editingMissionId,
     missionDraft: missionEditor.missionDraft,
     isEditing: missionEditor.isEditing,

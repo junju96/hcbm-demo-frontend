@@ -43,6 +43,17 @@
           :handle-associate="handleAssociate"
           :remove-selected-command="removeSelectedCommand"
           :parse-selected-command="parseSelectedCommand"
+          :all-missions="allMissions"
+          :all-resources="allResources"
+          @open-associate-dialog="associateDialogVisible = true"
+        />
+
+        <AssociateDialog
+          v-model:visible="associateDialogVisible"
+          :selected-command="selectedCommand"
+          :missions="allMissions"
+          :resources="allResources"
+          @confirm="({ missionIds, resourceIds }) => handleAssociate(missionIds, resourceIds)"
         />
 
         <AnalysisResultPanel
@@ -67,12 +78,14 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import {
   createInteractionTargetAttrs,
 } from '../../../../shared/interaction/createInteractionTarget';
 import { useTaskUnderstandingState } from '../../state/useTaskUnderstandingState';
 import CommandDetailSection from './CommandDetailSection.vue';
 import AnalysisResultPanel from './AnalysisResultPanel.vue';
+import AssociateDialog from './AssociateDialog.vue';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
@@ -99,10 +112,14 @@ const {
   handleAssociate,
   removeSelectedCommand,
   parseSelectedCommand,
+  allMissions,
+  allResources,
   startEditMission,
   cancelEditMission,
   saveEditMission,
 } = useTaskUnderstandingState({ moduleApi: props.moduleApi });
+
+const associateDialogVisible = ref(false);
 
 const resolveCommandTargetId = (command) => `coordination:command:${command?.commandId || ''}`;
 

@@ -62,7 +62,7 @@
           class="coord-btn"
           type="button"
           v-bind="buildCommandActionAttrs('coordination:associate-command', '关联命令')"
-          @click="handleAssociate"
+          @click="emit('open-associate-dialog')"
         >
           关联
         </button>
@@ -98,6 +98,14 @@
         </div>
       </div>
     </div>
+
+    <AssociateDialog
+      v-model:visible="associateDialogVisible"
+      :selected-command="selectedCommand"
+      :missions="allMissions"
+      :resources="allResources"
+      @confirm="({ missionIds, resourceIds }) => handleAssociate(missionIds, resourceIds)"
+    />
   </article>
 
   <article v-else class="coord-panel coord-command-panel coord-command-empty-panel">
@@ -112,6 +120,7 @@ import {
   createInteractionActionAttrs,
   createInteractionTargetAttrs,
 } from '../../../../shared/interaction/createInteractionTarget';
+import AssociateDialog from './AssociateDialog.vue';
 
 const props = defineProps({
   selectedCommand: { type: Object, default: null },
@@ -124,9 +133,14 @@ const props = defineProps({
   handleAssociate: { type: Function, required: true },
   removeSelectedCommand: { type: Function, required: true },
   parseSelectedCommand: { type: Function, required: true },
+  allMissions: { type: Array, default: () => [] },
+  allResources: { type: Array, default: () => [] },
 });
 
+const emit = defineEmits(['open-associate-dialog']);
+
 const deleteDialogVisible = ref(false);
+const associateDialogVisible = ref(false);
 
 const openDeleteDialog = () => {
   if (!props.selectedCommand) return;
