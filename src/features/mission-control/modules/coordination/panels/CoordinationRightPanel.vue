@@ -7,6 +7,13 @@
       :panel-definition="panelDefinition"
     />
 
+    <PlanDesignPanel
+      v-else-if="activeSubviewId === 'plan-design'"
+      :module-api="moduleApi"
+      :module-manifest="moduleManifest"
+      :panel-definition="panelDefinition"
+    />
+
     <ResourceCatalogPanel
       v-else-if="activeSubviewId === 'resource-list'"
       :module-api="moduleApi"
@@ -25,6 +32,7 @@
 import { computed } from 'vue';
 import MissionRightPanelShell from '../../../shared/layout/MissionRightPanelShell.vue';
 import TaskUnderstandingPanel from './right/TaskUnderstandingPanel.vue';
+import PlanDesignPanel from './right/PlanDesignPanel.vue';
 import ResourceCatalogPanel from './right/ResourceCatalogPanel.vue';
 
 const props = defineProps({
