@@ -217,35 +217,7 @@
                   <span v-for="tid in stage.target_ids" :key="tid" class="planning-tag-chip target">{{ resolveTargetName(tid) }}</span>
                 </div>
 
-                <!-- 行动序列 -->
-                <div class="planning-actions-section">
-                  <div class="planning-actions-title">行动序列</div>
-                  <div v-for="teamId in stage.team_ids" :key="teamId" class="planning-action-group">
-                    <div class="planning-action-group-title">{{ resolveTeamName(teamId) }}</div>
-                    <div v-if="stage.team_actions?.[teamId]?.length" class="planning-action-vehicles">
-                      <div v-for="vehicle in stage.team_actions[teamId]" :key="vehicle.vid" class="planning-vehicle-card">
-                        <div class="planning-vehicle-header">
-                          <span class="planning-vehicle-name">{{ vehicle.vid }}</span>
-                          <span class="planning-vehicle-state" :class="`state-${STATE_TONE[vehicle.state] || 'ready'}`">
-                            {{ STATE_LABELS[vehicle.state] || vehicle.state }}
-                          </span>
-                        </div>
-                        <div class="planning-action-list">
-                          <div
-                            v-for="(action, idx) in vehicle.actions"
-                            :key="action.action_id"
-                            class="planning-action-item"
-                          >
-                            <span class="planning-action-seq">{{ idx + 1 }}</span>
-                            <span class="planning-action-name">{{ action.name }}</span>
-                            <span class="planning-action-desc">{{ action.description }}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div v-else class="planning-action-empty">暂无行动序列</div>
-                  </div>
-                </div>
+                <!-- 行动序列（已移除） -->
               </div>
             </div>
           </div>
@@ -473,20 +445,6 @@
         </div>
         <div v-else class="plan-team-empty">
           <span>暂无阶段，可点击"新增阶段"添加</span>
-        </div>
-      </div>
-
-      <!-- 行动序列 -->
-      <div class="plan-section">
-        <div class="plan-section-header">
-          <div class="plan-section-title">行动序列</div>
-          <div class="plan-action-btns">
-            <button class="planning-btn small" type="button" @click="onEditActionParams">编辑行动序列参数</button>
-            <button class="planning-btn small" type="button" @click="onAddAction">新增序列</button>
-          </div>
-        </div>
-        <div class="plan-action-empty">
-          <span>请先新增泳道并补充节点名称、开始时间和结束时间，泳道图会自动生成</span>
         </div>
       </div>
 
@@ -852,14 +810,6 @@ const onAddStage = () => {
 
 const onRemoveStage = (stageId) => {
   stages.value = stages.value.filter((s) => s.stage_id !== stageId);
-};
-
-const onEditActionParams = () => {
-  appendSystemMessage('编辑行动序列参数（演示模式）');
-};
-
-const onAddAction = () => {
-  appendSystemMessage('新增行动序列（演示模式）');
 };
 
 const onAddTactic = () => {
