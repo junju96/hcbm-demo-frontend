@@ -15,7 +15,6 @@ const COORDINATION_BRIEF_PANEL_ID = 'coord-brief';
 const COORDINATION_SUBVIEWS = Object.freeze([
   { id: 'task-understanding', title: '任务理解' },
   { id: 'plan-design', title: '方案规划' },
-  { id: 'action-sequence', title: '行动序列' },
   { id: 'resource-list', title: '资源清单' },
 ]);
 
