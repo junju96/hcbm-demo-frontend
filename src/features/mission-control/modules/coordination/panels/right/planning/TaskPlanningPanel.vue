@@ -273,13 +273,22 @@
       <!-- 顶部栏 -->
       <div class="plan-edit-header">
         <div class="plan-edit-tags">
-          <span class="plan-edit-tag draft">行动方案草稿</span>
-          <span class="plan-edit-tag status">编辑中</span>
+          <span v-if="planEditMode === 'ad-hoc'" class="plan-edit-tag draft">临机调整</span>
+          <template v-else>
+            <span class="plan-edit-tag draft">行动方案草稿</span>
+            <span class="plan-edit-tag status">编辑中</span>
+          </template>
         </div>
         <div class="plan-edit-actions">
-          <button class="planning-btn" type="button" @click="onSaveDraft">保存草稿</button>
-          <button class="planning-btn primary" type="button" @click="onGeneratePlan">一键生成行动方案</button>
-          <button class="planning-btn primary" type="button" @click="onPublishPlan">发布为正式行动方案</button>
+          <template v-if="planEditMode === 'ad-hoc'">
+            <button class="planning-btn primary" type="button" @click="onSaveDraft">保存</button>
+            <button class="planning-btn" type="button" @click="onCancelAdHocEdit">取消</button>
+          </template>
+          <template v-else>
+            <button class="planning-btn" type="button" @click="onSaveDraft">保存草稿</button>
+            <button class="planning-btn primary" type="button" @click="onGeneratePlan">一键生成行动方案</button>
+            <button class="planning-btn primary" type="button" @click="onPublishPlan">发布为正式行动方案</button>
+          </template>
         </div>
       </div>
 
@@ -363,7 +372,7 @@
 
         <!-- 未展开时显示占位 -->
         <template v-if="!resourcePickerVisible">
-          <div class="plan-resource-empty">
+          <div v-if="!selectedResourceIds.length" class="plan-resource-empty">
             <span class="plan-resource-empty-text">暂无已选资源，可点击"增加"选择</span>
           </div>
           <div class="plan-resource-selected">
@@ -401,16 +410,38 @@
         <!-- 行动编组 -->
         <div class="plan-team-block">
           <div class="plan-section-subheader">
-            <span class="plan-section-subtitle">行动编组</span>
-            <button class="planning-btn small" type="button" @click="onEditTeam">编辑</button>
+            <div class="plan-team-header-left">
+              <span class="plan-section-subtitle">行动编组</span>
+              <div v-if="teamEditMode" class="plan-team-edit-actions">
+                <button class="planning-btn small" type="button" @click="openCreateTeamDialog">新建</button>
+                <button class="planning-btn small" type="button" :disabled="selectedTeamIds.length < 2" @click="onMergeTeams">合并</button>
+                <button class="planning-btn small danger" type="button" @click="onRemoveTeams">移除</button>
+              </div>
+            </div>
+            <button class="planning-btn small" type="button" @click="toggleTeamEdit">
+              {{ teamEditMode ? '收起' : '编辑' }}
+            </button>
           </div>
-          <div class="plan-team-hint">点击编组卡片可选中，编辑面板支持新建、合并、移除</div>
+          <div v-if="!teamEditMode" class="plan-team-hint">点击编组卡片可选中，编辑面板支持新建、合并、移除</div>
           <div class="plan-team-table-header">
             <span>编组名称</span>
             <span>编组说明</span>
             <span>编组资源</span>
           </div>
-          <div class="plan-team-empty">
+          <div v-if="teams.length" class="plan-team-list">
+            <div
+              v-for="team in teams"
+              :key="team.team_id"
+              class="plan-team-row"
+              :class="{ selected: selectedTeamIds.includes(team.team_id) }"
+              @click="toggleTeamSelection(team.team_id)"
+            >
+              <span class="plan-team-cell">{{ team.name }}</span>
+              <span class="plan-team-cell">{{ team.description }}</span>
+              <span class="plan-team-cell">{{ team.resource_names }}</span>
+            </div>
+          </div>
+          <div v-else class="plan-team-empty">
             <span>暂无编组，可点击"编辑"后新建编组</span>
           </div>
         </div>
@@ -421,6 +452,27 @@
         <div class="plan-section-header">
           <div class="plan-section-title">阶段划分</div>
           <button class="planning-btn small" type="button" @click="onAddStage">新增阶段</button>
+        </div>
+        <div v-if="stages.length" class="stage-list">
+          <div v-for="(stage, index) in stages" :key="stage.stage_id" class="stage-card">
+            <div class="stage-card-header">
+              <span class="stage-seq">阶段 {{ index + 1 }}</span>
+              <input v-model="stage.title" class="stage-title-input" placeholder="请输入阶段名称" />
+              <div class="stage-card-actions">
+                <button class="planning-btn small" type="button" @click="stage.expanded = !stage.expanded">
+                  {{ stage.expanded ? '收起' : '展开' }}
+                </button>
+                <button class="planning-btn small danger" type="button" @click="onRemoveStage(stage.stage_id)">删除</button>
+              </div>
+            </div>
+            <div v-if="stage.expanded" class="stage-card-body">
+              <div class="plan-form-label">阶段说明</div>
+              <textarea v-model="stage.description" class="plan-form-input stage-desc-input" rows="4" placeholder="请输入该阶段行动安排" />
+            </div>
+          </div>
+        </div>
+        <div v-else class="plan-team-empty">
+          <span>暂无阶段，可点击"新增阶段"添加</span>
         </div>
       </div>
 
@@ -449,6 +501,46 @@
       v-model:visible="editAssocVisible"
       @confirm="onAssocConfirm"
     />
+
+    <!-- 新建行动编组弹窗 -->
+    <div v-if="newTeamDialogVisible" class="team-dialog-mask" @click.self="newTeamDialogVisible = false">
+      <div class="team-dialog">
+        <div class="team-dialog-header">
+          <div class="team-dialog-title">新建行动编组</div>
+          <button class="planning-btn small" type="button" @click="newTeamDialogVisible = false">关闭</button>
+        </div>
+        <div class="team-dialog-body">
+          <div class="plan-form-row">
+            <span class="plan-form-label">编组名称</span>
+            <input v-model="newTeamName" class="plan-form-input" placeholder="请输入编组名称" />
+          </div>
+          <div class="plan-form-row">
+            <span class="plan-form-label">选择行动资源</span>
+            <div v-if="!selectedResourceIds.length" class="plan-resource-empty">
+              <span class="plan-resource-empty-text">请先在上方行动资源中选择资源，再建立编组</span>
+            </div>
+            <div v-else class="team-resource-select-list">
+              <label
+                v-for="res in selectedEquipmentResources"
+                :key="res.resource_id"
+                class="team-resource-select-item"
+              >
+                <input type="checkbox" :value="res.resource_id" v-model="newTeamResourceIds" />
+                <span>{{ res.resource_name }}（{{ getResourceTypeLabel(res) }}）</span>
+              </label>
+            </div>
+          </div>
+          <div class="plan-form-row">
+            <span class="plan-form-label">编组说明</span>
+            <textarea v-model="newTeamDesc" class="plan-form-input" rows="3" placeholder="请输入编组说明" />
+          </div>
+        </div>
+        <div class="team-dialog-footer">
+          <button class="planning-btn" type="button" @click="newTeamDialogVisible = false">取消</button>
+          <button class="planning-btn primary" type="button" @click="onCreateTeam">确定</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -468,6 +560,7 @@ const emit = defineEmits(['switch-tab']);
 
 // ========== 视图模式 ==========
 const viewMode = ref('mission-list'); // 'mission-list' | 'plan-edit'
+const planEditMode = ref('normal'); // 'normal' | 'ad-hoc'
 
 // ========== 左侧 Tab ==========
 const leftTabs = [
@@ -529,14 +622,24 @@ const onRemoveRelation = () => {
 
 const enterPlanEdit = () => {
   planDraft.value = JSON.parse(JSON.stringify(planDetail));
+  planEditMode.value = 'normal';
   viewMode.value = 'plan-edit';
   appendSystemMessage(`开始任务规划：${selectedMission.value?.title}`);
 };
 
 // ========== 方案详情操作 ==========
 const onAdHocAdjust = () => {
+  planDraft.value = JSON.parse(JSON.stringify(planDetail));
+  planEditMode.value = 'ad-hoc';
+  viewMode.value = 'plan-edit';
   appendSystemMessage('临机调整：已请求调整当前方案');
-  emit('switch-tab', 'ad-hoc-planning');
+};
+
+const onCancelAdHocEdit = () => {
+  viewMode.value = 'mission-list';
+  planEditMode.value = 'normal';
+  planDraft.value = null;
+  appendSystemMessage('已取消临机调整');
 };
 
 const onDispatchExecute = () => {
@@ -646,12 +749,108 @@ const selectedResourceNames = computed(() => {
   return names.length ? names.join('、') : '暂无选择';
 });
 
+// ========== 行动编组 ==========
+const teamEditMode = ref(false);
+const teams = ref([]);
+const selectedTeamIds = ref([]);
+const newTeamDialogVisible = ref(false);
+const newTeamName = ref('');
+const newTeamDesc = ref('');
+const newTeamResourceIds = ref([]);
+
+const selectedEquipmentResources = computed(() =>
+  equipmentResources.value.filter((r) => selectedResourceIds.value.includes(r.resource_id))
+);
+
+const toggleTeamEdit = () => {
+  teamEditMode.value = !teamEditMode.value;
+  if (!teamEditMode.value) selectedTeamIds.value = [];
+};
+
+const openCreateTeamDialog = () => {
+  newTeamName.value = '';
+  newTeamDesc.value = '';
+  newTeamResourceIds.value = [];
+  newTeamDialogVisible.value = true;
+};
+
+const onCreateTeam = () => {
+  const name = newTeamName.value.trim();
+  if (!name) {
+    appendSystemMessage('请输入编组名称');
+    return;
+  }
+  const selectedResources = equipmentResources.value.filter((r) => newTeamResourceIds.value.includes(r.resource_id));
+  teams.value.push({
+    team_id: `TEAM_${Date.now()}`,
+    name,
+    description: newTeamDesc.value.trim(),
+    resource_ids: [...newTeamResourceIds.value],
+    resource_names: selectedResources.map((r) => r.resource_name).join('、') || '无',
+  });
+  newTeamDialogVisible.value = false;
+  appendSystemMessage(`新建编组：${name}`);
+};
+
+const toggleTeamSelection = (teamId) => {
+  if (selectedTeamIds.value.includes(teamId)) {
+    selectedTeamIds.value = selectedTeamIds.value.filter((id) => id !== teamId);
+  } else {
+    selectedTeamIds.value.push(teamId);
+  }
+};
+
+const onRemoveTeams = () => {
+  if (selectedTeamIds.value.length === 0) {
+    appendSystemMessage('请先点击选中要移除的编组');
+    return;
+  }
+  const count = selectedTeamIds.value.length;
+  teams.value = teams.value.filter((t) => !selectedTeamIds.value.includes(t.team_id));
+  selectedTeamIds.value = [];
+  appendSystemMessage(`已移除 ${count} 个编组`);
+};
+
+const onMergeTeams = () => {
+  if (selectedTeamIds.value.length < 2) return;
+  const selectedTeams = teams.value.filter((t) => selectedTeamIds.value.includes(t.team_id));
+  const mergedName = `${selectedTeams[0].name}合并组`;
+  const mergedDesc = selectedTeams.map((t) => t.description).filter(Boolean).join('；');
+  const allResourceIds = [...new Set(selectedTeams.flatMap((t) => t.resource_ids))];
+  const allResourceNames = equipmentResources.value
+    .filter((r) => allResourceIds.includes(r.resource_id))
+    .map((r) => r.resource_name)
+    .join('、');
+  teams.value = teams.value.filter((t) => !selectedTeamIds.value.includes(t.team_id));
+  teams.value.push({
+    team_id: `TEAM_${Date.now()}`,
+    name: mergedName,
+    description: mergedDesc,
+    resource_ids: allResourceIds,
+    resource_names: allResourceNames || '无',
+  });
+  selectedTeamIds.value = [];
+  appendSystemMessage(`合并编组：${mergedName}`);
+};
+
 const onEditTeam = () => {
   appendSystemMessage('编辑行动编组（演示模式）');
 };
 
+// ========== 阶段划分 ==========
+const stages = ref([]);
+
 const onAddStage = () => {
-  appendSystemMessage('新增阶段（演示模式）');
+  stages.value.push({
+    stage_id: `STAGE_${Date.now()}`,
+    title: '',
+    description: '',
+    expanded: true,
+  });
+};
+
+const onRemoveStage = (stageId) => {
+  stages.value = stages.value.filter((s) => s.stage_id !== stageId);
 };
 
 const onEditActionParams = () => {
@@ -1637,13 +1836,27 @@ const onAddTactic = () => {
 
 .plan-resource-selected {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(0, 222, 200, 0.05);
+  border: 1px solid rgba(0, 222, 200, 0.12);
+}
+
+.plan-resource-selected .plan-form-label {
+  color: rgba(226, 246, 248, 0.55);
+  font-size: 0.82rem;
+  flex-shrink: 0;
+  padding-top: 0.08rem;
 }
 
 .plan-resource-selected-value {
-  color: rgba(226, 246, 248, 0.45);
-  font-size: 0.85rem;
+  color: var(--planning-accent);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.5;
 }
 
 /* 资源选择面板 */
@@ -1758,31 +1971,279 @@ const onAddTactic = () => {
   margin-top: 0.3rem;
 }
 
+.plan-team-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.plan-team-edit-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
 .plan-team-hint {
-  font-size: 0.82rem;
-  color: rgba(226, 246, 248, 0.55);
-  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+  color: rgba(226, 246, 248, 0.45);
+  margin-bottom: 0.3rem;
 }
 
 .plan-team-table-header {
   display: grid;
   grid-template-columns: 1fr 1.5fr 1fr;
   gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  color: rgba(226, 246, 248, 0.65);
-  border-bottom: 1px solid rgba(0, 222, 200, 0.12);
+  color: rgba(226, 246, 248, 0.55);
+  border-bottom: 1px solid rgba(0, 222, 200, 0.1);
+}
+
+.plan-team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.plan-team-row {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr;
+  gap: 0.5rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 222, 200, 0.1);
+  background: rgba(0, 222, 200, 0.03);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+  font-size: 0.86rem;
+  color: var(--planning-text-soft);
+}
+
+.plan-team-row:hover {
+  border-color: rgba(0, 222, 200, 0.25);
+}
+
+.plan-team-row.selected {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.plan-team-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .plan-team-empty {
-  border-radius: 10px;
-  border: 1px dashed rgba(0, 222, 200, 0.18);
-  padding: 1.2rem;
+  border-radius: 8px;
+  border: 1px dashed rgba(0, 222, 200, 0.15);
+  padding: 0.8rem;
   text-align: center;
-  margin-top: 0.4rem;
-  color: rgba(226, 246, 248, 0.5);
+  margin-top: 0.25rem;
+  color: rgba(226, 246, 248, 0.45);
+  font-size: 0.84rem;
+}
+
+/* danger 按钮 */
+.planning-btn.danger {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.45) 0%, rgba(185, 28, 28, 0.45) 100%);
+}
+
+.planning-btn.danger:hover {
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.6) 0%, rgba(185, 28, 28, 0.6) 100%);
+}
+
+.planning-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 新建编组弹窗 */
+/* 阶段划分 */
+.stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+}
+
+.stage-card {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 222, 200, 0.12);
+  background: rgba(0, 222, 200, 0.03);
+  padding: 0.6rem 0.75rem;
+}
+
+.stage-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.stage-seq {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--planning-text);
+  flex-shrink: 0;
+  min-width: 48px;
+}
+
+.stage-title-input {
+  flex: 1;
+  min-height: 36px;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 222, 200, 0.18);
+  background: rgba(10, 18, 22, 0.7);
+  color: #f8fafc;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+
+.stage-title-input:focus {
+  border-color: rgba(0, 222, 200, 0.4);
+}
+
+.stage-title-input::placeholder {
+  color: rgba(226, 246, 248, 0.4);
+}
+
+.stage-card-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.stage-card-body {
+  margin-top: 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.stage-desc-input {
+  resize: vertical;
+}
+
+.team-dialog-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+}
+
+.team-dialog {
+  width: 100%;
+  max-width: 560px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 208, 188, 0.4);
+  background:
+    linear-gradient(180deg, rgba(0, 213, 192, 0.06), rgba(0, 49, 72, 0.01)),
+    rgba(1, 16, 22, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.05), 0 20px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  margin: auto;
+}
+
+.team-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.15);
+}
+
+.team-dialog-title {
+  color: #f1feff;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.team-dialog-body {
+  padding: 0.8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.team-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  border-top: 1px solid rgba(0, 222, 200, 0.1);
+}
+
+.team-resource-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.team-resource-select-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 222, 200, 0.12);
+  background: rgba(0, 222, 200, 0.03);
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
   font-size: 0.88rem;
+  color: var(--planning-text);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.team-resource-select-item:hover {
+  border-color: rgba(0, 222, 200, 0.28);
+}
+
+.team-resource-select-item input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 2px solid rgba(0, 222, 200, 0.35);
+  background: rgba(0, 222, 200, 0.06);
+  flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+}
+
+.team-resource-select-item input[type="checkbox"]:checked {
+  border-color: var(--planning-accent);
+  background: var(--planning-accent);
+}
+
+.team-resource-select-item input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid rgba(1, 16, 22, 0.96);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+@media (max-width: 768px) {
+  .plan-tactic-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .plan-action-btns {
