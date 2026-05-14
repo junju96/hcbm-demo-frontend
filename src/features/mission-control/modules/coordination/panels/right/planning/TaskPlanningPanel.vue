@@ -4,8 +4,8 @@
     <div v-if="viewMode === 'mission-list'" class="planning-layout">
       <!-- 左侧列表区 -->
       <aside class="coord-panel planning-left-pane">
-        <!-- Tab 切换 -->
-        <div class="left-tab-bar">
+        <!-- Tab 切换（任务规划模式显示，临机规划模式隐藏） -->
+        <div v-if="mode !== 'ad-hoc'" class="left-tab-bar">
           <button
             v-for="t in leftTabs"
             :key="t.id"
@@ -263,8 +263,8 @@
       </section>
 
       <div v-else class="coord-panel planning-right-pane planning-empty">
-        <div class="coord-pane-title">{{ leftTab === 'missions' ? '任务详情' : '方案详情' }}</div>
-        <div class="coord-empty-state">请从左侧选择一个{{ leftTab === 'missions' ? '任务' : '方案' }}</div>
+        <div class="coord-pane-title">{{ (mode !== 'ad-hoc' && leftTab === 'missions') ? '任务详情' : '方案详情' }}</div>
+        <div class="coord-empty-state">请从左侧选择一个{{ (mode !== 'ad-hoc' && leftTab === 'missions') ? '任务' : '方案' }}</div>
       </div>
     </div>
 
@@ -554,6 +554,7 @@ import EditAssociationDialog from './EditAssociationDialog.vue';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
+  mode: { type: String, default: 'task' }, // 'task' | 'ad-hoc'
 });
 
 const emit = defineEmits(['switch-tab']);
@@ -567,7 +568,7 @@ const leftTabs = [
   { id: 'missions', label: '任务列表' },
   { id: 'plans', label: '方案列表' },
 ];
-const leftTab = ref('missions');
+const leftTab = ref(props.mode === 'ad-hoc' ? 'plans' : 'missions');
 
 // ========== 任务列表 ==========
 const missions = missionsList;

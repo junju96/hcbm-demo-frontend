@@ -21,10 +21,12 @@
         :module-api="moduleApi"
         @switch-tab="activeTab = $event"
       />
-      <div v-else-if="activeTab === 'ad-hoc-planning'" class="plan-design-placeholder">
-        <div class="coord-pane-title">临机规划</div>
-        <div class="coord-pane-subtitle">当前子面板暂未接入详细界面。</div>
-      </div>
+      <TaskPlanningPanel
+        v-else-if="activeTab === 'ad-hoc-planning'"
+        :module-api="moduleApi"
+        mode="ad-hoc"
+        @switch-tab="activeTab = $event"
+      />
       <div v-else-if="activeTab === 'plan-library'" class="plan-design-placeholder">
         <div class="coord-pane-title">预案库</div>
         <div class="coord-pane-subtitle">当前子面板暂未接入详细界面。</div>
