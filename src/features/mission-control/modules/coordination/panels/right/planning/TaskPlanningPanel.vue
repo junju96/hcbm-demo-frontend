@@ -4,78 +4,58 @@
     <div v-if="viewMode === 'mission-list'" class="planning-layout">
       <!-- 左侧列表区 -->
       <aside class="coord-panel planning-left-pane">
-        <!-- Tab 切换（任务规划模式显示，临机规划模式隐藏） -->
-        <div v-if="mode !== 'ad-hoc'" class="left-tab-bar">
+        <!-- 任务列表 -->
+        <div v-if="mode === 'task' && missions.length" class="planning-mission-list">
           <button
-            v-for="t in leftTabs"
-            :key="t.id"
-            class="left-tab-btn"
-            :class="{ active: leftTab === t.id }"
+            v-for="m in missions"
+            :key="m.mission_id"
+            class="planning-mission-item"
+            :class="{ active: selectedMissionId === m.mission_id }"
             type="button"
-            @click="leftTab = t.id"
+            @click="selectedMissionId = m.mission_id"
           >
-            {{ t.label }}
+            <div class="planning-mission-top">
+              <span class="planning-mission-name">{{ m.title }}</span>
+              <span class="planning-mission-state" :class="`state-${STATE_TONE[m.state] || 'ready'}`">
+                {{ STATE_LABELS[m.state] || m.state }}
+              </span>
+            </div>
+            <div class="planning-mission-desc">{{ m.description }}</div>
+            <div class="planning-mission-meta">
+              <span>目标 {{ m.target }}</span>
+              <span>命令 {{ m.command_id }}</span>
+            </div>
           </button>
         </div>
-
-        <!-- 任务列表 -->
-        <div v-if="leftTab === 'missions'">
-          <div v-if="missions.length" class="planning-mission-list">
-            <button
-              v-for="m in missions"
-              :key="m.mission_id"
-              class="planning-mission-item"
-              :class="{ active: selectedMissionId === m.mission_id }"
-              type="button"
-              @click="selectedMissionId = m.mission_id"
-            >
-              <div class="planning-mission-top">
-                <span class="planning-mission-name">{{ m.title }}</span>
-                <span class="planning-mission-state" :class="`state-${STATE_TONE[m.state] || 'ready'}`">
-                  {{ STATE_LABELS[m.state] || m.state }}
-                </span>
-              </div>
-              <div class="planning-mission-desc">{{ m.description }}</div>
-              <div class="planning-mission-meta">
-                <span>目标 {{ m.target }}</span>
-                <span>命令 {{ m.command_id }}</span>
-              </div>
-            </button>
-          </div>
-          <div v-else class="coord-empty-state">暂无任务数据</div>
-        </div>
-
         <!-- 方案列表 -->
-        <div v-else>
-          <div v-if="planCards.length" class="planning-mission-list">
-            <button
-              v-for="card in planCards"
-              :key="card.plan_id"
-              class="planning-mission-item"
-              :class="{ active: selectedPlanId === card.plan_id }"
-              type="button"
-              @click="selectedPlanId = card.plan_id"
-            >
-              <div class="planning-mission-top">
-                <span class="planning-mission-name">{{ card.title }}</span>
-                <span class="planning-mission-state" :class="`state-${STATE_TONE[card.state] || 'draft'}`">
-                  {{ STATE_LABELS[card.state] || card.state }}
-                </span>
-              </div>
-              <div class="planning-mission-desc">{{ card.description }}</div>
-              <div class="planning-mission-meta">
-                <span>编组 {{ card.teams_count }}</span>
-                <span>阶段 {{ card.stages_count }}</span>
-                <span>战法 {{ card.tactic_title }}</span>
-              </div>
-            </button>
-          </div>
-          <div v-else class="coord-empty-state">暂无方案数据</div>
+        <div v-else-if="mode === 'plan' && plans.length" class="planning-mission-list">
+          <button
+            v-for="p in plans"
+            :key="p.plan_id"
+            class="planning-mission-item"
+            :class="{ active: selectedPlanId === p.plan_id }"
+            type="button"
+            @click="selectedPlanId = p.plan_id"
+          >
+            <div class="planning-mission-top">
+              <span class="planning-mission-name">{{ p.title }}</span>
+              <span class="planning-mission-state" :class="`state-${STATE_TONE[p.state] || 'ready'}`">
+                {{ STATE_LABELS[p.state] || p.state }}
+              </span>
+            </div>
+            <div class="planning-mission-desc">{{ p.description }}</div>
+            <div class="planning-mission-meta">
+              <span>战术 {{ p.tactic_title || '未指定' }}</span>
+              <span>编组 {{ p.teams_count }} / 阶段 {{ p.stages_count }}</span>
+            </div>
+          </button>
         </div>
+        <div v-else-if="mode === 'task'" class="coord-empty-state">暂无任务数据</div>
+        <div v-else-if="mode === 'plan'" class="coord-empty-state">暂无方案数据</div>
       </aside>
 
-      <!-- 右侧详情区 -->
-      <section v-if="leftTab === 'missions' && selectedMission" class="coord-panel planning-right-pane mission-detail-pane">
+      <!-- 右侧任务详情区 -->
+      <section v-if="mode === 'task' && selectedMission" class="coord-panel planning-right-pane mission-detail-pane">
         <!-- 头部 -->
         <div class="mission-detail-header">
           <h2 class="mission-detail-title">{{ selectedMission.title }}</h2>
@@ -136,107 +116,67 @@
         </div>
       </section>
 
-      <!-- 右侧：方案详情 -->
-      <section v-else-if="leftTab === 'plans' && selectedPlan" class="coord-panel planning-right-pane">
-        <!-- 方案概览 -->
-        <div class="planning-section">
-          <div class="planning-section-title">方案概览</div>
-          <div class="planning-overview">
-            <div class="planning-overview-row">
-              <span class="planning-label">方案标题</span>
-              <span class="planning-value">{{ selectedPlan.title }}</span>
-            </div>
-            <div class="planning-overview-row">
-              <span class="planning-label">方案说明</span>
-              <span class="planning-value">{{ selectedPlan.description }}</span>
-            </div>
-            <div class="planning-overview-row">
-              <span class="planning-label">战术战法</span>
-              <span class="planning-value">
-                <strong>{{ selectedPlan.tactic?.title }}</strong>
-                <span v-if="selectedPlan.tactic?.content"> — {{ selectedPlan.tactic.content }}</span>
-              </span>
-            </div>
-            <div class="planning-overview-row">
-              <span class="planning-label">方案目标</span>
-              <div class="planning-targets">
-                <div v-for="t in selectedPlan.targets" :key="t.target_id" class="planning-target-chip">
-                  {{ t.name }}（{{ t.target_type }}）
-                </div>
-              </div>
+      <!-- 右侧方案详情区 -->
+      <section v-else-if="mode === 'plan' && selectedPlan" class="coord-panel planning-right-pane mission-detail-pane">
+        <div class="mission-detail-header">
+          <h2 class="mission-detail-title">{{ selectedPlan.title }}</h2>
+          <div class="mission-detail-actions">
+            <button class="planning-btn" type="button" @click="onForwardPlan">转发</button>
+            <div class="mission-status-badge">
+              <span class="mission-status-label">状态</span>
+              <span class="mission-status-value">{{ STATE_LABELS[selectedPlan.state] || selectedPlan.state }}</span>
             </div>
           </div>
         </div>
 
-        <!-- 编组编成 -->
-        <div class="planning-section">
-          <div class="planning-section-title">编组编成</div>
-          <div class="planning-teams">
-            <div v-for="team in selectedPlan.teams" :key="team.team_id" class="planning-team-card">
-              <div class="planning-team-header">
-                <span class="planning-team-name">{{ team.name }}</span>
-                <span class="planning-team-state" :class="`state-${STATE_TONE[team.state] || 'ready'}`">
-                  {{ STATE_LABELS[team.state] || team.state }}
-                </span>
-              </div>
-              <div class="planning-team-desc">{{ team.description }}</div>
-              <div class="planning-team-equip">
-                <span class="planning-label">装备：</span>
-                <span v-for="(eq, i) in team.equipment" :key="i" class="planning-equip-chip">{{ eq }}</span>
-              </div>
+        <div class="planning-section mission-content-section">
+          <div class="planning-section-title">方案描述</div>
+          <p class="mission-content-text">{{ selectedPlan.description }}</p>
+          <div class="mission-content-meta">
+            <div class="mission-meta-card">
+              <span class="mission-meta-label">战术战法</span>
+              <span class="mission-meta-value">{{ selectedPlan.tactic_title || '未指定' }}</span>
+            </div>
+            <div class="mission-meta-card">
+              <span class="mission-meta-label">编组/阶段</span>
+              <span class="mission-meta-value">{{ selectedPlan.teams_count }} 编组 / {{ selectedPlan.stages_count }} 阶段</span>
             </div>
           </div>
         </div>
 
-        <!-- 阶段划分 -->
-        <div class="planning-section">
-          <div class="planning-section-title">阶段划分</div>
-          <div class="planning-stages">
-            <div
-              v-for="stage in selectedPlan.stages"
-              :key="stage.stage_id"
-              class="planning-stage-card"
-              :class="{ expanded: expandedStageIds.includes(stage.stage_id) }"
-            >
-              <button class="planning-stage-header" type="button" @click="toggleStage(stage.stage_id)">
-                <span class="planning-stage-seq">P{{ stage.stage_seq }}</span>
-                <span class="planning-stage-title">{{ stage.title }}</span>
-                <span class="planning-stage-state" :class="`state-${STATE_TONE[stage.state] || 'ready'}`">
-                  {{ STATE_LABELS[stage.state] || stage.state }}
-                </span>
-                <span class="planning-stage-chevron">{{ expandedStageIds.includes(stage.stage_id) ? '▾' : '▸' }}</span>
-              </button>
-              <div v-if="expandedStageIds.includes(stage.stage_id)" class="planning-stage-body">
-                <div class="planning-stage-desc">{{ stage.description }}</div>
-                <div class="planning-stage-teams">
-                  <span class="planning-label">参与编组：</span>
-                  <span v-for="tid in stage.team_ids" :key="tid" class="planning-tag-chip">{{ resolveTeamName(tid) }}</span>
-                </div>
-                <div v-if="stage.target_ids?.length" class="planning-stage-targets">
-                  <span class="planning-label">关联目标：</span>
-                  <span v-for="tid in stage.target_ids" :key="tid" class="planning-tag-chip target">{{ resolveTargetName(tid) }}</span>
-                </div>
-
-                <!-- 行动序列（已移除） -->
-              </div>
+        <div class="planning-section mission-relation-section">
+          <div class="planning-section-header">
+            <div class="planning-section-title">关联关系</div>
+            <div class="mission-relation-actions">
+              <button class="planning-btn small" type="button" @click="onAddRelation">新增</button>
+              <button class="planning-btn small" type="button" @click="onRemoveRelation">删除</button>
+            </div>
+          </div>
+          <div class="mission-relation-block">
+            <div class="mission-relation-label">已关联命令</div>
+            <div class="mission-relation-tags">
+              <span class="mission-relation-tag command">命令 1</span>
+            </div>
+          </div>
+          <div class="mission-relation-block">
+            <div class="mission-relation-label">已关联任务</div>
+            <div class="mission-relation-tags">
+              <span class="mission-relation-tag mission">任务 1</span>
+              <span class="mission-relation-tag plan-title">{{ missionsList[0]?.title || '区域侦察命令-机动任务' }}</span>
             </div>
           </div>
         </div>
 
-        <!-- 底部操作 -->
         <div class="mission-footer-actions">
-          <button class="planning-btn primary large" type="button" @click="onAdHocAdjust">
-            临机调整
-          </button>
-          <button class="planning-btn primary large" type="button" @click="onDispatchExecute">
-            下发执行
+          <button class="planning-btn primary large" type="button" @click="enterPlanEditFromPlan">
+            编辑方案
           </button>
         </div>
       </section>
 
       <div v-else class="coord-panel planning-right-pane planning-empty">
-        <div class="coord-pane-title">{{ (mode !== 'ad-hoc' && leftTab === 'missions') ? '任务详情' : '方案详情' }}</div>
-        <div class="coord-empty-state">请从左侧选择一个{{ (mode !== 'ad-hoc' && leftTab === 'missions') ? '任务' : '方案' }}</div>
+        <div class="coord-pane-title">{{ mode === 'plan' ? '方案详情' : '任务详情' }}</div>
+        <div class="coord-empty-state">请从左侧选择一个{{ mode === 'plan' ? '方案' : '任务' }}</div>
       </div>
     </div>
 
@@ -255,18 +195,34 @@
           <template v-if="planEditMode === 'ad-hoc'">
             <button class="planning-btn primary" type="button" @click="onSaveDraft">保存</button>
             <button class="planning-btn" type="button" @click="onCancelAdHocEdit">取消</button>
+            <button class="planning-btn" type="button" @click="viewMode = 'mission-list'">{{ mode === 'plan' ? '返回方案列表' : '返回任务列表' }}</button>
           </template>
           <template v-else>
             <button class="planning-btn" type="button" @click="onSaveDraft">保存草稿</button>
             <button class="planning-btn primary" type="button" @click="onGeneratePlan">一键生成行动方案</button>
             <button class="planning-btn primary" type="button" @click="onPublishPlan">发布为正式行动方案</button>
+            <button class="planning-btn" type="button" @click="viewMode = 'mission-list'">{{ mode === 'plan' ? '返回方案列表' : '返回任务列表' }}</button>
           </template>
         </div>
       </div>
 
-      <!-- 基本信息 -->
-      <div class="plan-section">
-        <div class="plan-section-title">基本信息</div>
+      <!-- 编辑面板：分段控制器 + 内容区融为一体 -->
+      <div class="plan-edit-panel">
+        <div class="plan-edit-segmented">
+          <button
+            v-for="step in planEditSteps"
+            :key="step.id"
+            class="plan-edit-segment"
+            :class="{ active: planEditSubTab === step.id }"
+            type="button"
+            @click="planEditSubTab = step.id"
+          >
+            {{ step.label }}
+          </button>
+        </div>
+
+        <!-- 基本信息 -->
+        <div v-if="planEditSubTab === 'basic'" class="plan-section">
         <div class="plan-form-row">
           <span class="plan-form-label">方案标题</span>
           <input v-model="planDraft.title" class="plan-form-input" placeholder="输入方案标题" />
@@ -328,9 +284,8 @@
         </div>
       </div>
 
-      <!-- 编组编成 -->
-      <div class="plan-section">
-        <div class="plan-section-title">编组编成</div>
+        <!-- 编组编成 -->
+        <div v-else-if="planEditSubTab === 'teams'" class="plan-section">
         <div class="plan-resource-header">
           <span class="plan-form-label">行动资源</span>
           <button
@@ -419,10 +374,9 @@
         </div>
       </div>
 
-      <!-- 阶段划分 -->
-      <div class="plan-section">
-        <div class="plan-section-header">
-          <div class="plan-section-title">阶段划分</div>
+        <!-- 阶段划分 -->
+        <div v-else-if="planEditSubTab === 'stages'" class="plan-section">
+          <div class="plan-section-header">
           <button class="planning-btn small" type="button" @click="onAddStage">新增阶段</button>
         </div>
         <div v-if="stages.length" class="stage-list">
@@ -448,9 +402,6 @@
         </div>
       </div>
 
-      <!-- 返回按钮 -->
-      <div class="plan-edit-footer">
-        <button class="planning-btn" type="button" @click="viewMode = 'mission-list'">返回任务列表</button>
       </div>
     </div>
 
@@ -512,7 +463,7 @@ import EditAssociationDialog from './EditAssociationDialog.vue';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
-  mode: { type: String, default: 'task' }, // 'task' | 'ad-hoc'
+  mode: { type: String, default: 'task' }, // 'task' | 'plan' | 'ad-hoc'
 });
 
 const emit = defineEmits(['switch-tab']);
@@ -521,12 +472,13 @@ const emit = defineEmits(['switch-tab']);
 const viewMode = ref('mission-list'); // 'mission-list' | 'plan-edit'
 const planEditMode = ref('normal'); // 'normal' | 'ad-hoc'
 
-// ========== 左侧 Tab ==========
-const leftTabs = [
-  { id: 'missions', label: '任务列表' },
-  { id: 'plans', label: '方案列表' },
+// ========== 方案编辑二级分段控制器 ==========
+const planEditSteps = [
+  { id: 'basic', label: '基本信息' },
+  { id: 'teams', label: '编组编成' },
+  { id: 'stages', label: '阶段划分' },
 ];
-const leftTab = ref(props.mode === 'ad-hoc' ? 'plans' : 'missions');
+const planEditSubTab = ref('basic');
 
 // ========== 任务列表 ==========
 const missions = missionsList;
@@ -535,13 +487,11 @@ const selectedMission = computed(() =>
   missions.find((m) => m.mission_id === selectedMissionId.value) || null
 );
 
-// ========== 方案列表 ==========
-const selectedPlanId = ref(planCards[0]?.plan_id || '');
-const selectedPlan = computed(() => {
-  if (!selectedPlanId.value) return null;
-  // 目前仅一条 mock 数据，直接返回 planDetail
-  return planDetail.plan_id === selectedPlanId.value ? planDetail : null;
-});
+const plans = planCards;
+const selectedPlanId = ref(plans[0]?.plan_id || '');
+const selectedPlan = computed(() =>
+  plans.find((p) => p.plan_id === selectedPlanId.value) || null
+);
 
 const expandedStageIds = ref([]);
 const toggleStage = (stageId) => {
@@ -584,6 +534,17 @@ const enterPlanEdit = () => {
   planEditMode.value = 'normal';
   viewMode.value = 'plan-edit';
   appendSystemMessage(`开始任务规划：${selectedMission.value?.title}`);
+};
+
+const enterPlanEditFromPlan = () => {
+  planDraft.value = JSON.parse(JSON.stringify(planDetail));
+  planEditMode.value = 'normal';
+  viewMode.value = 'plan-edit';
+  appendSystemMessage(`开始编辑方案：${selectedPlan.value?.title}`);
+};
+
+const onForwardPlan = () => {
+  appendSystemMessage(`转发方案：${selectedPlan.value?.title}`);
 };
 
 // ========== 方案详情操作 ==========
@@ -938,38 +899,7 @@ const onAddTactic = () => {
   padding: 0.9rem;
 }
 
-/* 左侧 Tab */
-.left-tab-bar {
-  display: flex;
-  gap: 0.2rem;
-  margin-bottom: 0.7rem;
-  border-bottom: 1px solid rgba(0, 222, 200, 0.12);
-}
-
-.left-tab-btn {
-  flex: 1;
-  padding: 0.45rem 0.3rem;
-  border: none;
-  background: transparent;
-  color: rgba(226, 246, 248, 0.6);
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: 8px 8px 0 0;
-  transition: color 160ms ease, background 160ms ease;
-}
-
-.left-tab-btn:hover {
-  color: rgba(226, 246, 248, 0.9);
-  background: rgba(0, 222, 200, 0.05);
-}
-
-.left-tab-btn.active {
-  color: var(--planning-accent);
-  background: rgba(0, 222, 200, 0.08);
-}
-
-/* 列表项（复用于任务和方案） */
+/* 列表项（任务列表） */
 .planning-mission-list {
   margin-top: 0.2rem;
   display: flex;
@@ -1514,6 +1444,22 @@ const onAddTactic = () => {
   padding: 0.2rem 0.1rem;
 }
 
+/* ===== 编辑面板容器：分段控制器 + 内容区融为一体 ===== */
+.plan-edit-panel {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--planning-border-soft);
+  background: var(--planning-card-bg);
+  overflow: hidden;
+}
+
+.plan-edit-panel .plan-section {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
 .plan-edit-header {
   display: flex;
   align-items: center;
@@ -1553,10 +1499,39 @@ const onAddTactic = () => {
   flex-wrap: wrap;
 }
 
+/* ===== 二级分段控制器（编辑步骤切换） ===== */
+.plan-edit-segmented {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.6rem 0.9rem 0.5rem;
+  background: linear-gradient(180deg, rgba(0, 213, 192, 0.04), rgba(0, 49, 72, 0.01)), rgba(1, 16, 22, 0.5);
+  border-bottom: 1px solid rgba(0, 222, 200, 0.12);
+}
+
+.plan-edit-segment {
+  padding: 0.4rem 0.9rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: rgba(226, 246, 248, 0.65);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+  white-space: nowrap;
+}
+
+.plan-edit-segment:hover {
+  color: rgba(226, 246, 248, 0.9);
+}
+
+.plan-edit-segment.active {
+  background: rgba(0, 222, 200, 0.15);
+  color: var(--planning-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
 .plan-section {
-  border-radius: 12px;
-  border: 1px solid var(--planning-border-soft);
-  background: var(--planning-card-bg);
   padding: 0.8rem 0.9rem;
   display: flex;
   flex-direction: column;

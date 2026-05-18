@@ -1,5 +1,21 @@
 <template>
   <MissionRightPanelShell class="coord-right-shell">
+    <!-- 子视图标题栏（仅方案规划显示子选项卡，不重复显示标题） -->
+    <div v-if="activeSubviewId === 'plan-design'" class="coord-subview-header">
+      <div class="plan-design-tabs">
+        <button
+          v-for="tab in planDesignTabs"
+          :key="tab.id"
+          class="plan-design-tab"
+          :class="{ active: planDesignActiveTab === tab.id }"
+          type="button"
+          @click="planDesignActiveTab = tab.id"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+    </div>
+
     <TaskUnderstandingPanel
       v-if="activeSubviewId === 'task-understanding'"
       :module-api="moduleApi"
@@ -12,6 +28,8 @@
       :module-api="moduleApi"
       :module-manifest="moduleManifest"
       :panel-definition="panelDefinition"
+      :active-tab="planDesignActiveTab"
+      @update:active-tab="planDesignActiveTab = $event"
     />
 
     <ResourceCatalogPanel
@@ -29,7 +47,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import MissionRightPanelShell from '../../../shared/layout/MissionRightPanelShell.vue';
 import TaskUnderstandingPanel from './right/TaskUnderstandingPanel.vue';
 import PlanDesignPanel from './right/PlanDesignPanel.vue';
@@ -52,6 +70,14 @@ const props = defineProps({
 
 const activeSubviewId = computed(() => props.moduleApi.coordination?.activeSubviewId || 'task-understanding');
 const activeSubviewTitle = computed(() => props.moduleApi.coordination?.activeSubviewTitle || '任务理解');
+
+const planDesignTabs = [
+  { id: 'task-planning', label: '任务规划' },
+  { id: 'ad-hoc-planning', label: '方案规划' },
+  { id: 'plan-library', label: '预案库' },
+  { id: 'knowledge-base', label: '知识库' },
+];
+const planDesignActiveTab = ref('task-planning');
 
 const moduleApi = props.moduleApi;
 const moduleManifest = props.moduleManifest;
@@ -92,5 +118,59 @@ const panelDefinition = props.panelDefinition;
   color: rgba(226, 246, 248, 0.86);
   font-size: 0.98rem;
   line-height: 1.7;
+}
+
+/* ===== 子视图标题栏 ===== */
+.coord-subview-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1rem;
+  padding: 0.5rem 0.9rem 0;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.15);
+  flex-shrink: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 213, 192, 0.04), rgba(0, 49, 72, 0.01)),
+    rgba(1, 16, 22, 0.6);
+}
+
+/* ===== 方案规划子选项卡（已提升到标题栏） ===== */
+.plan-design-tabs {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.plan-design-tab {
+  position: relative;
+  padding: 0.4rem 0.85rem;
+  border: none;
+  background: transparent;
+  color: rgba(226, 246, 248, 0.7);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+  border-radius: 8px 8px 0 0;
+}
+
+.plan-design-tab:hover {
+  color: rgba(226, 246, 248, 0.95);
+  background: rgba(0, 222, 200, 0.06);
+}
+
+.plan-design-tab.active {
+  color: #00dec8;
+  background: rgba(0, 222, 200, 0.1);
+}
+
+.plan-design-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  width: 80%;
+  height: 2px;
+  background: #00dec8;
+  border-radius: 2px 2px 0 0;
 }
 </style>

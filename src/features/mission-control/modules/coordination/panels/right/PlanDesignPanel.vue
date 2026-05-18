@@ -1,31 +1,17 @@
 <template>
   <div class="plan-design-shell">
-    <!-- 子选项卡导航 -->
-    <div class="plan-design-tabs">
-      <button
-        v-for="tab in tabs"
-        :key="tab.id"
-        class="plan-design-tab"
-        :class="{ active: activeTab === tab.id }"
-        type="button"
-        @click="activeTab = tab.id"
-      >
-        {{ tab.label }}
-      </button>
-    </div>
-
-    <!-- 子面板内容 -->
+    <!-- 子面板内容（tabs 已提升到父组件 CoordinationRightPanel） -->
     <div class="plan-design-content">
       <TaskPlanningPanel
         v-if="activeTab === 'task-planning'"
         :module-api="moduleApi"
-        @switch-tab="activeTab = $event"
+        @switch-tab="emit('update:activeTab', $event)"
       />
       <TaskPlanningPanel
         v-else-if="activeTab === 'ad-hoc-planning'"
         :module-api="moduleApi"
-        mode="ad-hoc"
-        @switch-tab="activeTab = $event"
+        mode="plan"
+        @switch-tab="emit('update:activeTab', $event)"
       />
       <div v-else-if="activeTab === 'plan-library'" class="plan-design-placeholder">
         <div class="coord-pane-title">预案库</div>
@@ -40,23 +26,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
 import TaskPlanningPanel from './planning/TaskPlanningPanel.vue';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
   moduleManifest: { type: Object, default: () => ({}) },
   panelDefinition: { type: Object, default: () => ({}) },
+  activeTab: { type: String, default: 'task-planning' },
 });
 
-const tabs = [
-  { id: 'task-planning', label: '任务规划' },
-  { id: 'ad-hoc-planning', label: '临机规划' },
-  { id: 'plan-library', label: '预案库' },
-  { id: 'knowledge-base', label: '知识库' },
-];
-
-const activeTab = ref('task-planning');
+const emit = defineEmits(['update:activeTab']);
 const moduleApi = props.moduleApi;
 </script>
 
@@ -68,51 +47,6 @@ const moduleApi = props.moduleApi;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-}
-
-.plan-design-tabs {
-  display: flex;
-  gap: 0.3rem;
-  padding: 0.5rem 0.6rem 0;
-  border-bottom: 1px solid rgba(0, 222, 200, 0.15);
-  flex-shrink: 0;
-  background:
-    linear-gradient(180deg, rgba(0, 213, 192, 0.04), rgba(0, 49, 72, 0.01)),
-    rgba(1, 16, 22, 0.6);
-}
-
-.plan-design-tab {
-  position: relative;
-  padding: 0.5rem 0.9rem;
-  border: none;
-  background: transparent;
-  color: rgba(226, 246, 248, 0.7);
-  font-size: 0.92rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 160ms ease;
-  border-radius: 8px 8px 0 0;
-}
-
-.plan-design-tab:hover {
-  color: rgba(226, 246, 248, 0.95);
-  background: rgba(0, 222, 200, 0.06);
-}
-
-.plan-design-tab.active {
-  color: #00dec8;
-  background: rgba(0, 222, 200, 0.1);
-}
-
-.plan-design-tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 10%;
-  width: 80%;
-  height: 2px;
-  background: #00dec8;
-  border-radius: 2px 2px 0 0;
 }
 
 .plan-design-content {
