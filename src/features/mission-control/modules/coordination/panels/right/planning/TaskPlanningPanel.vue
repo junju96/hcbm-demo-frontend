@@ -411,7 +411,7 @@
             <!-- 表头行 -->
             <div
               class="swimlane-header-row"
-              :style="{ gridTemplateColumns: `120px ${planDraft.stages.map((_, i) => i < planDraft.stages.length - 1 ? 'minmax(180px, 1fr) 2px' : 'minmax(180px, 1fr)').join(' ')}` }"
+              :style="{ gridTemplateColumns: `56px ${planDraft.stages.map((_, i) => i < planDraft.stages.length - 1 ? 'minmax(180px, 1fr) 2px' : 'minmax(180px, 1fr)').join(' ')}` }"
             >
               <div class="swimlane-header-cell swimlane-corner">编组 / 车辆</div>
               <template v-for="(stage, sIndex) in planDraft.stages" :key="stage.stage_id">
@@ -439,10 +439,10 @@
               </div>
               <div
                 class="swimlane-team-panel-body"
-                :style="{ gridTemplateColumns: `120px ${planDraft.stages.map((_, i) => i < planDraft.stages.length - 1 ? 'minmax(180px, 1fr) 2px' : 'minmax(180px, 1fr)').join(' ')}` }"
+                :style="{ gridTemplateColumns: `56px ${planDraft.stages.map((_, i) => i < planDraft.stages.length - 1 ? 'minmax(180px, 1fr) 2px' : 'minmax(180px, 1fr)').join(' ')}` }"
               >
                 <template v-for="vid in team.equipment" :key="vid">
-                  <div class="swimlane-vehicle-cell">{{ vid }}</div>
+                  <div class="swimlane-vehicle-cell"><span class="swimlane-vid">{{ vid }}</span></div>
                   <template v-for="(stage, sIndex) in planDraft.stages" :key="stage.stage_id">
                     <div class="swimlane-stage-cell" :class="`swimlane-stage-col-${sIndex % 4}`">
                       <div v-if="getVehicleStageActions(vid, stage).length" class="swimlane-action-list">
@@ -2632,6 +2632,14 @@ const getVehicleStageActions = (vid, stage) => {
 .swimlane-corner {
   background: rgba(0, 222, 200, 0.05);
   color: rgba(196, 243, 248, 0.7);
+  padding: 0.5rem 0.15rem;
+  font-size: 0.78rem;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .swimlane-col-divider-header {
@@ -2712,20 +2720,24 @@ const getVehicleStageActions = (vid, stage) => {
 }
 
 .swimlane-vehicle-cell {
-  padding: 0.55rem 0.45rem;
+  padding: 0.35rem 0.15rem;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 222, 200, 0.04);
-  border-radius: 9px;
+  border-radius: 6px;
   border: 1px solid rgba(0, 222, 200, 0.12);
 }
 
 .swimlane-vid {
   font-weight: 700;
-  font-size: 0.88rem;
+  font-size: 0.78rem;
   color: #f7fdff;
   text-align: center;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
 }
 
 .swimlane-stage-cell {
@@ -2733,7 +2745,7 @@ const getVehicleStageActions = (vid, stage) => {
   background: rgba(0, 222, 200, 0.04);
   border-radius: 9px;
   border: 1px solid rgba(0, 222, 200, 0.12);
-  min-height: 64px;
+  min-height: 48px;
 }
 
 .swimlane-stage-cell.swimlane-stage-col-0 { background: rgba(0, 222, 200, 0.04); }
