@@ -2815,10 +2815,12 @@ const getVehicleStageActions = (vid, stage) => {
 .swimlane-stage-cell.swimlane-stage-col-3 { background: rgba(245, 158, 11, 0.04); }
 
 .swimlane-empty-cell {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
   color: rgba(196, 243, 248, 0.25);
   font-size: 0.82rem;
-  padding: 0.9rem 0;
 }
 
 .swimlane-action-list {
