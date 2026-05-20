@@ -2652,26 +2652,25 @@ const getVehicleStageActions = (vid, stage) => {
 }
 
 .swimlane-header-cell {
-  padding: 0.5rem 0.55rem;
-  background: rgba(0, 222, 200, 0.14);
-  border-radius: 8px 8px 0 0;
+  padding: 0.35rem 0.5rem;
+  background: transparent;
+  border-radius: 7px;
   text-align: center;
-  font-weight: 800;
-  font-size: 0.92rem;
-  color: #00e5ca;
-  border: none;
-  border-bottom: 2px solid rgba(0, 222, 200, 0.45);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: rgba(0, 229, 202, 0.85);
+  border: 1px solid rgba(0, 222, 200, 0.18);
   letter-spacing: 0.02em;
 }
 
-.swimlane-header-cell.swimlane-stage-col-0 { background: rgba(0, 222, 200, 0.18); border-bottom-color: rgba(0, 222, 200, 0.55); }
-.swimlane-header-cell.swimlane-stage-col-1 { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border-bottom-color: rgba(59, 130, 246, 0.55); }
-.swimlane-header-cell.swimlane-stage-col-2 { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border-bottom-color: rgba(139, 92, 246, 0.55); }
-.swimlane-header-cell.swimlane-stage-col-3 { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border-bottom-color: rgba(245, 158, 11, 0.55); }
+.swimlane-header-cell.swimlane-stage-col-0 { background: rgba(0, 222, 200, 0.06); border-color: rgba(0, 222, 200, 0.22); }
+.swimlane-header-cell.swimlane-stage-col-1 { background: rgba(59, 130, 246, 0.07); color: rgba(147, 197, 253, 0.85); border-color: rgba(59, 130, 246, 0.22); }
+.swimlane-header-cell.swimlane-stage-col-2 { background: rgba(139, 92, 246, 0.07); color: rgba(196, 181, 253, 0.85); border-color: rgba(139, 92, 246, 0.22); }
+.swimlane-header-cell.swimlane-stage-col-3 { background: rgba(245, 158, 11, 0.07); color: rgba(252, 211, 77, 0.85); border-color: rgba(245, 158, 11, 0.22); }
 
 .swimlane-corner {
-  background: rgba(0, 222, 200, 0.08);
-  color: rgba(196, 243, 248, 0.55);
+  background: transparent;
+  color: rgba(196, 243, 248, 0.45);
   padding: 0.3rem 0.1rem;
   font-size: 0.72rem;
   line-height: 1.35;
@@ -2680,7 +2679,8 @@ const getVehicleStageActions = (vid, stage) => {
   align-items: center;
   justify-content: center;
   gap: 0.05rem;
-  border-radius: 8px 8px 0 0;
+  border-radius: 7px;
+  border: 1px solid rgba(0, 222, 200, 0.12);
 }
 
 .swimlane-col-divider-header {
@@ -2706,8 +2706,8 @@ const getVehicleStageActions = (vid, stage) => {
 
 /* 编组大框 panel */
 .swimlane-team-panel {
-  border-radius: 10px;
-  border: none;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 222, 200, 0.12);
   background: rgba(4, 16, 22, 0.55);
   min-width: fit-content;
 }
@@ -2718,8 +2718,8 @@ const getVehicleStageActions = (vid, stage) => {
   justify-content: space-between;
   gap: 0.8rem;
   padding: 0.55rem 1rem;
-  background: rgba(0, 222, 200, 0.06);
-  border-bottom: 1px solid rgba(0, 222, 200, 0.14);
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.12);
 }
 
 .swimlane-team-panel-title {
