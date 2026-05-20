@@ -1,6 +1,7 @@
 <template>
-  <div v-if="visible" class="coord-dialog-mask" @click.self="close">
-    <div class="coord-dialog associate-dialog">
+  <Transition name="dialog-scale">
+    <div v-if="visible" class="coord-dialog-mask" @click.self="close">
+      <div class="coord-dialog associate-dialog">
       <div class="coord-dialog-title">关联任务和资源</div>
 
       <!-- 当前命令信息 -->
@@ -87,6 +88,7 @@
       </div>
     </div>
   </div>
+  </Transition>
 </template>
 
 <script setup>
@@ -371,12 +373,13 @@ const confirm = () => {
   cursor: pointer;
   font-size: 0.97rem;
   font-weight: 700;
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .coord-btn:hover {
-  border-color: rgba(0, 222, 200, 0.5);
-  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.12);
+  border-color: rgba(0, 222, 200, 0.55);
+  box-shadow: 0 0 0 3px rgba(0, 222, 200, 0.12), 0 4px 14px rgba(0, 222, 200, 0.08);
+  transform: translateY(-1px);
 }
 
 .coord-btn.primary {
@@ -395,5 +398,29 @@ const confirm = () => {
   padding: 0 0.66rem;
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+/* 弹窗缩放动画 */
+.dialog-scale-enter-active,
+.dialog-scale-leave-active {
+  transition: opacity 220ms ease;
+}
+.dialog-scale-enter-active .coord-dialog,
+.dialog-scale-leave-active .coord-dialog {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease;
+}
+.dialog-scale-enter-from {
+  opacity: 0;
+}
+.dialog-scale-enter-from .coord-dialog {
+  opacity: 0;
+  transform: scale(0.94) translateY(8px);
+}
+.dialog-scale-leave-to {
+  opacity: 0;
+}
+.dialog-scale-leave-to .coord-dialog {
+  opacity: 0;
+  transform: scale(0.96) translateY(-4px);
 }
 </style>

@@ -484,6 +484,7 @@
     />
 
     <!-- 新建行动编组弹窗 -->
+    <Transition name="dialog-scale">
     <div v-if="newTeamDialogVisible" class="team-dialog-mask" @click.self="newTeamDialogVisible = false">
       <div class="team-dialog">
         <div class="team-dialog-header">
@@ -520,10 +521,12 @@
           <button class="planning-btn" type="button" @click="newTeamDialogVisible = false">取消</button>
           <button class="planning-btn primary" type="button" @click="onCreateTeam">确定</button>
         </div>
-      </div>
+        </div>
     </div>
+  </Transition>
 
     <!-- 行动详情编辑弹窗 -->
+  <Transition name="dialog-scale">
     <div v-if="actionDetailVisible" class="action-dialog-mask" @click.self="actionDetailVisible = false">
       <div class="action-dialog">
         <div class="action-dialog-header">
@@ -576,6 +579,7 @@
         </div>
       </div>
     </div>
+  </Transition>
   </div>
 </template>
 
@@ -1039,12 +1043,13 @@ const getVehicleStageActions = (vid, stage) => {
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 700;
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   white-space: nowrap;
 }
 .planning-btn:hover {
-  border-color: rgba(0, 222, 200, 0.5);
-  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.12);
+  border-color: rgba(0, 222, 200, 0.55);
+  box-shadow: 0 0 0 3px rgba(0, 222, 200, 0.12), 0 4px 14px rgba(0, 222, 200, 0.08);
+  transform: translateY(-1px);
 }
 .planning-btn.primary {
   border-color: rgba(0, 208, 188, 0.4);
@@ -1149,7 +1154,7 @@ const getVehicleStageActions = (vid, stage) => {
   text-align: left;
   padding: 0.72rem 0.85rem;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 .planning-mission-item.active {
   border-color: var(--planning-border);
@@ -1157,8 +1162,9 @@ const getVehicleStageActions = (vid, stage) => {
   background: linear-gradient(180deg, var(--planning-accent-soft), rgba(0, 49, 72, 0.03)), var(--planning-bg-strong);
 }
 .planning-mission-item:hover {
-  border-color: rgba(0, 222, 200, 0.42);
-  transform: translateY(-1px);
+  border-color: rgba(0, 222, 200, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 222, 200, 0.1);
 }
 
 .planning-mission-top {
@@ -2804,13 +2810,14 @@ const getVehicleStageActions = (vid, stage) => {
   background: rgba(0, 222, 200, 0.07);
   padding: 0.45rem 0.6rem;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
 .swimlane-action-card:hover {
-  border-color: rgba(0, 222, 200, 0.4);
-  background: rgba(0, 222, 200, 0.1);
-  transform: translateY(-1px);
+  border-color: rgba(0, 222, 200, 0.55);
+  background: rgba(0, 222, 200, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 222, 200, 0.12);
 }
 
 .swimlane-stage-col-0 .swimlane-action-card {
@@ -3004,5 +3011,33 @@ const getVehicleStageActions = (vid, stage) => {
   background: var(--planning-bg-strong);
   color: var(--planning-text);
   padding: 0.5rem 0.7rem;
+}
+
+/* ===== 弹窗缩放动画 ===== */
+.dialog-scale-enter-active,
+.dialog-scale-leave-active {
+  transition: opacity 220ms ease;
+}
+.dialog-scale-enter-active .team-dialog,
+.dialog-scale-enter-active .action-dialog,
+.dialog-scale-leave-active .team-dialog,
+.dialog-scale-leave-active .action-dialog {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease;
+}
+.dialog-scale-enter-from {
+  opacity: 0;
+}
+.dialog-scale-enter-from .team-dialog,
+.dialog-scale-enter-from .action-dialog {
+  opacity: 0;
+  transform: scale(0.94) translateY(8px);
+}
+.dialog-scale-leave-to {
+  opacity: 0;
+}
+.dialog-scale-leave-to .team-dialog,
+.dialog-scale-leave-to .action-dialog {
+  opacity: 0;
+  transform: scale(0.96) translateY(-4px);
 }
 </style>

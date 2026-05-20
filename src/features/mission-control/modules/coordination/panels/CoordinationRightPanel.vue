@@ -16,33 +16,38 @@
       </div>
     </div>
 
-    <TaskUnderstandingPanel
-      v-if="activeSubviewId === 'task-understanding'"
-      :module-api="moduleApi"
-      :module-manifest="moduleManifest"
-      :panel-definition="panelDefinition"
-    />
+    <Transition name="coord-subview-switch" mode="out-in">
+      <TaskUnderstandingPanel
+        v-if="activeSubviewId === 'task-understanding'"
+        key="task-understanding"
+        :module-api="moduleApi"
+        :module-manifest="moduleManifest"
+        :panel-definition="panelDefinition"
+      />
 
-    <PlanDesignPanel
-      v-else-if="activeSubviewId === 'plan-design'"
-      :module-api="moduleApi"
-      :module-manifest="moduleManifest"
-      :panel-definition="panelDefinition"
-      :active-tab="planDesignActiveTab"
-      @update:active-tab="planDesignActiveTab = $event"
-    />
+      <PlanDesignPanel
+        v-else-if="activeSubviewId === 'plan-design'"
+        key="plan-design"
+        :module-api="moduleApi"
+        :module-manifest="moduleManifest"
+        :panel-definition="panelDefinition"
+        :active-tab="planDesignActiveTab"
+        @update:active-tab="planDesignActiveTab = $event"
+      />
 
-    <ResourceCatalogPanel
-      v-else-if="activeSubviewId === 'resource-list'"
-      :module-api="moduleApi"
-      :module-manifest="moduleManifest"
-      :panel-definition="panelDefinition"
-    />
+      <ResourceCatalogPanel
+        v-else-if="activeSubviewId === 'resource-list'"
+        key="resource-list"
+        :module-api="moduleApi"
+        :module-manifest="moduleManifest"
+        :panel-definition="panelDefinition"
+      />
 
-    <div v-else class="coord-placeholder">
-      <div class="coord-pane-title">{{ activeSubviewTitle }}</div>
-      <div class="coord-pane-subtitle">当前子面板暂未接入详细界面。</div>
-    </div>
+      <div v-else key="placeholder" class="coord-placeholder">
+        <div class="coord-pane-title">{{ activeSubviewTitle }}</div>
+        <div class="coord-pane-subtitle">当前子面板暂未接入详细界面。</div>
+      </div>
+    </Transition>
   </MissionRightPanelShell>
 </template>
 
@@ -172,5 +177,19 @@ const panelDefinition = props.panelDefinition;
   height: 2px;
   background: #00dec8;
   border-radius: 2px 2px 0 0;
+}
+
+/* ===== 子视图切换动画 ===== */
+.coord-subview-switch-enter-active,
+.coord-subview-switch-leave-active {
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.coord-subview-switch-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.coord-subview-switch-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>

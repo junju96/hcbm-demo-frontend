@@ -183,7 +183,6 @@
           </div>
         </div>
       </section>
-
       <section v-else class="coord-panel coord-resource-right coord-resource-empty-panel">
         <div class="coord-pane-title">资源详情</div>
         <div class="coord-resource-empty-copy">当前没有已解析的资源数据，右侧详情区已自动清空。</div>
@@ -454,11 +453,12 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   text-align: left;
   padding: 0.58rem 0.64rem;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 200ms ease, transform 200ms ease;
 }
-
 .coord-resource-item:hover {
-  border-color: rgba(0, 222, 200, 0.4);
+  border-color: rgba(0, 222, 200, 0.45);
+  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.08), 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
 }
 
 .coord-resource-item.active {

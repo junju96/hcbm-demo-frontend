@@ -3,12 +3,18 @@
     <div class="coord-layout">
       <aside class="coord-panel coord-left-pane">
         <div class="coord-pane-title">命令列表</div>
-        <div v-if="commands.length" class="coord-command-list">
+        <TransitionGroup
+          v-if="commands.length"
+          name="command-list"
+          tag="div"
+          class="coord-command-list"
+        >
           <button
-            v-for="command in commands"
+            v-for="(command, index) in commands"
             :key="command.commandId"
             class="coord-command-item"
             :class="{ active: selectedCommandId === command.commandId }"
+            :style="{ '--stagger-index': index }"
             v-bind="buildCommandTargetAttrs(command)"
             type="button"
             @click="selectedCommandId = command.commandId"
@@ -25,7 +31,7 @@
             </div>
             <div class="coord-command-title">{{ command.title }}</div>
           </button>
-        </div>
+        </TransitionGroup>
         <div v-else class="coord-empty-state coord-left-empty-state">
           当前没有可展示的命令，请等待新命令下发或重新初始化数据。
         </div>
@@ -188,9 +194,25 @@ const buildCommandTargetAttrs = (command) => createInteractionTargetAttrs({
 .coord-pane-title { color: var(--coord-text); font-size: 1.24rem; font-weight: 800; letter-spacing: 0.01em; text-shadow: 0 0 14px rgba(0, 222, 200, 0.16); }
 .coord-command-list { margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.62rem; min-height: fit-content; }
 .coord-left-empty-state { margin-top: 0.8rem; }
-.coord-command-item { border-radius: 12px; border: 1px solid var(--coord-border-soft); border-left: 3px solid rgba(0, 222, 200, 0.36); background: var(--coord-bg-strong); color: var(--coord-text); text-align: left; padding: 0.66rem 0.72rem; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, transform 160ms ease; }
+.coord-command-item { border-radius: 12px; border: 1px solid var(--coord-border-soft); border-left: 3px solid rgba(0, 222, 200, 0.36); background: var(--coord-bg-strong); color: var(--coord-text); text-align: left; padding: 0.66rem 0.72rem; cursor: pointer; transition: border-color 180ms ease, background 180ms ease, transform 180ms ease, box-shadow 180ms ease; }
 .coord-command-item.active { border-color: var(--coord-border); border-left-color: var(--coord-accent); background: linear-gradient(180deg, var(--coord-accent-soft), rgba(0, 49, 72, 0.03)), var(--coord-bg-strong); }
-.coord-command-item:hover { border-color: rgba(0, 222, 200, 0.42); transform: translateY(-1px); }
+.coord-command-item:hover { border-color: rgba(0, 222, 200, 0.5); transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 222, 200, 0.1); }
+
+/* 命令列表 stagger 动画 */
+.command-list-enter-active {
+  transition: opacity 220ms ease, transform 220ms ease;
+  transition-delay: calc(min(var(--stagger-index, 0), 12) * 35ms);
+}
+.command-list-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.command-list-leave-active {
+  transition: opacity 160ms ease;
+}
+.command-list-leave-to {
+  opacity: 0;
+}
 .coord-command-item-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .coord-command-name { font-weight: 700; font-size: 0.96rem; }
 .coord-command-title { margin-top: 0.38rem; color: rgba(236, 252, 255, 0.92); font-size: 0.9rem; line-height: 1.45; }

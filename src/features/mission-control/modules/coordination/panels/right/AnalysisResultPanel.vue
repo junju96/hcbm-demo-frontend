@@ -55,12 +55,18 @@
         </span>
       </div>
 
-      <div v-if="resultView === 'missions'" class="coord-list">
+      <TransitionGroup
+        v-if="resultView === 'missions'"
+        name="result-list"
+        tag="div"
+        class="coord-list"
+      >
         <div
-          v-for="mission in selectedAnalysis.missions"
+          v-for="(mission, index) in selectedAnalysis.missions"
           :key="mission.mission_id"
           class="coord-list-row"
           :class="{ editing: editingMissionId === mission.mission_id }"
+          :style="{ '--stagger-index': index }"
           v-bind="buildMissionTargetAttrs(mission)"
         >
           <div class="coord-mission-row-head">
@@ -151,13 +157,19 @@
             </template>
           </template>
         </div>
-      </div>
+      </TransitionGroup>
 
-      <div v-else class="coord-list">
+      <TransitionGroup
+        v-else
+        name="result-list"
+        tag="div"
+        class="coord-list"
+      >
         <div
-          v-for="resource in selectedAnalysis.resources"
+          v-for="(resource, index) in selectedAnalysis.resources"
           :key="resource.resource_id"
           class="coord-list-row"
+          :style="{ '--stagger-index': index }"
           v-bind="buildResourceTargetAttrs(resource)"
         >
           <div class="coord-list-main">
@@ -202,7 +214,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </TransitionGroup>
     </div>
   </article>
 </template>
@@ -323,6 +335,22 @@ const resourceSummary = (resource) => {
 .coord-result-summary-trace { font-size: 0.78rem; color: rgba(153, 218, 227, 0.65); font-family: var(--font-mono, monospace); }
 
 .coord-list { margin-top: 0.62rem; display: flex; flex-direction: column; gap: 0.72rem; min-height: fit-content; }
+
+/* 结果列表 stagger 动画 */
+.result-list-enter-active {
+  transition: opacity 220ms ease, transform 220ms ease;
+  transition-delay: calc(min(var(--stagger-index, 0), 12) * 30ms);
+}
+.result-list-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.result-list-leave-active {
+  transition: opacity 160ms ease;
+}
+.result-list-leave-to {
+  opacity: 0;
+}
 .coord-list-row { position: relative; border-radius: 10px; border: 1px solid rgba(0, 208, 188, 0.32); background: linear-gradient(180deg, rgba(0, 222, 200, 0.05), rgba(0, 222, 200, 0.015)), rgba(0, 16, 22, 0.68); padding: 0.54rem 0.64rem; box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.05), 0 6px 14px rgba(0, 0, 0, 0.16); }
 .coord-list-row:nth-child(even) { background: linear-gradient(180deg, rgba(0, 222, 200, 0.03), rgba(0, 222, 200, 0.01)), rgba(1, 14, 20, 0.72); }
 .coord-list-row + .coord-list-row::before { content: ''; position: absolute; top: -0.42rem; left: 0.62rem; right: 0.62rem; height: 1px; background: linear-gradient(90deg, rgba(0, 222, 200, 0), rgba(0, 222, 200, 0.34) 18%, rgba(0, 222, 200, 0.34) 82%, rgba(0, 222, 200, 0)); }
@@ -353,8 +381,8 @@ const resourceSummary = (resource) => {
 
 .coord-mission-row-head { display: flex; align-items: center; justify-content: space-between; gap: 0.65rem; }
 .coord-mission-row-actions { display: inline-flex; align-items: center; gap: 0.45rem; flex: 0 0 auto; }
-.coord-btn { min-height: 36px; padding: 0 0.92rem; border-radius: 9px; border: 1px solid var(--coord-border-soft); background: rgba(255, 255, 255, 0.08); color: var(--coord-text); cursor: pointer; font-size: 0.97rem; font-weight: 700; transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
-.coord-btn:hover { border-color: rgba(0, 222, 200, 0.5); box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.12); }
+.coord-btn { min-height: 36px; padding: 0 0.92rem; border-radius: 9px; border: 1px solid var(--coord-border-soft); background: rgba(255, 255, 255, 0.08); color: var(--coord-text); cursor: pointer; font-size: 0.97rem; font-weight: 700; transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
+.coord-btn:hover { border-color: rgba(0, 222, 200, 0.55); box-shadow: 0 0 0 3px rgba(0, 222, 200, 0.12), 0 4px 14px rgba(0, 222, 200, 0.08); transform: translateY(-1px); }
 .coord-btn.primary { border-color: var(--coord-border); background: linear-gradient(180deg, rgba(0, 110, 116, 0.44), rgba(0, 56, 58, 0.96)); }
 .coord-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .coord-mini-btn { min-height: 32px; min-width: 72px; padding: 0 0.66rem; font-size: 0.82rem; font-weight: 600; }

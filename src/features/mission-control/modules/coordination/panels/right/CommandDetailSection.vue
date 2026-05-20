@@ -86,6 +86,7 @@
       </button>
     </footer>
 
+  <Transition name="dialog-scale">
     <div v-if="deleteDialogVisible" class="coord-dialog-mask" @click.self="closeDeleteDialog">
       <div class="coord-dialog">
         <div class="coord-dialog-title">删除确认</div>
@@ -98,6 +99,7 @@
         </div>
       </div>
     </div>
+  </Transition>
 
     <AssociateDialog
       v-model:visible="associateDialogVisible"
@@ -196,8 +198,8 @@ const buildCommandActionAttrs = (actionId, label) => createInteractionActionAttr
 .coord-command-actions-group { display: inline-flex; align-items: center; gap: 0.52rem; flex-wrap: wrap; }
 .coord-command-primary { min-width: 132px; }
 
-.coord-btn { min-height: 36px; padding: 0 0.92rem; border-radius: 9px; border: 1px solid rgba(0, 208, 188, 0.26); background: rgba(255, 255, 255, 0.08); color: #f1feff; cursor: pointer; font-size: 0.97rem; font-weight: 700; transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
-.coord-btn:hover { border-color: rgba(0, 222, 200, 0.5); box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.12); }
+.coord-btn { min-height: 36px; padding: 0 0.92rem; border-radius: 9px; border: 1px solid rgba(0, 208, 188, 0.26); background: rgba(255, 255, 255, 0.08); color: #f1feff; cursor: pointer; font-size: 0.97rem; font-weight: 700; transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
+.coord-btn:hover { border-color: rgba(0, 222, 200, 0.55); box-shadow: 0 0 0 3px rgba(0, 222, 200, 0.12), 0 4px 14px rgba(0, 222, 200, 0.08); transform: translateY(-1px); }
 .coord-btn.primary { border-color: rgba(0, 208, 188, 0.4); background: linear-gradient(180deg, rgba(0, 110, 116, 0.44), rgba(0, 56, 58, 0.96)); }
 .coord-btn.danger { border-color: rgba(243, 98, 98, 0.52); background: linear-gradient(180deg, rgba(143, 54, 54, 0.78), rgba(111, 38, 38, 0.84)); }
 .coord-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -211,6 +213,30 @@ const buildCommandActionAttrs = (actionId, label) => createInteractionActionAttr
 .coord-dialog-title { color: #f1feff; font-size: 1rem; font-weight: 800; }
 .coord-dialog-text { margin-top: 0.58rem; color: rgba(226, 246, 248, 0.88); font-size: 0.9rem; line-height: 1.65; }
 .coord-dialog-actions { margin-top: 0.82rem; display: flex; justify-content: flex-end; gap: 0.52rem; }
+
+/* 弹窗缩放动画 */
+.dialog-scale-enter-active,
+.dialog-scale-leave-active {
+  transition: opacity 220ms ease;
+}
+.dialog-scale-enter-active .coord-dialog,
+.dialog-scale-leave-active .coord-dialog {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease;
+}
+.dialog-scale-enter-from {
+  opacity: 0;
+}
+.dialog-scale-enter-from .coord-dialog {
+  opacity: 0;
+  transform: scale(0.94) translateY(8px);
+}
+.dialog-scale-leave-to {
+  opacity: 0;
+}
+.dialog-scale-leave-to .coord-dialog {
+  opacity: 0;
+  transform: scale(0.96) translateY(-4px);
+}
 
 @media (max-width: 1200px) {
   .coord-meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
