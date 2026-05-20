@@ -353,8 +353,14 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 .coord-resource-filters {
   margin-top: 0.6rem;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scrollbar-width: none;
+}
+.coord-resource-filters::-webkit-scrollbar {
+  display: none;
 }
 
 .coord-resource-filter-btn {
@@ -362,8 +368,9 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   border: 1px solid var(--coord-border-soft);
   background: rgba(1, 12, 18, 0.9);
   color: rgba(214, 237, 242, 0.86);
-  padding: 0.32rem 0.52rem;
-  font-size: 0.78rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
   font-weight: 600;
   cursor: pointer;
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
