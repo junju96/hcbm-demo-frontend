@@ -46,7 +46,6 @@ const moduleApi = props.moduleApi;
   width: 100%;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
 }
 
 .plan-design-content {

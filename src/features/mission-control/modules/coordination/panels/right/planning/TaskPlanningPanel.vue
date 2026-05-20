@@ -402,6 +402,78 @@
         </div>
       </div>
 
+        <!-- 行动序列：泳道图 -->
+        <div v-else-if="planEditSubTab === 'actions'" class="plan-section">
+          <div class="plan-section-header">
+            <button class="planning-btn small" type="button" @click="onGenerateActions">生成行动序列</button>
+          </div>
+          <div v-if="planDraft?.stages?.length" class="action-swimlane-wrapper">
+            <!-- 表头行 -->
+            <div
+              class="swimlane-header-row"
+              :style="{ gridTemplateColumns: `120px ${planDraft.stages.map((_, i) => i < planDraft.stages.length - 1 ? 'minmax(180px, 1fr) 2px' : 'minmax(180px, 1fr)').join(' ')}` }"
+            >
+              <div class="swimlane-header-cell swimlane-corner">编组 / 车辆</div>
+              <template v-for="(stage, sIndex) in planDraft.stages" :key="stage.stage_id">
+                <div class="swimlane-header-cell" :class="`swimlane-stage-col-${sIndex % 4}`">
+                  <div class="swimlane-stage-title">阶段 {{ sIndex + 1 }}</div>
+                  <div class="swimlane-stage-sub">{{ stage.title }}</div>
+                </div>
+                <div v-if="sIndex < planDraft.stages.length - 1" class="swimlane-col-divider-header"></div>
+              </template>
+            </div>
+
+            <!-- 编组 panels -->
+            <div
+              v-for="(team, tIndex) in planDraft.teams"
+              :key="team.team_id"
+              class="swimlane-team-panel"
+              :class="`swimlane-team-theme-${tIndex % 3}`"
+            >
+              <div class="swimlane-team-panel-header">
+                <div class="swimlane-team-panel-title">
+                  <span class="swimlane-team-panel-name">{{ team.name }}</span>
+                  <span class="swimlane-team-panel-desc">{{ team.description }}</span>
+                </div>
+                <span class="swimlane-team-panel-badge">{{ team.equipment.length }} 辆装备</span>
+              </div>
+              <div
+                class="swimlane-team-panel-body"
+                :style="{ gridTemplateColumns: `120px ${planDraft.stages.map((_, i) => i < planDraft.stages.length - 1 ? 'minmax(180px, 1fr) 2px' : 'minmax(180px, 1fr)').join(' ')}` }"
+              >
+                <template v-for="vid in team.equipment" :key="vid">
+                  <div class="swimlane-vehicle-cell">{{ vid }}</div>
+                  <template v-for="(stage, sIndex) in planDraft.stages" :key="stage.stage_id">
+                    <div class="swimlane-stage-cell" :class="`swimlane-stage-col-${sIndex % 4}`">
+                      <div v-if="getVehicleStageActions(vid, stage).length" class="swimlane-action-list">
+                        <div
+                          v-for="action in getVehicleStageActions(vid, stage)"
+                          :key="action.action_id"
+                          class="swimlane-action-card"
+                          @click="onActionClick(action, vid, stage)"
+                        >
+                          <div class="swimlane-action-header">
+                            <span class="swimlane-action-seq">{{ action.action_seq }}</span>
+                            <span class="swimlane-action-name">{{ action.name }}</span>
+                          </div>
+                          <div class="swimlane-action-state" :class="`state-${STATE_TONE[action.state] || 'ready'}`">
+                            {{ STATE_LABELS[action.state] || action.state }}
+                          </div>
+                        </div>
+                      </div>
+                      <div v-else class="swimlane-empty-cell">—</div>
+                    </div>
+                    <div v-if="sIndex < planDraft.stages.length - 1" class="swimlane-col-divider"></div>
+                  </template>
+                </template>
+              </div>
+            </div>
+          </div>
+          <div v-else class="plan-team-empty">
+            <span>暂无阶段数据，请先在"阶段划分"中添加阶段</span>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -450,6 +522,44 @@
         </div>
       </div>
     </div>
+
+    <!-- 行动详情编辑弹窗 -->
+    <div v-if="actionDetailVisible" class="action-dialog-mask" @click.self="actionDetailVisible = false">
+      <div class="action-dialog">
+        <div class="action-dialog-header">
+          <div class="action-dialog-title">编辑行动</div>
+          <button class="planning-btn small" type="button" @click="actionDetailVisible = false">关闭</button>
+        </div>
+        <div class="action-dialog-body">
+          <div class="plan-form-row">
+            <span class="plan-form-label">行动名称</span>
+            <input v-model="editingAction.name" class="plan-form-input" placeholder="输入行动名称" />
+          </div>
+          <div class="plan-form-row">
+            <span class="plan-form-label">描述</span>
+            <textarea v-model="editingAction.description" class="plan-form-input" rows="3" placeholder="输入行动描述" />
+          </div>
+          <div class="plan-form-row">
+            <span class="plan-form-label">参数 (JSON)</span>
+            <textarea v-model="editingActionParamJson" class="plan-form-input" rows="3" placeholder='{"key": "value"}' />
+          </div>
+          <div class="plan-form-row">
+            <span class="plan-form-label">状态</span>
+            <select v-model="editingAction.state" class="plan-form-input">
+              <option value="READY">就绪</option>
+              <option value="ACTIVE">执行中</option>
+              <option value="DONE">完成</option>
+              <option value="SCHEDULED">计划中</option>
+              <option value="PAUSED">已暂停</option>
+            </select>
+          </div>
+        </div>
+        <div class="action-dialog-footer">
+          <button class="planning-btn" type="button" @click="actionDetailVisible = false">取消</button>
+          <button class="planning-btn primary" type="button" @click="onSaveActionDetail">保存</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -477,6 +587,7 @@ const planEditSteps = [
   { id: 'basic', label: '基本信息' },
   { id: 'teams', label: '编组编成' },
   { id: 'stages', label: '阶段划分' },
+  { id: 'actions', label: '行动序列' },
 ];
 const planEditSubTab = ref('basic');
 
@@ -533,6 +644,21 @@ const enterPlanEdit = () => {
   planDraft.value = JSON.parse(JSON.stringify(planDetail));
   planEditMode.value = 'normal';
   viewMode.value = 'plan-edit';
+  // 同步编组数据
+  teams.value = (planDraft.value.teams || []).map((t) => ({
+    team_id: t.team_id,
+    name: t.name,
+    description: t.description,
+    resource_ids: t.equipment || [],
+    resource_names: (t.equipment || []).join('、') || '无',
+  }));
+  // 同步阶段数据
+  stages.value = (planDraft.value.stages || []).map((s) => ({
+    stage_id: s.stage_id,
+    title: s.title,
+    description: s.description,
+    expanded: true,
+  }));
   appendSystemMessage(`开始任务规划：${selectedMission.value?.title}`);
 };
 
@@ -540,6 +666,21 @@ const enterPlanEditFromPlan = () => {
   planDraft.value = JSON.parse(JSON.stringify(planDetail));
   planEditMode.value = 'normal';
   viewMode.value = 'plan-edit';
+  // 同步编组数据
+  teams.value = (planDraft.value.teams || []).map((t) => ({
+    team_id: t.team_id,
+    name: t.name,
+    description: t.description,
+    resource_ids: t.equipment || [],
+    resource_names: (t.equipment || []).join('、') || '无',
+  }));
+  // 同步阶段数据
+  stages.value = (planDraft.value.stages || []).map((s) => ({
+    stage_id: s.stage_id,
+    title: s.title,
+    description: s.description,
+    expanded: true,
+  }));
   appendSystemMessage(`开始编辑方案：${selectedPlan.value?.title}`);
 };
 
@@ -776,6 +917,68 @@ const onRemoveStage = (stageId) => {
 const onAddTactic = () => {
   appendSystemMessage('新增战术战法（演示模式）');
 };
+
+const onGenerateActions = () => {
+  appendSystemMessage('正在生成行动序列…');
+  setTimeout(() => {
+    appendSystemMessage('行动序列生成完成');
+  }, 800);
+};
+
+// ========== 行动序列详情编辑 ==========
+const actionDetailVisible = ref(false);
+const editingAction = ref(null);
+
+const editingActionParamJson = computed({
+  get() {
+    try {
+      return JSON.stringify(editingAction.value?.param || {}, null, 2);
+    } catch {
+      return '{}';
+    }
+  },
+  set(val) {
+    try {
+      editingAction.value.param = JSON.parse(val);
+    } catch {
+      // ignore invalid JSON
+    }
+  },
+});
+
+const onActionClick = (action, vehicle, stage) => {
+  editingAction.value = JSON.parse(JSON.stringify(action));
+  actionDetailVisible.value = true;
+};
+
+const onSaveActionDetail = () => {
+  if (!editingAction.value || !planDraft.value) return;
+  // 找到原数据并更新
+  for (const stage of planDraft.value.stages || []) {
+    for (const teamActions of Object.values(stage.team_actions || {})) {
+      for (const vehicle of teamActions) {
+        const idx = vehicle.actions.findIndex((a) => a.action_id === editingAction.value.action_id);
+        if (idx !== -1) {
+          vehicle.actions[idx] = { ...editingAction.value };
+          appendSystemMessage(`已更新行动：${editingAction.value.name}`);
+          actionDetailVisible.value = false;
+          return;
+        }
+      }
+    }
+  }
+};
+
+const getVehicleStageActions = (vid, stage) => {
+  for (const teamActions of Object.values(stage.team_actions || {})) {
+    for (const vehicle of teamActions) {
+      if (vehicle.vid === vid) {
+        return vehicle.actions || [];
+      }
+    }
+  }
+  return [];
+};
 </script>
 
 <style>
@@ -800,7 +1003,6 @@ const onAddTactic = () => {
   width: 100%;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
   font-size: 14px;
   line-height: 1.6;
   color: var(--planning-text);
@@ -808,31 +1010,41 @@ const onAddTactic = () => {
 
 /* ===== 通用按钮 ===== */
 .planning-btn {
-  min-height: 34px;
-  padding: 0 0.85rem;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 222, 200, 0.22);
-  background: var(--planning-btn-bg);
-  color: #f8fafc;
+  min-height: 36px;
+  padding: 0 0.92rem;
+  border-radius: 9px;
+  border: 1px solid rgba(0, 208, 188, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1feff;
   cursor: pointer;
-  font-size: 0.88rem;
-  transition: border-color 160ms ease, background 160ms ease;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
   white-space: nowrap;
 }
 .planning-btn:hover {
-  border-color: rgba(0, 222, 200, 0.45);
+  border-color: rgba(0, 222, 200, 0.5);
+  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.12);
 }
 .planning-btn.primary {
-  border-color: rgba(0, 222, 200, 0.35);
-  background: var(--planning-btn-primary);
+  border-color: rgba(0, 208, 188, 0.4);
+  background: linear-gradient(180deg, rgba(0, 110, 116, 0.44), rgba(0, 56, 58, 0.96));
 }
 .planning-btn.primary:hover {
-  background: linear-gradient(180deg, rgba(0, 173, 181, 0.7) 0%, rgba(0, 130, 140, 0.7) 100%);
+  background: linear-gradient(180deg, rgba(0, 130, 136, 0.54), rgba(0, 66, 68, 1));
+}
+.planning-btn.danger {
+  border-color: rgba(243, 98, 98, 0.52);
+  background: linear-gradient(180deg, rgba(143, 54, 54, 0.78), rgba(111, 38, 38, 0.84));
+}
+.planning-btn.danger:hover {
+  border-color: rgba(243, 98, 98, 0.7);
+  box-shadow: 0 0 0 2px rgba(243, 98, 98, 0.15);
 }
 .planning-btn.small {
-  min-height: 28px;
-  padding: 0 0.65rem;
-  font-size: 0.82rem;
+  min-height: 32px;
+  padding: 0 0.7rem;
+  font-size: 0.85rem;
   border-radius: 8px;
 }
 .planning-btn.large {
@@ -894,9 +1106,10 @@ const onAddTactic = () => {
 .coord-empty-state {
   margin-top: 0.7rem;
   border-radius: 10px;
-  border: 1px dashed var(--planning-border-soft);
-  color: var(--planning-text-soft);
-  padding: 0.9rem;
+  border: 1px dashed rgba(0, 222, 200, 0.25);
+  color: rgba(196, 243, 248, 0.65);
+  padding: 1rem;
+  font-size: 0.92rem;
 }
 
 /* 列表项（任务列表） */
@@ -914,7 +1127,7 @@ const onAddTactic = () => {
   background: var(--planning-bg-strong);
   color: var(--planning-text);
   text-align: left;
-  padding: 0.66rem 0.72rem;
+  padding: 0.72rem 0.85rem;
   cursor: pointer;
   transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
@@ -935,34 +1148,37 @@ const onAddTactic = () => {
   gap: 0.5rem;
 }
 .planning-mission-name {
-  font-weight: 700;
-  font-size: 0.96rem;
+  font-weight: 800;
+  font-size: 1rem;
+  color: #f7fdff;
+  letter-spacing: 0.01em;
 }
 .planning-mission-state {
   border-radius: 999px;
-  padding: 0.16rem 0.56rem;
-  font-size: 0.74rem;
+  padding: 0.18rem 0.6rem;
+  font-size: 0.76rem;
   font-weight: 700;
   flex-shrink: 0;
 }
 .planning-mission-desc {
   margin-top: 0.38rem;
   color: rgba(236, 252, 255, 0.92);
-  font-size: 0.9rem;
-  line-height: 1.45;
+  font-size: 0.92rem;
+  line-height: 1.55;
 }
 .planning-mission-meta {
   margin-top: 0.38rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  color: rgba(226, 246, 248, 0.7);
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: rgba(196, 243, 248, 0.9);
 }
 .planning-mission-meta > span {
-  background: rgba(0, 222, 200, 0.08);
-  border-radius: 6px;
-  padding: 0.12rem 0.4rem;
+  background: rgba(0, 222, 200, 0.1);
+  border-radius: 8px;
+  padding: 0.15rem 0.5rem;
+  font-weight: 700;
 }
 
 /* 状态颜色 */
@@ -986,11 +1202,12 @@ const onAddTactic = () => {
 }
 
 .mission-detail-title {
-  font-size: 1.35rem;
+  font-size: 1.22rem;
   font-weight: 800;
-  color: var(--planning-text);
+  color: #f7fdff;
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
 }
 
 .mission-detail-actions {
@@ -1004,11 +1221,12 @@ const onAddTactic = () => {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 222, 200, 0.22);
+  border-radius: 999px;
+  border: 1px solid rgba(0, 222, 200, 0.3);
   background: rgba(6, 20, 26, 0.7);
-  padding: 0.35rem 0.7rem;
-  font-size: 0.88rem;
+  padding: 0.22rem 0.62rem;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .mission-status-label {
@@ -1022,17 +1240,18 @@ const onAddTactic = () => {
 
 /* 任务内容区 */
 .mission-content-section {
-  border-radius: 12px;
-  border: 1px solid var(--planning-border-soft);
-  background: var(--planning-card-bg);
-  padding: 0.8rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 208, 188, 0.26);
+  background: rgba(0, 16, 22, 0.62);
+  padding: 0.7rem;
 }
 
 .mission-content-text {
-  margin: 0.5rem 0 0;
-  color: var(--planning-text-soft);
-  font-size: 0.92rem;
-  line-height: 1.7;
+  margin: 0.45rem 0 0;
+  color: #f1feff;
+  font-size: 0.96rem;
+  line-height: 1.65;
+  text-indent: 1.5em;
 }
 
 .mission-content-meta {
@@ -1044,23 +1263,32 @@ const onAddTactic = () => {
 
 .mission-meta-card {
   border-radius: 10px;
-  border: 1px solid rgba(0, 222, 200, 0.15);
-  background: rgba(0, 222, 200, 0.04);
-  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(0, 206, 186, 0.32);
+  background: rgba(0, 16, 22, 0.7);
+  padding: 0.52rem 0.58rem;
+  min-height: 72px;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
 
 .mission-meta-label {
-  font-size: 0.82rem;
-  color: rgba(226, 246, 248, 0.6);
+  color: rgba(196, 243, 248, 0.96);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .mission-meta-value {
-  font-size: 0.92rem;
+  display: block;
+  margin-top: 0.26rem;
+  color: #ecfbff;
+  font-size: 0.9rem;
   font-weight: 700;
-  color: var(--planning-text);
+  line-height: 1.45;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 关联关系 */
@@ -1080,9 +1308,10 @@ const onAddTactic = () => {
 }
 
 .planning-section-title {
-  color: var(--planning-text);
-  font-weight: 700;
-  font-size: 1.05rem;
+  color: #eefcff;
+  font-weight: 800;
+  font-size: 1.02rem;
+  letter-spacing: 0.01em;
 }
 
 .mission-relation-actions {
@@ -1429,9 +1658,9 @@ const onAddTactic = () => {
 }
 
 .planning-action-empty {
-  color: rgba(226, 246, 248, 0.5);
-  font-size: 0.84rem;
-  padding: 0.3rem 0;
+  color: rgba(196, 243, 248, 0.6);
+  font-size: 0.9rem;
+  padding: 0.35rem 0;
 }
 
 /* ===== 视图2：方案编辑 ===== */
@@ -1439,9 +1668,9 @@ const onAddTactic = () => {
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: fit-content;
+  flex: 1;
+  min-height: 0;
   gap: 0.7rem;
-  padding: 0.2rem 0.1rem;
 }
 
 /* ===== 编辑面板容器：分段控制器 + 内容区融为一体 ===== */
@@ -1451,13 +1680,18 @@ const onAddTactic = () => {
   border-radius: 12px;
   border: 1px solid var(--planning-border-soft);
   background: var(--planning-card-bg);
-  overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
 .plan-edit-panel .plan-section {
   border: none;
   border-radius: 0;
   background: transparent;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 2rem;
 }
 
 .plan-edit-header {
@@ -1466,7 +1700,7 @@ const onAddTactic = () => {
   justify-content: space-between;
   gap: 0.8rem;
   flex-wrap: wrap;
-  padding: 0.4rem 0.2rem;
+  padding: 0.5rem 0.3rem;
 }
 
 .plan-edit-tags {
@@ -1477,8 +1711,8 @@ const onAddTactic = () => {
 
 .plan-edit-tag {
   border-radius: 999px;
-  padding: 0.3rem 0.7rem;
-  font-size: 0.88rem;
+  padding: 0.32rem 0.72rem;
+  font-size: 0.9rem;
   font-weight: 700;
 }
 
@@ -1509,33 +1743,33 @@ const onAddTactic = () => {
 }
 
 .plan-edit-segment {
-  padding: 0.4rem 0.9rem;
-  border-radius: 8px;
+  padding: 0.45rem 0.95rem;
+  border-radius: 9px;
   border: none;
   background: transparent;
-  color: rgba(226, 246, 248, 0.65);
-  font-size: 0.86rem;
-  font-weight: 600;
+  color: rgba(196, 243, 248, 0.65);
+  font-size: 0.9rem;
+  font-weight: 700;
   cursor: pointer;
   transition: color 160ms ease, background 160ms ease;
   white-space: nowrap;
 }
 
 .plan-edit-segment:hover {
-  color: rgba(226, 246, 248, 0.9);
+  color: rgba(196, 243, 248, 0.9);
 }
 
 .plan-edit-segment.active {
-  background: rgba(0, 222, 200, 0.15);
-  color: var(--planning-accent);
+  background: rgba(0, 222, 200, 0.18);
+  color: #00e5ca;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .plan-section {
-  padding: 0.8rem 0.9rem;
+  padding: 0.95rem;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.65rem;
 }
 
 .plan-form-row {
@@ -1545,25 +1779,29 @@ const onAddTactic = () => {
 }
 
 .plan-form-label {
-  color: rgba(226, 246, 248, 0.65);
-  font-size: 0.85rem;
+  color: rgba(196, 243, 248, 0.9);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .plan-form-input {
   width: 100%;
   min-height: 40px;
-  padding: 0.45rem 0.7rem;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 222, 200, 0.22);
+  padding: 0.45rem 0.75rem;
+  border-radius: 9px;
+  border: 1px solid rgba(0, 222, 200, 0.25);
   background: rgba(10, 18, 22, 0.88);
-  color: #f8fafc;
-  font-size: 0.92rem;
+  color: #f1feff;
+  font-size: 0.96rem;
+  font-weight: 500;
   outline: none;
-  transition: border-color 160ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .plan-form-input:focus {
-  border-color: rgba(0, 222, 200, 0.5);
+  border-color: rgba(0, 222, 200, 0.45);
+  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.1);
 }
 
 .plan-association-block {
@@ -1581,19 +1819,20 @@ const onAddTactic = () => {
 }
 
 .plan-section-subtitle {
-  color: var(--planning-text);
-  font-weight: 700;
-  font-size: 1rem;
+  color: #eefcff;
+  font-weight: 800;
+  font-size: 1.02rem;
+  letter-spacing: 0.01em;
 }
 
 .plan-association-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.6rem;
+  gap: 0.55rem;
+  padding: 0.5rem 0.65rem;
   border-radius: 10px;
-  border: 1px solid rgba(0, 222, 200, 0.12);
-  background: rgba(0, 222, 200, 0.03);
+  border: 1px solid rgba(0, 222, 200, 0.18);
+  background: rgba(0, 16, 22, 0.55);
 }
 
 .plan-association-label {
@@ -1622,7 +1861,7 @@ const onAddTactic = () => {
 }
 
 .plan-association-tag.empty {
-  color: rgba(226, 246, 248, 0.45);
+  color: rgba(196, 243, 248, 0.55);
   font-weight: 500;
 }
 
@@ -1637,41 +1876,44 @@ const onAddTactic = () => {
 .plan-tactic-option {
   position: relative;
   border-radius: 10px;
-  border: 1px solid rgba(0, 222, 200, 0.2);
-  background: rgba(0, 222, 200, 0.05);
-  padding: 0.65rem 0.85rem;
+  border: 1px solid rgba(0, 222, 200, 0.22);
+  background: rgba(0, 16, 22, 0.55);
+  padding: 0.7rem 0.9rem;
   cursor: pointer;
-  transition: border-color 160ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .plan-tactic-option:hover {
-  border-color: rgba(0, 222, 200, 0.35);
+  border-color: rgba(0, 222, 200, 0.4);
+  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.08);
 }
 
 .plan-tactic-option.active {
-  border-color: rgba(0, 222, 200, 0.35);
-  background: rgba(0, 222, 200, 0.08);
+  border-color: rgba(0, 222, 200, 0.4);
+  background: rgba(0, 222, 200, 0.1);
 }
 
 .plan-tactic-name {
-  font-weight: 700;
-  font-size: 0.98rem;
-  color: var(--planning-text);
+  font-weight: 800;
+  font-size: 1rem;
+  color: #f7fdff;
+  letter-spacing: 0.01em;
 }
 
 .plan-tactic-desc {
-  margin-top: 0.2rem;
-  font-size: 0.85rem;
-  color: var(--planning-text-soft);
+  margin-top: 0.25rem;
+  font-size: 0.88rem;
+  color: rgba(196, 243, 248, 0.85);
+  line-height: 1.5;
 }
 
 .plan-tactic-chevron {
   position: absolute;
-  right: 0.85rem;
+  right: 0.9rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--planning-accent);
-  font-size: 0.8rem;
+  color: #00e5ca;
+  font-size: 0.82rem;
 }
 
 /* 战法卡片网格 */
@@ -1684,54 +1926,56 @@ const onAddTactic = () => {
 
 .plan-tactic-card {
   border-radius: 12px;
-  border: 1px solid rgba(0, 222, 200, 0.15);
-  background: rgba(6, 20, 26, 0.7);
-  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(0, 222, 200, 0.2);
+  background: rgba(6, 20, 26, 0.75);
+  padding: 0.8rem 0.95rem;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
   min-height: 100px;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .plan-tactic-card:hover {
-  border-color: rgba(0, 222, 200, 0.3);
+  border-color: rgba(0, 222, 200, 0.4);
   transform: translateY(-1px);
+  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.08);
 }
 
 .plan-tactic-card.active {
-  border-color: rgba(59, 130, 246, 0.55);
-  background: rgba(59, 130, 246, 0.1);
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
 }
 
 .plan-tactic-card.add {
   border-style: dashed;
-  border-color: rgba(0, 222, 200, 0.22);
-  background: rgba(0, 222, 200, 0.03);
+  border-color: rgba(0, 222, 200, 0.28);
+  background: rgba(0, 222, 200, 0.04);
 }
 
 .plan-tactic-card.add:hover {
-  border-color: rgba(0, 222, 200, 0.4);
-  background: rgba(0, 222, 200, 0.06);
+  border-color: rgba(0, 222, 200, 0.45);
+  background: rgba(0, 222, 200, 0.08);
 }
 
 .plan-tactic-card-name {
-  font-weight: 700;
-  font-size: 0.96rem;
-  color: var(--planning-text);
+  font-weight: 800;
+  font-size: 1rem;
+  color: #f7fdff;
+  letter-spacing: 0.01em;
 }
 
 .plan-tactic-card-desc {
-  font-size: 0.86rem;
-  color: var(--planning-text-soft);
-  line-height: 1.5;
+  font-size: 0.9rem;
+  color: rgba(196, 243, 248, 0.85);
+  line-height: 1.55;
 }
 
 .plan-tactic-card-scenario {
-  font-size: 0.84rem;
-  color: rgba(226, 246, 248, 0.6);
+  font-size: 0.86rem;
+  color: rgba(196, 243, 248, 0.65);
   margin-top: 0.1rem;
 }
 
@@ -1756,19 +2000,19 @@ const onAddTactic = () => {
 }
 
 .plan-resource-empty-text {
-  color: rgba(226, 246, 248, 0.5);
-  font-size: 0.88rem;
+  color: rgba(196, 243, 248, 0.6);
+  font-size: 0.92rem;
 }
 
 .plan-resource-selected {
   display: flex;
   align-items: flex-start;
-  gap: 0.5rem;
+  gap: 0.55rem;
   margin-top: 0.35rem;
-  padding: 0.5rem 0.65rem;
-  border-radius: 8px;
-  background: rgba(0, 222, 200, 0.05);
-  border: 1px solid rgba(0, 222, 200, 0.12);
+  padding: 0.55rem 0.75rem;
+  border-radius: 9px;
+  background: rgba(0, 222, 200, 0.06);
+  border: 1px solid rgba(0, 222, 200, 0.18);
 }
 
 .plan-resource-selected .plan-form-label {
@@ -1789,9 +2033,9 @@ const onAddTactic = () => {
 .resource-picker {
   margin-top: 0.4rem;
   border-radius: 12px;
-  border: 1px solid rgba(0, 222, 200, 0.15);
-  background: rgba(6, 20, 26, 0.6);
-  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(0, 222, 200, 0.2);
+  background: rgba(6, 20, 26, 0.7);
+  padding: 0.75rem 0.9rem;
 }
 
 .resource-picker-header {
@@ -1802,9 +2046,10 @@ const onAddTactic = () => {
 }
 
 .resource-picker-title {
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--planning-text);
+  font-weight: 800;
+  font-size: 1rem;
+  color: #f7fdff;
+  letter-spacing: 0.01em;
 }
 
 .resource-picker-list {
@@ -1818,22 +2063,23 @@ const onAddTactic = () => {
 .resource-picker-card {
   display: flex;
   align-items: flex-start;
-  gap: 0.6rem;
+  gap: 0.65rem;
   border-radius: 10px;
-  border: 1px solid rgba(0, 222, 200, 0.12);
-  background: rgba(0, 222, 200, 0.04);
-  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(0, 222, 200, 0.16);
+  background: rgba(0, 222, 200, 0.05);
+  padding: 0.65rem 0.8rem;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 .resource-picker-card:hover {
-  border-color: rgba(0, 222, 200, 0.28);
+  border-color: rgba(0, 222, 200, 0.35);
+  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.08);
 }
 
 .resource-picker-card.selected {
-  border-color: rgba(59, 130, 246, 0.45);
-  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.55);
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .resource-picker-card input[type="checkbox"] {
@@ -1877,20 +2123,22 @@ const onAddTactic = () => {
 }
 
 .resource-picker-name {
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--planning-text);
+  font-weight: 800;
+  font-size: 1rem;
+  color: #f7fdff;
+  letter-spacing: 0.01em;
 }
 
 .resource-picker-type {
-  font-size: 0.84rem;
+  font-size: 0.88rem;
   color: #93c5fd;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .resource-picker-desc {
-  font-size: 0.84rem;
-  color: rgba(226, 246, 248, 0.65);
+  font-size: 0.88rem;
+  color: rgba(196, 243, 248, 0.75);
+  line-height: 1.5;
 }
 
 .plan-team-block {
@@ -1938,24 +2186,25 @@ const onAddTactic = () => {
 .plan-team-row {
   display: grid;
   grid-template-columns: 1fr 1.5fr 1fr;
-  gap: 0.5rem;
-  padding: 0.45rem 0.5rem;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 222, 200, 0.1);
-  background: rgba(0, 222, 200, 0.03);
+  gap: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 222, 200, 0.15);
+  background: rgba(0, 222, 200, 0.04);
   cursor: pointer;
   transition: border-color 160ms ease, background 160ms ease;
-  font-size: 0.86rem;
-  color: var(--planning-text-soft);
+  font-size: 0.9rem;
+  color: rgba(236, 252, 255, 0.85);
 }
 
 .plan-team-row:hover {
-  border-color: rgba(0, 222, 200, 0.25);
+  border-color: rgba(0, 222, 200, 0.35);
+  background: rgba(0, 222, 200, 0.07);
 }
 
 .plan-team-row.selected {
-  border-color: rgba(59, 130, 246, 0.45);
-  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .plan-team-cell {
@@ -1965,23 +2214,13 @@ const onAddTactic = () => {
 }
 
 .plan-team-empty {
-  border-radius: 8px;
-  border: 1px dashed rgba(0, 222, 200, 0.15);
-  padding: 0.8rem;
+  border-radius: 10px;
+  border: 1px dashed rgba(0, 222, 200, 0.2);
+  padding: 1rem;
   text-align: center;
-  margin-top: 0.25rem;
-  color: rgba(226, 246, 248, 0.45);
-  font-size: 0.84rem;
-}
-
-/* danger 按钮 */
-.planning-btn.danger {
-  border-color: rgba(239, 68, 68, 0.35);
-  background: linear-gradient(180deg, rgba(239, 68, 68, 0.45) 0%, rgba(185, 28, 28, 0.45) 100%);
-}
-
-.planning-btn.danger:hover {
-  background: linear-gradient(180deg, rgba(239, 68, 68, 0.6) 0%, rgba(185, 28, 28, 0.6) 100%);
+  margin-top: 0.3rem;
+  color: rgba(196, 243, 248, 0.55);
+  font-size: 0.9rem;
 }
 
 .planning-btn:disabled {
@@ -1999,10 +2238,10 @@ const onAddTactic = () => {
 }
 
 .stage-card {
-  border-radius: 10px;
-  border: 1px solid rgba(0, 222, 200, 0.12);
-  background: rgba(0, 222, 200, 0.03);
-  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 222, 200, 0.18);
+  background: rgba(0, 16, 22, 0.55);
+  padding: 0.7rem 0.85rem;
 }
 
 .stage-card-header {
@@ -2021,19 +2260,21 @@ const onAddTactic = () => {
 
 .stage-title-input {
   flex: 1;
-  min-height: 36px;
-  padding: 0.35rem 0.6rem;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 222, 200, 0.18);
+  min-height: 38px;
+  padding: 0.4rem 0.7rem;
+  border-radius: 9px;
+  border: 1px solid rgba(0, 222, 200, 0.22);
   background: rgba(10, 18, 22, 0.7);
-  color: #f8fafc;
-  font-size: 0.9rem;
+  color: #f1feff;
+  font-size: 0.95rem;
+  font-weight: 700;
   outline: none;
-  transition: border-color 160ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .stage-title-input:focus {
-  border-color: rgba(0, 222, 200, 0.4);
+  border-color: rgba(0, 222, 200, 0.45);
+  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.1);
 }
 
 .stage-title-input::placeholder {
@@ -2047,10 +2288,10 @@ const onAddTactic = () => {
 }
 
 .stage-card-body {
-  margin-top: 0.55rem;
+  margin-top: 0.6rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .stage-desc-input {
@@ -2087,29 +2328,30 @@ const onAddTactic = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.9rem 1rem;
-  border-bottom: 1px solid rgba(0, 222, 200, 0.15);
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.18);
 }
 
 .team-dialog-title {
-  color: #f1feff;
-  font-size: 1.15rem;
+  color: #f7fdff;
+  font-size: 1.18rem;
   font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 .team-dialog-body {
-  padding: 0.8rem 1rem;
+  padding: 0.9rem 1.1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.75rem;
 }
 
 .team-dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 0.6rem;
-  padding: 0.7rem 1rem;
-  border-top: 1px solid rgba(0, 222, 200, 0.1);
+  gap: 0.65rem;
+  padding: 0.8rem 1.1rem;
+  border-top: 1px solid rgba(0, 222, 200, 0.14);
 }
 
 .team-resource-select-list {
@@ -2121,19 +2363,22 @@ const onAddTactic = () => {
 .team-resource-select-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 222, 200, 0.12);
-  background: rgba(0, 222, 200, 0.03);
-  padding: 0.4rem 0.6rem;
+  gap: 0.55rem;
+  border-radius: 9px;
+  border: 1px solid rgba(0, 222, 200, 0.16);
+  background: rgba(0, 222, 200, 0.04);
+  padding: 0.5rem 0.7rem;
   cursor: pointer;
-  font-size: 0.88rem;
-  color: var(--planning-text);
-  transition: border-color 160ms ease, background 160ms ease;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #f1feff;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 .team-resource-select-item:hover {
-  border-color: rgba(0, 222, 200, 0.28);
+  border-color: rgba(0, 222, 200, 0.35);
+  background: rgba(0, 222, 200, 0.07);
+  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.08);
 }
 
 .team-resource-select-item input[type="checkbox"] {
@@ -2180,17 +2425,17 @@ const onAddTactic = () => {
 
 .plan-action-empty {
   border-radius: 10px;
-  border: 1px dashed rgba(0, 222, 200, 0.18);
+  border: 1px dashed rgba(0, 222, 200, 0.25);
   padding: 1.2rem;
   text-align: center;
-  color: rgba(226, 246, 248, 0.5);
-  font-size: 0.88rem;
+  color: rgba(196, 243, 248, 0.65);
+  font-size: 0.92rem;
 }
 
 .plan-edit-footer {
   display: flex;
   justify-content: flex-start;
-  padding: 0.3rem 0.2rem 0.5rem;
+  padding: 0.4rem 0.3rem 0.6rem;
 }
 
 @media (max-width: 1200px) {
@@ -2201,5 +2446,519 @@ const onAddTactic = () => {
   .planning-layout { grid-template-columns: 1fr; }
   .mission-content-meta { grid-template-columns: 1fr; }
   .plan-edit-header { flex-direction: column; align-items: flex-start; }
+}
+
+/* ===== 行动序列 ===== */
+.action-sequence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.stage-action-card {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 222, 200, 0.2);
+  background: rgba(0, 16, 22, 0.6);
+  overflow: hidden;
+}
+
+.stage-action-header {
+  padding: 0.65rem 0.85rem;
+  background: rgba(0, 222, 200, 0.08);
+  border-bottom: 1px solid rgba(0, 222, 200, 0.18);
+}
+
+.stage-action-title {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #f7fdff;
+  letter-spacing: 0.01em;
+}
+
+.stage-action-body {
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.team-action-block {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 222, 200, 0.16);
+  background: rgba(0, 222, 200, 0.04);
+  padding: 0.6rem 0.75rem;
+}
+
+.team-action-name {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #00e5ca;
+  letter-spacing: 0.01em;
+  margin-bottom: 0.5rem;
+}
+
+.vehicle-action-row {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px dashed rgba(0, 222, 200, 0.14);
+}
+
+.vehicle-action-row:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.vehicle-action-label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.4rem;
+}
+
+.vehicle-vid {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #f1feff;
+}
+
+.vehicle-state {
+  border-radius: 999px;
+  padding: 0.12rem 0.48rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.vehicle-action-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding-left: 0.3rem;
+}
+
+.action-node {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 222, 200, 0.18);
+  background: rgba(0, 222, 200, 0.05);
+  padding: 0.5rem 0.65rem;
+  min-width: 160px;
+  flex: 1 1 200px;
+}
+
+.action-node-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.action-node-seq {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: rgba(0, 222, 200, 0.14);
+  color: #00e5ca;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.action-node-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #f1feff;
+}
+
+.action-node-state {
+  border-radius: 999px;
+  padding: 0.1rem 0.42rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.action-node-desc {
+  margin-top: 0.28rem;
+  font-size: 0.86rem;
+  color: rgba(196, 243, 248, 0.8);
+  line-height: 1.55;
+}
+
+.action-node-param {
+  margin-top: 0.28rem;
+  font-size: 0.82rem;
+  color: rgba(196, 243, 248, 0.6);
+  font-family: monospace;
+  background: rgba(0, 222, 200, 0.06);
+  border-radius: 6px;
+  padding: 0.22rem 0.45rem;
+  word-break: break-all;
+}
+
+/* ===== 行动序列泳道图 ===== */
+.action-swimlane-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  overflow-x: auto;
+  padding-bottom: 0.3rem;
+}
+
+/* 表头行 */
+.swimlane-header-row {
+  display: grid;
+  gap: 0.35rem;
+  min-width: fit-content;
+}
+
+.swimlane-header-cell {
+  padding: 0.5rem 0.55rem;
+  background: rgba(0, 222, 200, 0.08);
+  border-radius: 9px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: #00e5ca;
+  border: 1px solid rgba(0, 222, 200, 0.18);
+}
+
+.swimlane-header-cell.swimlane-stage-col-0 { background: rgba(0, 222, 200, 0.12); }
+.swimlane-header-cell.swimlane-stage-col-1 { background: rgba(59, 130, 246, 0.14); color: #93c5fd; border-color: rgba(59, 130, 246, 0.28); }
+.swimlane-header-cell.swimlane-stage-col-2 { background: rgba(139, 92, 246, 0.14); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.28); }
+.swimlane-header-cell.swimlane-stage-col-3 { background: rgba(245, 158, 11, 0.14); color: #fcd34d; border-color: rgba(245, 158, 11, 0.28); }
+
+.swimlane-corner {
+  background: rgba(0, 222, 200, 0.05);
+  color: rgba(196, 243, 248, 0.7);
+}
+
+.swimlane-col-divider-header {
+  background: rgba(0, 222, 200, 0.4);
+  border-radius: 999px;
+  width: 2px;
+  height: 100%;
+  margin: 0 auto;
+}
+
+.swimlane-stage-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.swimlane-stage-sub {
+  font-size: 0.8rem;
+  color: rgba(196, 243, 248, 0.75);
+  font-weight: 700;
+  margin-top: 0.12rem;
+}
+
+/* 编组大框 panel */
+.swimlane-team-panel {
+  border-radius: 16px;
+  border: 1px solid rgba(0, 222, 200, 0.3);
+  background: rgba(6, 20, 26, 0.75);
+  min-width: fit-content;
+}
+
+.swimlane-team-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.65rem 1rem;
+  background: rgba(0, 222, 200, 0.09);
+  border-bottom: 1px solid rgba(0, 222, 200, 0.22);
+}
+
+.swimlane-team-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.swimlane-team-panel-name {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #f7fdff;
+  letter-spacing: 0.01em;
+}
+
+.swimlane-team-panel-desc {
+  font-size: 0.85rem;
+  color: rgba(196, 243, 248, 0.85);
+}
+
+.swimlane-team-panel-badge {
+  border-radius: 999px;
+  padding: 0.22rem 0.62rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: rgba(0, 222, 200, 0.14);
+  color: #b4fff8;
+  border: 1px solid rgba(0, 222, 200, 0.25);
+  white-space: nowrap;
+}
+
+/* 编组内部 grid */
+.swimlane-team-panel-body {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem 0.5rem 1rem;
+  min-width: fit-content;
+}
+
+.swimlane-vehicle-cell {
+  padding: 0.55rem 0.45rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 222, 200, 0.04);
+  border-radius: 9px;
+  border: 1px solid rgba(0, 222, 200, 0.12);
+}
+
+.swimlane-vid {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #f7fdff;
+  text-align: center;
+}
+
+.swimlane-stage-cell {
+  padding: 0.45rem;
+  background: rgba(0, 222, 200, 0.04);
+  border-radius: 9px;
+  border: 1px solid rgba(0, 222, 200, 0.12);
+  min-height: 64px;
+}
+
+.swimlane-stage-cell.swimlane-stage-col-0 { background: rgba(0, 222, 200, 0.04); }
+.swimlane-stage-cell.swimlane-stage-col-1 { background: rgba(59, 130, 246, 0.05); border-color: rgba(59, 130, 246, 0.15); }
+.swimlane-stage-cell.swimlane-stage-col-2 { background: rgba(139, 92, 246, 0.05); border-color: rgba(139, 92, 246, 0.15); }
+.swimlane-stage-cell.swimlane-stage-col-3 { background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.15); }
+
+.swimlane-empty-cell {
+  text-align: center;
+  color: rgba(196, 243, 248, 0.45);
+  font-size: 0.92rem;
+  padding: 0.9rem 0;
+}
+
+.swimlane-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.swimlane-action-card {
+  border-radius: 9px;
+  border: 1px solid rgba(0, 222, 200, 0.2);
+  background: rgba(0, 222, 200, 0.07);
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.swimlane-action-card:hover {
+  border-color: rgba(0, 222, 200, 0.4);
+  background: rgba(0, 222, 200, 0.1);
+  transform: translateY(-1px);
+}
+
+.swimlane-stage-col-0 .swimlane-action-card {
+  border-color: rgba(0, 222, 200, 0.22);
+  background: rgba(0, 222, 200, 0.07);
+}
+.swimlane-stage-col-0 .swimlane-action-card:hover {
+  border-color: rgba(0, 222, 200, 0.45);
+  background: rgba(0, 222, 200, 0.12);
+}
+
+.swimlane-stage-col-1 .swimlane-action-card {
+  border-color: rgba(59, 130, 246, 0.22);
+  background: rgba(59, 130, 246, 0.08);
+}
+.swimlane-stage-col-1 .swimlane-action-card:hover {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.swimlane-stage-col-2 .swimlane-action-card {
+  border-color: rgba(139, 92, 246, 0.22);
+  background: rgba(139, 92, 246, 0.08);
+}
+.swimlane-stage-col-2 .swimlane-action-card:hover {
+  border-color: rgba(139, 92, 246, 0.45);
+  background: rgba(139, 92, 246, 0.14);
+}
+
+.swimlane-stage-col-3 .swimlane-action-card {
+  border-color: rgba(245, 158, 11, 0.22);
+  background: rgba(245, 158, 11, 0.08);
+}
+.swimlane-stage-col-3 .swimlane-action-card:hover {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.swimlane-action-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.swimlane-action-seq {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: rgba(0, 222, 200, 0.14);
+  color: #00e5ca;
+  font-size: 0.72rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.swimlane-action-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #f1feff;
+}
+
+.swimlane-action-state {
+  display: inline-block;
+  margin-top: 0.28rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.38rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.swimlane-col-divider {
+  background: rgba(0, 222, 200, 0.4);
+  border-radius: 999px;
+  width: 2px;
+  height: 100%;
+  margin: 0 auto;
+}
+
+/* 编组主题色 */
+.swimlane-team-theme-0 {
+  border-color: rgba(0, 222, 200, 0.3);
+}
+.swimlane-team-theme-0 .swimlane-team-panel-header {
+  background: rgba(0, 222, 200, 0.08);
+  border-bottom-color: rgba(0, 222, 200, 0.2);
+}
+.swimlane-team-theme-0 .swimlane-team-panel-badge {
+  background: rgba(0, 222, 200, 0.14);
+  color: #b4fff8;
+  border-color: rgba(0, 222, 200, 0.25);
+}
+
+.swimlane-team-theme-1 {
+  border-color: rgba(59, 130, 246, 0.35);
+}
+.swimlane-team-theme-1 .swimlane-team-panel-header {
+  background: rgba(59, 130, 246, 0.08);
+  border-bottom-color: rgba(59, 130, 246, 0.2);
+}
+.swimlane-team-theme-1 .swimlane-team-panel-badge {
+  background: rgba(59, 130, 246, 0.14);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.swimlane-team-theme-2 {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.swimlane-team-theme-2 .swimlane-team-panel-header {
+  background: rgba(245, 158, 11, 0.08);
+  border-bottom-color: rgba(245, 158, 11, 0.2);
+}
+.swimlane-team-theme-2 .swimlane-team-panel-badge {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.swimlane-action-state {
+  display: inline-block;
+  margin-top: 0.25rem;
+  border-radius: 999px;
+  padding: 0.08rem 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+/* ===== 行动详情编辑弹窗 ===== */
+.action-dialog-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(1, 10, 14, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.action-dialog {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 16px;
+  border: 1px solid var(--planning-border);
+  background:
+    linear-gradient(180deg, rgba(0, 213, 192, 0.06), rgba(0, 49, 72, 0.01)),
+    var(--planning-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.05), 0 24px 64px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+}
+
+.action-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.18);
+}
+
+.action-dialog-title {
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: #f7fdff;
+  letter-spacing: 0.01em;
+}
+
+.action-dialog-body {
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.action-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0.8rem 1.1rem;
+  border-top: 1px solid rgba(0, 222, 200, 0.14);
+}
+
+.action-dialog-body select.plan-form-input {
+  appearance: auto;
+  background: var(--planning-bg-strong);
+  color: var(--planning-text);
+  padding: 0.5rem 0.7rem;
 }
 </style>
