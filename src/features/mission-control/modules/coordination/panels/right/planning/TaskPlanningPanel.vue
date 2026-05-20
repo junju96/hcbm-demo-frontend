@@ -2807,6 +2807,8 @@ const getVehicleStageActions = (vid, stage) => {
   border-radius: 6px;
   border: none;
   min-height: 48px;
+  display: flex;
+  flex-direction: column;
 }
 
 .swimlane-stage-cell.swimlane-stage-col-0 { background: rgba(0, 222, 200, 0.03); }
@@ -2818,7 +2820,7 @@ const getVehicleStageActions = (vid, stage) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
+  flex: 1;
   color: rgba(196, 243, 248, 0.25);
   font-size: 0.82rem;
 }
