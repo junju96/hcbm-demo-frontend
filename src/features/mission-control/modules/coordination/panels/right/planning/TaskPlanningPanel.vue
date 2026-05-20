@@ -376,9 +376,9 @@
 
         <!-- 阶段划分 -->
         <div v-else-if="planEditSubTab === 'stages'" class="plan-section">
-          <div class="plan-section-header">
-          <button class="planning-btn small" type="button" @click="onAddStage">新增阶段</button>
-        </div>
+          <div class="plan-section-toolbar">
+            <button class="planning-btn small" type="button" @click="onAddStage">新增阶段</button>
+          </div>
         <div v-if="stages.length" class="stage-list">
           <div v-for="(stage, index) in stages" :key="stage.stage_id" class="stage-card">
             <div class="stage-card-header">
@@ -404,7 +404,7 @@
 
         <!-- 行动序列：泳道图 -->
         <div v-else-if="planEditSubTab === 'actions'" class="plan-section">
-          <div class="plan-section-header">
+          <div class="plan-section-toolbar">
             <button class="planning-btn small" type="button" @click="onGenerateActions">生成行动序列</button>
           </div>
           <div v-if="planDraft?.stages?.length" class="action-swimlane-wrapper">
@@ -1796,6 +1796,11 @@ const getVehicleStageActions = (vid, stage) => {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+}
+
+.plan-section-toolbar {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .plan-form-row {
