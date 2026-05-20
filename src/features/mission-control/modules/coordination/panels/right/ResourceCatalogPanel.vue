@@ -1,25 +1,26 @@
 <template>
   <div class="coord-resource-shell">
+    <!-- 顶部标题 + 筛选（全宽） -->
+    <div class="coord-resource-top-bar">
+      <div class="coord-pane-title">资源池</div>
+      <div class="coord-resource-filters">
+        <button
+          v-for="tab in filterTabs"
+          :key="tab.tag"
+          class="coord-resource-filter-btn"
+          :class="{ active: activeFilterTag === tab.tag }"
+          type="button"
+          @click="activeFilterTag = tab.tag"
+        >
+          {{ tab.label }}
+          <span v-if="tab.count > 0" class="coord-resource-filter-count">{{ tab.count }}</span>
+        </button>
+      </div>
+    </div>
+
     <div class="coord-resource-layout">
       <!-- 左侧资源列表 -->
       <aside class="coord-panel coord-resource-left">
-        <div class="coord-pane-title">资源池</div>
-
-        <!-- 类型筛选 -->
-        <div class="coord-resource-filters">
-          <button
-            v-for="tab in filterTabs"
-            :key="tab.tag"
-            class="coord-resource-filter-btn"
-            :class="{ active: activeFilterTag === tab.tag }"
-            type="button"
-            @click="activeFilterTag = tab.tag"
-          >
-            {{ tab.label }}
-            <span v-if="tab.count > 0" class="coord-resource-filter-count">{{ tab.count }}</span>
-          </button>
-        </div>
-
         <!-- 资源列表 -->
         <div v-if="filteredResources.length" class="coord-resource-list">
           <button
@@ -310,8 +311,18 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   --coord-bg: rgba(1, 16, 22, 0.84);
   --coord-text: #f1feff;
   display: flex;
+  flex-direction: column;
   width: 100%;
   min-height: 100%;
+  gap: 0.7rem;
+}
+
+.coord-resource-top-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.5rem 0.2rem 0.2rem;
+  flex-wrap: nowrap;
 }
 
 .coord-resource-layout {
@@ -319,6 +330,8 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   grid-template-columns: 280px minmax(0, 1fr);
   gap: 0.8rem;
   width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .coord-panel {
@@ -351,13 +364,13 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 
 /* 筛选标签 */
 .coord-resource-filters {
-  margin-top: 0.6rem;
   display: flex;
   flex-wrap: nowrap;
   gap: 0.4rem;
   overflow-x: auto;
   padding-bottom: 0.2rem;
   scrollbar-width: none;
+  flex: 1;
 }
 .coord-resource-filters::-webkit-scrollbar {
   display: none;
