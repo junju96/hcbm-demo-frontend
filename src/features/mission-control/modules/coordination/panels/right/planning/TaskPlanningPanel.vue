@@ -537,21 +537,37 @@
           </div>
           <div class="plan-form-row">
             <span class="plan-form-label">描述</span>
-            <textarea v-model="editingAction.description" class="plan-form-input" rows="3" placeholder="输入行动描述" />
+            <textarea v-model="editingAction.description" class="plan-form-input" rows="2" placeholder="输入行动描述" />
+          </div>
+          <div class="plan-form-row plan-form-row-2col">
+            <div class="plan-form-col">
+              <span class="plan-form-label">行动序号</span>
+              <input v-model.number="editingAction.action_seq" class="plan-form-input" type="number" min="1" placeholder="1" />
+            </div>
+            <div class="plan-form-col">
+              <span class="plan-form-label">状态</span>
+              <select v-model="editingAction.state" class="plan-form-input">
+                <option value="READY">就绪</option>
+                <option value="ACTIVE">执行中</option>
+                <option value="DONE">完成</option>
+                <option value="SCHEDULED">计划中</option>
+                <option value="PAUSED">已暂停</option>
+              </select>
+            </div>
+          </div>
+          <div class="plan-form-row plan-form-row-2col">
+            <div class="plan-form-col">
+              <span class="plan-form-label">计划开始时间 (s)</span>
+              <input v-model.number="editingAction.time_attributes.schedule_start_time" class="plan-form-input" type="number" min="0" placeholder="0" />
+            </div>
+            <div class="plan-form-col">
+              <span class="plan-form-label">计划持续时间 (s)</span>
+              <input v-model.number="editingAction.time_attributes.schedule_duration" class="plan-form-input" type="number" min="0" placeholder="0" />
+            </div>
           </div>
           <div class="plan-form-row">
             <span class="plan-form-label">参数 (JSON)</span>
-            <textarea v-model="editingActionParamJson" class="plan-form-input" rows="3" placeholder='{"key": "value"}' />
-          </div>
-          <div class="plan-form-row">
-            <span class="plan-form-label">状态</span>
-            <select v-model="editingAction.state" class="plan-form-input">
-              <option value="READY">就绪</option>
-              <option value="ACTIVE">执行中</option>
-              <option value="DONE">完成</option>
-              <option value="SCHEDULED">计划中</option>
-              <option value="PAUSED">已暂停</option>
-            </select>
+            <textarea v-model="editingActionParamJson" class="plan-form-input" rows="2" placeholder='{"key": "value"}' />
           </div>
         </div>
         <div class="action-dialog-footer">
@@ -947,7 +963,11 @@ const editingActionParamJson = computed({
 });
 
 const onActionClick = (action, vehicle, stage) => {
-  editingAction.value = JSON.parse(JSON.stringify(action));
+  const cloned = JSON.parse(JSON.stringify(action));
+  if (!cloned.time_attributes) {
+    cloned.time_attributes = { schedule_start_time: 0, schedule_duration: 0 };
+  }
+  editingAction.value = cloned;
   actionDetailVisible.value = true;
 };
 
@@ -1773,6 +1793,18 @@ const getVehicleStageActions = (vid, stage) => {
 }
 
 .plan-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.plan-form-row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.plan-form-col {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
