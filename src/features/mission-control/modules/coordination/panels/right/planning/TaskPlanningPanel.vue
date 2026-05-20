@@ -209,15 +209,33 @@
       <!-- 编辑面板：分段控制器 + 内容区融为一体 -->
       <div class="plan-edit-panel">
         <div class="plan-edit-segmented">
+          <div class="plan-edit-segment-tabs">
+            <button
+              v-for="step in planEditSteps"
+              :key="step.id"
+              class="plan-edit-segment"
+              :class="{ active: planEditSubTab === step.id }"
+              type="button"
+              @click="planEditSubTab = step.id"
+            >
+              {{ step.label }}
+            </button>
+          </div>
           <button
-            v-for="step in planEditSteps"
-            :key="step.id"
-            class="plan-edit-segment"
-            :class="{ active: planEditSubTab === step.id }"
+            v-if="planEditSubTab === 'actions'"
+            class="planning-btn small"
             type="button"
-            @click="planEditSubTab = step.id"
+            @click="onGenerateActions"
           >
-            {{ step.label }}
+            生成行动序列
+          </button>
+          <button
+            v-if="planEditSubTab === 'stages'"
+            class="planning-btn small"
+            type="button"
+            @click="onAddStage"
+          >
+            新增阶段
           </button>
         </div>
 
@@ -376,9 +394,6 @@
 
         <!-- 阶段划分 -->
         <div v-else-if="planEditSubTab === 'stages'" class="plan-section">
-          <div class="plan-section-toolbar">
-            <button class="planning-btn small" type="button" @click="onAddStage">新增阶段</button>
-          </div>
         <div v-if="stages.length" class="stage-list">
           <div v-for="(stage, index) in stages" :key="stage.stage_id" class="stage-card">
             <div class="stage-card-header">
@@ -404,9 +419,6 @@
 
         <!-- 行动序列：泳道图 -->
         <div v-else-if="planEditSubTab === 'actions'" class="plan-section">
-          <div class="plan-section-toolbar">
-            <button class="planning-btn small" type="button" @click="onGenerateActions">生成行动序列</button>
-          </div>
           <div v-if="planDraft?.stages?.length" class="action-swimlane-wrapper">
             <!-- 表头行 -->
             <div
@@ -1762,10 +1774,17 @@ const getVehicleStageActions = (vid, stage) => {
 /* ===== 二级分段控制器（编辑步骤切换） ===== */
 .plan-edit-segmented {
   display: flex;
-  gap: 0.25rem;
-  padding: 0.6rem 0.9rem 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.5rem 0.9rem;
   background: linear-gradient(180deg, rgba(0, 213, 192, 0.04), rgba(0, 49, 72, 0.01)), rgba(1, 16, 22, 0.5);
   border-bottom: 1px solid rgba(0, 222, 200, 0.12);
+}
+
+.plan-edit-segment-tabs {
+  display: flex;
+  gap: 0.25rem;
 }
 
 .plan-edit-segment {
@@ -1798,10 +1817,7 @@ const getVehicleStageActions = (vid, stage) => {
   gap: 0.65rem;
 }
 
-.plan-section-toolbar {
-  display: flex;
-  justify-content: flex-end;
-}
+
 
 .plan-form-row {
   display: flex;
