@@ -2653,23 +2653,25 @@ const getVehicleStageActions = (vid, stage) => {
 
 .swimlane-header-cell {
   padding: 0.5rem 0.55rem;
-  background: rgba(0, 222, 200, 0.08);
-  border-radius: 9px;
+  background: rgba(0, 222, 200, 0.14);
+  border-radius: 8px 8px 0 0;
   text-align: center;
   font-weight: 800;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   color: #00e5ca;
-  border: 1px solid rgba(0, 222, 200, 0.18);
+  border: none;
+  border-bottom: 2px solid rgba(0, 222, 200, 0.45);
+  letter-spacing: 0.02em;
 }
 
-.swimlane-header-cell.swimlane-stage-col-0 { background: rgba(0, 222, 200, 0.12); }
-.swimlane-header-cell.swimlane-stage-col-1 { background: rgba(59, 130, 246, 0.14); color: #93c5fd; border-color: rgba(59, 130, 246, 0.28); }
-.swimlane-header-cell.swimlane-stage-col-2 { background: rgba(139, 92, 246, 0.14); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.28); }
-.swimlane-header-cell.swimlane-stage-col-3 { background: rgba(245, 158, 11, 0.14); color: #fcd34d; border-color: rgba(245, 158, 11, 0.28); }
+.swimlane-header-cell.swimlane-stage-col-0 { background: rgba(0, 222, 200, 0.18); border-bottom-color: rgba(0, 222, 200, 0.55); }
+.swimlane-header-cell.swimlane-stage-col-1 { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border-bottom-color: rgba(59, 130, 246, 0.55); }
+.swimlane-header-cell.swimlane-stage-col-2 { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border-bottom-color: rgba(139, 92, 246, 0.55); }
+.swimlane-header-cell.swimlane-stage-col-3 { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border-bottom-color: rgba(245, 158, 11, 0.55); }
 
 .swimlane-corner {
-  background: rgba(0, 222, 200, 0.05);
-  color: rgba(196, 243, 248, 0.7);
+  background: rgba(0, 222, 200, 0.08);
+  color: rgba(196, 243, 248, 0.55);
   padding: 0.3rem 0.1rem;
   font-size: 0.72rem;
   line-height: 1.35;
@@ -2678,6 +2680,7 @@ const getVehicleStageActions = (vid, stage) => {
   align-items: center;
   justify-content: center;
   gap: 0.05rem;
+  border-radius: 8px 8px 0 0;
 }
 
 .swimlane-col-divider-header {
@@ -2703,9 +2706,9 @@ const getVehicleStageActions = (vid, stage) => {
 
 /* 编组大框 panel */
 .swimlane-team-panel {
-  border-radius: 16px;
-  border: 1px solid rgba(0, 222, 200, 0.3);
-  background: rgba(6, 20, 26, 0.75);
+  border-radius: 10px;
+  border: none;
+  background: rgba(4, 16, 22, 0.55);
   min-width: fit-content;
 }
 
@@ -2714,9 +2717,9 @@ const getVehicleStageActions = (vid, stage) => {
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
-  padding: 0.65rem 1rem;
-  background: rgba(0, 222, 200, 0.09);
-  border-bottom: 1px solid rgba(0, 222, 200, 0.22);
+  padding: 0.55rem 1rem;
+  background: rgba(0, 222, 200, 0.06);
+  border-bottom: 1px solid rgba(0, 222, 200, 0.14);
 }
 
 .swimlane-team-panel-title {
@@ -2743,9 +2746,8 @@ const getVehicleStageActions = (vid, stage) => {
   padding: 0.22rem 0.62rem;
   font-size: 0.8rem;
   font-weight: 700;
-  background: rgba(0, 222, 200, 0.14);
+  background: rgba(0, 222, 200, 0.1);
   color: #b4fff8;
-  border: 1px solid rgba(0, 222, 200, 0.25);
   white-space: nowrap;
 }
 
@@ -2753,7 +2755,7 @@ const getVehicleStageActions = (vid, stage) => {
 .swimlane-team-panel-body {
   display: grid;
   gap: 0.35rem;
-  padding: 0.5rem 0.5rem 1rem;
+  padding: 0.7rem 0.6rem 0.9rem;
   min-width: fit-content;
 }
 
@@ -2762,9 +2764,9 @@ const getVehicleStageActions = (vid, stage) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 222, 200, 0.04);
+  background: rgba(0, 222, 200, 0.03);
   border-radius: 6px;
-  border: 1px solid rgba(0, 222, 200, 0.12);
+  border: none;
 }
 
 .swimlane-vid {
@@ -2780,21 +2782,21 @@ const getVehicleStageActions = (vid, stage) => {
 
 .swimlane-stage-cell {
   padding: 0.45rem;
-  background: rgba(0, 222, 200, 0.04);
-  border-radius: 9px;
-  border: 1px solid rgba(0, 222, 200, 0.12);
+  background: rgba(0, 222, 200, 0.025);
+  border-radius: 6px;
+  border: none;
   min-height: 48px;
 }
 
-.swimlane-stage-cell.swimlane-stage-col-0 { background: rgba(0, 222, 200, 0.04); }
-.swimlane-stage-cell.swimlane-stage-col-1 { background: rgba(59, 130, 246, 0.05); border-color: rgba(59, 130, 246, 0.15); }
-.swimlane-stage-cell.swimlane-stage-col-2 { background: rgba(139, 92, 246, 0.05); border-color: rgba(139, 92, 246, 0.15); }
-.swimlane-stage-cell.swimlane-stage-col-3 { background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.15); }
+.swimlane-stage-cell.swimlane-stage-col-0 { background: rgba(0, 222, 200, 0.03); }
+.swimlane-stage-cell.swimlane-stage-col-1 { background: rgba(59, 130, 246, 0.04); }
+.swimlane-stage-cell.swimlane-stage-col-2 { background: rgba(139, 92, 246, 0.04); }
+.swimlane-stage-cell.swimlane-stage-col-3 { background: rgba(245, 158, 11, 0.04); }
 
 .swimlane-empty-cell {
   text-align: center;
-  color: rgba(196, 243, 248, 0.45);
-  font-size: 0.92rem;
+  color: rgba(196, 243, 248, 0.25);
+  font-size: 0.82rem;
   padding: 0.9rem 0;
 }
 
@@ -2805,9 +2807,9 @@ const getVehicleStageActions = (vid, stage) => {
 }
 
 .swimlane-action-card {
-  border-radius: 9px;
-  border: 1px solid rgba(0, 222, 200, 0.2);
-  background: rgba(0, 222, 200, 0.07);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 222, 200, 0.22);
+  background: rgba(0, 222, 200, 0.08);
   padding: 0.45rem 0.6rem;
   cursor: pointer;
   transition: border-color 180ms ease, background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
@@ -2815,45 +2817,45 @@ const getVehicleStageActions = (vid, stage) => {
 
 .swimlane-action-card:hover {
   border-color: rgba(0, 222, 200, 0.55);
-  background: rgba(0, 222, 200, 0.12);
+  background: rgba(0, 222, 200, 0.14);
   transform: translateY(-2px);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 222, 200, 0.12);
 }
 
 .swimlane-stage-col-0 .swimlane-action-card {
-  border-color: rgba(0, 222, 200, 0.22);
-  background: rgba(0, 222, 200, 0.07);
+  border-color: rgba(0, 222, 200, 0.24);
+  background: rgba(0, 222, 200, 0.09);
 }
 .swimlane-stage-col-0 .swimlane-action-card:hover {
-  border-color: rgba(0, 222, 200, 0.45);
-  background: rgba(0, 222, 200, 0.12);
+  border-color: rgba(0, 222, 200, 0.5);
+  background: rgba(0, 222, 200, 0.15);
 }
 
 .swimlane-stage-col-1 .swimlane-action-card {
-  border-color: rgba(59, 130, 246, 0.22);
-  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.24);
+  background: rgba(59, 130, 246, 0.1);
 }
 .swimlane-stage-col-1 .swimlane-action-card:hover {
-  border-color: rgba(59, 130, 246, 0.45);
-  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.16);
 }
 
 .swimlane-stage-col-2 .swimlane-action-card {
-  border-color: rgba(139, 92, 246, 0.22);
-  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.24);
+  background: rgba(139, 92, 246, 0.1);
 }
 .swimlane-stage-col-2 .swimlane-action-card:hover {
-  border-color: rgba(139, 92, 246, 0.45);
-  background: rgba(139, 92, 246, 0.14);
+  border-color: rgba(139, 92, 246, 0.5);
+  background: rgba(139, 92, 246, 0.16);
 }
 
 .swimlane-stage-col-3 .swimlane-action-card {
-  border-color: rgba(245, 158, 11, 0.22);
-  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.24);
+  background: rgba(245, 158, 11, 0.1);
 }
 .swimlane-stage-col-3 .swimlane-action-card:hover {
-  border-color: rgba(245, 158, 11, 0.45);
-  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.16);
 }
 
 .swimlane-action-header {
