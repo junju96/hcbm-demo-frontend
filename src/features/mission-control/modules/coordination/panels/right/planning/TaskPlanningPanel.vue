@@ -413,7 +413,7 @@
               class="swimlane-header-row"
               :style="{ gridTemplateColumns: `56px ${planDraft.stages.map((_, i) => i < planDraft.stages.length - 1 ? 'minmax(180px, 1fr) 2px' : 'minmax(180px, 1fr)').join(' ')}` }"
             >
-              <div class="swimlane-header-cell swimlane-corner">编组 / 车辆</div>
+              <div class="swimlane-header-cell swimlane-corner"><div>编组</div><div>车辆</div></div>
               <template v-for="(stage, sIndex) in planDraft.stages" :key="stage.stage_id">
                 <div class="swimlane-header-cell" :class="`swimlane-stage-col-${sIndex % 4}`">
                   <div class="swimlane-stage-title">阶段 {{ sIndex + 1 }}</div>
@@ -2632,14 +2632,14 @@ const getVehicleStageActions = (vid, stage) => {
 .swimlane-corner {
   background: rgba(0, 222, 200, 0.05);
   color: rgba(196, 243, 248, 0.7);
-  padding: 0.5rem 0.15rem;
-  font-size: 0.78rem;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  letter-spacing: 0.06em;
+  padding: 0.3rem 0.1rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.05rem;
 }
 
 .swimlane-col-divider-header {
