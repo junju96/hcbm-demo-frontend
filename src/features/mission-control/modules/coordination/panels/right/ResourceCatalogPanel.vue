@@ -377,29 +377,46 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 }
 
 .coord-resource-filter-btn {
-  border-radius: 8px;
-  border: 1px solid var(--coord-border-soft);
-  background: rgba(1, 12, 18, 0.9);
-  color: rgba(214, 237, 242, 0.86);
-  padding: 0.35rem 0.65rem;
-  font-size: 0.82rem;
+  position: relative;
+  border: none;
+  background: transparent;
+  color: rgba(196, 243, 248, 0.65);
+  padding: 0.4rem 0.5rem 0.55rem;
+  font-size: 0.88rem;
   white-space: nowrap;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+  transition: color 180ms ease;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
 }
 
+.coord-resource-filter-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  width: 80%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--coord-accent, #00dec8);
+  opacity: 0;
+  transform: scaleX(0.6);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
 .coord-resource-filter-btn:hover {
-  border-color: rgba(0, 222, 200, 0.5);
+  color: rgba(196, 243, 248, 0.9);
 }
 
 .coord-resource-filter-btn.active {
-  border-color: rgba(0, 222, 200, 0.54);
-  background: linear-gradient(180deg, rgba(0, 222, 200, 0.12), rgba(0, 49, 72, 0.03)), rgba(1, 12, 18, 0.9);
-  color: #f1feff;
+  color: var(--coord-accent, #00dec8);
+}
+
+.coord-resource-filter-btn.active::after {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .coord-resource-filter-count {
