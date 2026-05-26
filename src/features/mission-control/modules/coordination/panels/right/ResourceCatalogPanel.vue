@@ -2,8 +2,11 @@
   <div class="coord-resource-shell">
     <!-- 顶部标题 + 筛选（全宽） -->
     <div class="coord-resource-top-bar">
-      <div class="coord-pane-title">资源池</div>
-      <div class="coord-resource-filters">
+      <div class="coord-pane-title">
+        <template v-if="viewMode === 'detail' && detailResource">资源详情</template>
+        <template v-else>资源池</template>
+      </div>
+      <div v-if="viewMode === 'list'" class="coord-resource-filters">
         <button
           v-for="tab in filterTabs"
           :key="tab.tag"
@@ -16,176 +19,193 @@
           <span v-if="tab.count > 0" class="coord-resource-filter-count">{{ tab.count }}</span>
         </button>
       </div>
+      <button
+        v-if="viewMode === 'detail' && detailResource"
+        class="coord-resource-back-btn"
+        type="button"
+        @click="goBack"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        返回
+      </button>
     </div>
 
-    <div class="coord-resource-layout">
-      <!-- 左侧资源列表 -->
-      <aside class="coord-panel coord-resource-left">
-        <!-- 资源列表 -->
-        <div v-if="filteredResources.length" class="coord-resource-list">
-          <button
-            v-for="resource in filteredResources"
-            :key="resource.resource_id"
-            class="coord-resource-item"
-            :class="{ active: selectedResourceId === resource.resource_id }"
-            type="button"
-            v-bind="buildResourceTargetAttrs(resource)"
-            @click="selectedResourceId = resource.resource_id"
-          >
-            <div class="coord-resource-item-top">
-              <span
-                class="coord-resource-tag"
-                :class="`tag-${resource.resource_tag}`"
+    <!-- 列表视图 -->
+    <div v-if="viewMode === 'list'" class="coord-resource-list-view">
+      <div v-if="filteredResources.length" class="coord-resource-list">
+        <div
+          v-for="resource in filteredResources"
+          :key="resource.resource_id"
+          class="coord-resource-card"
+          v-bind="buildResourceTargetAttrs(resource)"
+        >
+          <div class="coord-resource-card-main">
+            <div class="coord-resource-card-header">
+              <div class="coord-resource-card-title-row">
+                <span
+                  class="coord-resource-tag"
+                  :class="`tag-${resource.resource_tag}`"
+                >
+                  {{ tagLabel(resource.resource_tag) }}
+                </span>
+                <span class="coord-resource-type">{{ RESOURCE_TYPE_LABELS[resource.resource_type] || resource.resource_type }}</span>
+                <span class="coord-resource-name">{{ resource.resource_name }}</span>
+              </div>
+              <button
+                class="coord-resource-detail-btn"
+                type="button"
+                @click="openDetail(resource)"
               >
-                {{ tagLabel(resource.resource_tag) }}
-              </span>
-              <span class="coord-resource-name">{{ resource.resource_name }}</span>
+                详情
+              </button>
             </div>
-            <div class="coord-resource-sub">
-              <span class="coord-resource-type">{{ RESOURCE_TYPE_LABELS[resource.resource_type] || resource.resource_type }}</span>
-              <span v-if="resourceSubtitle(resource)" class="coord-resource-extra">
-                {{ resourceSubtitle(resource) }}
-              </span>
+            <div class="coord-resource-card-params">
+              <div
+                v-for="(param, idx) in getResourceMainParams(resource)"
+                :key="idx"
+                class="coord-resource-param-cell"
+              >
+                <div class="coord-resource-param-label">{{ param.label }}</div>
+                <div class="coord-resource-param-value" :class="param.class">{{ param.value }}</div>
+              </div>
             </div>
-          </button>
+          </div>
         </div>
-        <div v-else class="coord-resource-empty-state">
-          当前没有可展示的资源，请先完成命令解析或检查本地数据。
-        </div>
-      </aside>
+      </div>
+      <div v-else class="coord-resource-empty-state">
+        当前没有可展示的资源，请先完成命令解析或检查本地数据。
+      </div>
+    </div>
 
-      <!-- 右侧详情 -->
-      <section class="coord-panel coord-resource-right" v-if="selectedResource">
+    <!-- 详情视图 -->
+    <div v-else-if="viewMode === 'detail' && detailResource" class="coord-resource-detail-view">
+      <section class="coord-panel coord-resource-detail-panel">
         <div class="res-detail-header">
           <div class="res-detail-title-group">
-            <span class="res-detail-name">{{ selectedResource.resource_name }}</span>
-            <span class="res-detail-chip" :class="`tag-${selectedResource.resource_tag}`">
-              {{ tagLabel(selectedResource.resource_tag) }}
+            <span class="res-detail-name">{{ detailResource.resource_name }}</span>
+            <span class="res-detail-chip" :class="`tag-${detailResource.resource_tag}`">
+              {{ tagLabel(detailResource.resource_tag) }}
             </span>
           </div>
-          <span class="res-detail-type">{{ RESOURCE_TYPE_LABELS[selectedResource.resource_type] || selectedResource.resource_type }}</span>
+          <span class="res-detail-type">{{ RESOURCE_TYPE_LABELS[detailResource.resource_type] || detailResource.resource_type }}</span>
         </div>
 
         <div class="res-detail-meta-grid">
           <div class="res-detail-meta">
             <span class="res-detail-meta-label">资源编号</span>
-            <span class="res-detail-meta-value">{{ selectedResource.resource_id }}</span>
+            <span class="res-detail-meta-value">{{ detailResource.resource_id }}</span>
           </div>
           <div class="res-detail-meta">
             <span class="res-detail-meta-label">关联命令</span>
-            <span class="res-detail-meta-value">{{ connectedCommandsText }}</span>
+            <span class="res-detail-meta-value">{{ connectedCommandsTextDetail }}</span>
           </div>
           <div class="res-detail-meta">
             <span class="res-detail-meta-label">关联计划</span>
-            <span class="res-detail-meta-value">{{ connectedPlansText }}</span>
+            <span class="res-detail-meta-value">{{ connectedPlansTextDetail }}</span>
           </div>
         </div>
 
-        <div v-if="selectedResource.resource_tag === 'TS_TARGET'" class="res-detail-type-section">
+        <div v-if="detailResource.resource_tag === 'TS_TARGET'" class="res-detail-type-section">
           <div class="res-detail-section">
             <div class="res-detail-section-title">态势属性</div>
             <div class="res-detail-kv-grid">
-              <div class="res-detail-kv"><span class="res-detail-kv-key">敌我类型</span><span class="res-detail-kv-val">{{ t(detail.type) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">威胁等级</span><span class="res-detail-kv-val" :class="`threat-${detail.threat_level}`">{{ t(detail.threat_level) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">威胁值</span><span class="res-detail-kv-val">{{ t(detail.value) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">运动状态</span><span class="res-detail-kv-val">{{ t(detail.motion) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">意图</span><span class="res-detail-kv-val">{{ t(detail.intent) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">处理等级</span><span class="res-detail-kv-val">{{ t(detail.handle_tier) }}</span></div>
-              <div class="res-detail-kv wide"><span class="res-detail-kv-key">建议处置</span><span class="res-detail-kv-val">{{ detail.suggestion }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">敌我类型</span><span class="res-detail-kv-val">{{ t(detailViewData.type) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">威胁等级</span><span class="res-detail-kv-val" :class="`threat-${detailViewData.threat_level}`">{{ t(detailViewData.threat_level) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">威胁值</span><span class="res-detail-kv-val">{{ t(detailViewData.value) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">运动状态</span><span class="res-detail-kv-val">{{ t(detailViewData.motion) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">意图</span><span class="res-detail-kv-val">{{ t(detailViewData.intent) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">处理等级</span><span class="res-detail-kv-val">{{ t(detailViewData.handle_tier) }}</span></div>
+              <div class="res-detail-kv wide"><span class="res-detail-kv-key">建议处置</span><span class="res-detail-kv-val">{{ detailViewData.suggestion }}</span></div>
             </div>
           </div>
           <div class="res-detail-section">
             <div class="res-detail-section-title">区域坐标</div>
             <div class="res-detail-table">
               <div class="res-detail-table-head"><span>点位</span><span>纬度</span><span>经度</span><span>高度</span></div>
-              <div v-for="point in detail.location" :key="point.point" class="res-detail-table-row">
+              <div v-for="point in detailViewData.location" :key="point.point" class="res-detail-table-row">
                 <span>{{ point.point }}</span><span>{{ point.latitude }}</span><span>{{ point.longitude }}</span><span>{{ point.altitude }}</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div v-if="selectedResource.resource_tag === 'EQUIPMENT'" class="res-detail-type-section">
+        <div v-if="detailResource.resource_tag === 'EQUIPMENT'" class="res-detail-type-section">
           <div class="res-detail-section">
             <div class="res-detail-section-title">平台信息</div>
             <div class="res-detail-kv-grid cols-3">
-              <div class="res-detail-kv"><span class="res-detail-kv-key">平台类型</span><span class="res-detail-kv-val">{{ t(detail.platform_type) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">运行状态</span><span class="res-detail-kv-val" :class="`status-${detail.running_status}`">{{ t(detail.running_status) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">当前任务</span><span class="res-detail-kv-val">{{ detail.current_task }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">平台类型</span><span class="res-detail-kv-val">{{ t(detailViewData.platform_type) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">运行状态</span><span class="res-detail-kv-val" :class="`status-${detailViewData.running_status}`">{{ t(detailViewData.running_status) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">当前任务</span><span class="res-detail-kv-val">{{ detailViewData.current_task }}</span></div>
             </div>
           </div>
           <div class="res-detail-section">
             <div class="res-detail-section-title">载荷模块</div>
             <div class="res-detail-tags">
-              <span v-for="mod in detail.payload_modules" :key="mod" class="res-detail-tag">{{ mod }}</span>
+              <span v-for="mod in detailViewData.payload_modules" :key="mod" class="res-detail-tag">{{ mod }}</span>
             </div>
           </div>
           <div class="res-detail-section">
             <div class="res-detail-section-title">能力参数</div>
             <div class="res-detail-kv-grid cols-2">
-              <div class="res-detail-kv"><span class="res-detail-kv-key">最大航程</span><span class="res-detail-kv-val">{{ detail.mobility?.max_range_km }} km</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">最大速度</span><span class="res-detail-kv-val">{{ detail.mobility?.max_speed_kmh }} km/h</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">地形适应</span><span class="res-detail-kv-val">{{ t(detail.mobility?.terrain_adaptability) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">打击射程</span><span class="res-detail-kv-val">{{ detail.strike_capability?.max_range_km }} km</span></div>
-              <div class="res-detail-kv wide"><span class="res-detail-kv-key">武器类型</span><span class="res-detail-kv-val">{{ (detail.strike_capability?.weapon_types || []).map(t).join('、') || '无' }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">侦察射程</span><span class="res-detail-kv-val">{{ detail.recon_capability?.max_range_km }} km</span></div>
-              <div class="res-detail-kv wide"><span class="res-detail-kv-key">侦察方式</span><span class="res-detail-kv-val">{{ (detail.recon_capability?.methods || []).map(t).join('、') || '无' }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">最大航程</span><span class="res-detail-kv-val">{{ detailViewData.mobility?.max_range_km }} km</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">最大速度</span><span class="res-detail-kv-val">{{ detailViewData.mobility?.max_speed_kmh }} km/h</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">地形适应</span><span class="res-detail-kv-val">{{ t(detailViewData.mobility?.terrain_adaptability) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">打击射程</span><span class="res-detail-kv-val">{{ detailViewData.strike_capability?.max_range_km }} km</span></div>
+              <div class="res-detail-kv wide"><span class="res-detail-kv-key">武器类型</span><span class="res-detail-kv-val">{{ (detailViewData.strike_capability?.weapon_types || []).map(t).join('、') || '无' }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">侦察射程</span><span class="res-detail-kv-val">{{ detailViewData.recon_capability?.max_range_km }} km</span></div>
+              <div class="res-detail-kv wide"><span class="res-detail-kv-key">侦察方式</span><span class="res-detail-kv-val">{{ (detailViewData.recon_capability?.methods || []).map(t).join('、') || '无' }}</span></div>
             </div>
           </div>
         </div>
 
-        <div v-if="selectedResource.resource_tag === 'FIREPOWER'" class="res-detail-type-section">
+        <div v-if="detailResource.resource_tag === 'FIREPOWER'" class="res-detail-type-section">
           <div class="res-detail-section">
             <div class="res-detail-section-title">火力参数</div>
             <div class="res-detail-kv-grid cols-3">
-              <div class="res-detail-kv"><span class="res-detail-kv-key">数量</span><span class="res-detail-kv-val">{{ detail.quantity }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">武器类型</span><span class="res-detail-kv-val">{{ t(detail.weapon_type) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">弹药状态</span><span class="res-detail-kv-val" :class="`status-${detail.ammo_status}`">{{ t(detail.ammo_status) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">打击范围</span><span class="res-detail-kv-val">{{ detail.strike_range_km }} km</span></div>
-              <div class="res-detail-kv wide"><span class="res-detail-kv-key">所属装备</span><span class="res-detail-kv-val">{{ detail.belonging_equipment?.resource_name }} (#{{ detail.belonging_equipment?.resource_id }})</span></div>
-              <div class="res-detail-kv wide"><span class="res-detail-kv-key">杀伤效能</span><span class="res-detail-kv-val">{{ t(detail.lethality?.effect_type) }} — {{ detail.lethality?.effect_value }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">数量</span><span class="res-detail-kv-val">{{ detailViewData.quantity }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">武器类型</span><span class="res-detail-kv-val">{{ t(detailViewData.weapon_type) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">弹药状态</span><span class="res-detail-kv-val" :class="`status-${detailViewData.ammo_status}`">{{ t(detailViewData.ammo_status) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">打击范围</span><span class="res-detail-kv-val">{{ detailViewData.strike_range_km }} km</span></div>
+              <div class="res-detail-kv wide"><span class="res-detail-kv-key">所属装备</span><span class="res-detail-kv-val">{{ detailViewData.belonging_equipment?.resource_name }} (#{{ detailViewData.belonging_equipment?.resource_id }})</span></div>
+              <div class="res-detail-kv wide"><span class="res-detail-kv-key">杀伤效能</span><span class="res-detail-kv-val">{{ t(detailViewData.lethality?.effect_type) }} — {{ detailViewData.lethality?.effect_value }}</span></div>
             </div>
           </div>
         </div>
 
-        <div v-if="selectedResource.resource_tag === 'RECON'" class="res-detail-type-section">
+        <div v-if="detailResource.resource_tag === 'RECON'" class="res-detail-type-section">
           <div class="res-detail-section">
             <div class="res-detail-section-title">侦察参数</div>
             <div class="res-detail-kv-grid cols-2">
-              <div class="res-detail-kv"><span class="res-detail-kv-key">侦察方式</span><span class="res-detail-kv-val">{{ (detail.recon_methods || []).map(t).join('、') }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">侦察范围</span><span class="res-detail-kv-val">{{ detail.recon_range_km ?? '—' }} km</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">在线状态</span><span class="res-detail-kv-val" :class="`status-${detail.online_status}`">{{ t(detail.online_status) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">所属平台</span><span class="res-detail-kv-val">{{ detail.resource_platform?.resource_name }} (#{{ detail.resource_platform?.resource_id }})</span></div>
-              <div class="res-detail-kv wide"><span class="res-detail-kv-key">覆盖范围</span><span class="res-detail-kv-val">{{ detail.coverage_focus }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">侦察方式</span><span class="res-detail-kv-val">{{ (detailViewData.recon_methods || []).map(t).join('、') }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">侦察范围</span><span class="res-detail-kv-val">{{ detailViewData.recon_range_km ?? '—' }} km</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">在线状态</span><span class="res-detail-kv-val" :class="`status-${detailViewData.online_status}`">{{ t(detailViewData.online_status) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">所属平台</span><span class="res-detail-kv-val">{{ detailViewData.resource_platform?.resource_name }} (#{{ detailViewData.resource_platform?.resource_id }})</span></div>
+              <div class="res-detail-kv wide"><span class="res-detail-kv-key">覆盖范围</span><span class="res-detail-kv-val">{{ detailViewData.coverage_focus }}</span></div>
             </div>
           </div>
         </div>
 
-        <div v-if="selectedResource.resource_tag === 'SUPPORT'" class="res-detail-type-section">
+        <div v-if="detailResource.resource_tag === 'SUPPORT'" class="res-detail-type-section">
           <div class="res-detail-section">
             <div class="res-detail-section-title">保障参数</div>
             <div class="res-detail-kv-grid cols-2">
-              <div class="res-detail-kv"><span class="res-detail-kv-key">保障单位</span><span class="res-detail-kv-val">{{ detail.support_unit }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">保障能力</span><span class="res-detail-kv-val">{{ detail.support_capability }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">机动能力</span><span class="res-detail-kv-val">{{ detail.mobility_capability }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">当前状态</span><span class="res-detail-kv-val" :class="`status-${detail.current_status}`">{{ t(detail.current_status) }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">保障类别</span><span class="res-detail-kv-val">{{ t(detail.support_category) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">保障单位</span><span class="res-detail-kv-val">{{ detailViewData.support_unit }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">保障能力</span><span class="res-detail-kv-val">{{ detailViewData.support_capability }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">机动能力</span><span class="res-detail-kv-val">{{ detailViewData.mobility_capability }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">当前状态</span><span class="res-detail-kv-val" :class="`status-${detailViewData.current_status}`">{{ t(detailViewData.current_status) }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">保障类别</span><span class="res-detail-kv-val">{{ t(detailViewData.support_category) }}</span></div>
             </div>
           </div>
           <div class="res-detail-section">
             <div class="res-detail-section-title">部署位置</div>
             <div class="res-detail-kv-grid cols-2">
-              <div class="res-detail-kv wide"><span class="res-detail-kv-key">位置名称</span><span class="res-detail-kv-val">{{ detail.deployment_location?.location_name || '—' }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">纬度</span><span class="res-detail-kv-val">{{ detail.deployment_location?.latitude }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">经度</span><span class="res-detail-kv-val">{{ detail.deployment_location?.longitude }}</span></div>
-              <div class="res-detail-kv"><span class="res-detail-kv-key">高度</span><span class="res-detail-kv-val">{{ detail.deployment_location?.altitude }} m</span></div>
+              <div class="res-detail-kv wide"><span class="res-detail-kv-key">位置名称</span><span class="res-detail-kv-val">{{ detailViewData.deployment_location?.location_name || '—' }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">纬度</span><span class="res-detail-kv-val">{{ detailViewData.deployment_location?.latitude }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">经度</span><span class="res-detail-kv-val">{{ detailViewData.deployment_location?.longitude }}</span></div>
+              <div class="res-detail-kv"><span class="res-detail-kv-key">高度</span><span class="res-detail-kv-val">{{ detailViewData.deployment_location?.altitude }} m</span></div>
             </div>
           </div>
         </div>
-      </section>
-      <section v-else class="coord-panel coord-resource-right coord-resource-empty-panel">
-        <div class="coord-pane-title">资源详情</div>
-        <div class="coord-resource-empty-copy">当前没有已解析的资源数据，右侧详情区已自动清空。</div>
       </section>
     </div>
   </div>
@@ -218,17 +238,14 @@ const resources = resourceRecords.filter((item) => parsedResourceIds.has(item.re
 
 /* ---------- 状态 ---------- */
 const activeFilterTag = ref('ALL');
-const selectedResourceId = ref(resources[0]?.resource_id || null);
+const viewMode = ref('list'); // 'list' | 'detail'
+const detailResource = ref(null);
 
 const filteredResources = computed(() => {
   if (activeFilterTag.value === 'ALL') {
     return resources;
   }
   return resources.filter((r) => r.resource_tag === activeFilterTag.value);
-});
-
-const selectedResource = computed(() => {
-  return resources.find((item) => item.resource_id === selectedResourceId.value) || null;
 });
 
 /* ---------- 筛选标签 ---------- */
@@ -249,46 +266,77 @@ const filterTabs = computed(() => {
 const tagLabel = (tag) => RESOURCE_TAG_LABELS[tag] || tag;
 const t = translateResourceField;
 
-const detail = computed(() => selectedResource.value?.resource_detail || {});
-const connectedCommandsText = computed(() => {
-  const ids = selectedResource.value?.connections?.connected_commands || [];
+const detailViewData = computed(() => detailResource.value?.resource_detail || {});
+const connectedCommandsTextDetail = computed(() => {
+  const ids = detailResource.value?.connections?.connected_commands || [];
   return ids.length ? ids.map((id) => `命令${id}`).join('、') : '无';
 });
-const connectedPlansText = computed(() => {
-  const ids = selectedResource.value?.connections?.connected_plans || [];
+const connectedPlansTextDetail = computed(() => {
+  const ids = detailResource.value?.connections?.connected_plans || [];
   return ids.length ? ids.map((id) => `方案${id}`).join('、') : '无';
 });
 
-const resourceSubtitle = (resource) => {
+/* ---------- 主要参数提取 ---------- */
+const getResourceMainParams = (resource) => {
   const detail = resource.resource_detail;
+  const params = [];
   switch (resource.resource_tag) {
     case 'TS_TARGET':
-      return detail?.type ? `敌我: ${t(detail.type)}` : '';
+      params.push(
+        { label: '敌我类型', value: t(detail?.type), class: '' },
+        { label: '威胁等级', value: t(detail?.threat_level), class: `threat-${detail?.threat_level}` },
+        { label: '运动状态', value: t(detail?.motion), class: '' }
+      );
+      break;
     case 'EQUIPMENT':
-      return detail?.running_status ? `状态: ${t(detail.running_status)}` : '';
+      params.push(
+        { label: '平台类型', value: t(detail?.platform_type), class: '' },
+        { label: '运行状态', value: t(detail?.running_status), class: `status-${detail?.running_status}` },
+        { label: '当前任务', value: detail?.current_task || '—', class: '' }
+      );
+      break;
     case 'FIREPOWER':
-      return detail?.quantity !== undefined ? `数量: ${detail.quantity}` : '';
+      params.push(
+        { label: '数量', value: detail?.quantity !== undefined ? detail.quantity : '—', class: '' },
+        { label: '武器类型', value: t(detail?.weapon_type), class: '' },
+        { label: '弹药状态', value: t(detail?.ammo_status), class: `status-${detail?.ammo_status}` }
+      );
+      break;
     case 'RECON':
-      return detail?.online_status ? `状态: ${t(detail.online_status)}` : '';
+      params.push(
+        { label: '侦察方式', value: (detail?.recon_methods || []).map(t).join('、') || '—', class: '' },
+        { label: '在线状态', value: t(detail?.online_status), class: `status-${detail?.online_status}` },
+        { label: '覆盖范围', value: detail?.coverage_focus || '—', class: '' }
+      );
+      break;
     case 'SUPPORT':
-      return detail?.current_status ? `状态: ${t(detail.current_status)}` : '';
-    default:
-      return '';
+      params.push(
+        { label: '保障能力', value: detail?.support_capability || '—', class: '' },
+        { label: '当前状态', value: t(detail?.current_status), class: `status-${detail?.current_status}` },
+        { label: '保障类别', value: t(detail?.support_category), class: '' }
+      );
+      break;
   }
+  return params;
+};
+
+/* ---------- 视图切换 ---------- */
+const openDetail = (resource) => {
+  detailResource.value = resource;
+  viewMode.value = 'detail';
+};
+
+const goBack = () => {
+  viewMode.value = 'list';
+  detailResource.value = null;
 };
 
 /* ---------- 监听 ---------- */
-watch(filteredResources, (list) => {
-  if (!list.some((r) => r.resource_id === selectedResourceId.value)) {
-    selectedResourceId.value = list[0]?.resource_id || null;
+watch(filteredResources, () => {
+  if (viewMode.value === 'detail') {
+    goBack();
   }
-}, { immediate: true });
-
-watch(selectedResource, (value) => {
-  if (!value) {
-    selectedResourceId.value = filteredResources.value[0]?.resource_id || null;
-  }
-}, { immediate: true });
+}, { flush: 'post' });
 
 /* ---------- 语义目标 ---------- */
 const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
@@ -320,54 +368,49 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  padding: 0.5rem 0.2rem 0.2rem;
+  padding: 0.5rem 0.2rem 0.5rem;
   flex-wrap: nowrap;
-}
-
-.coord-resource-layout {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 0.8rem;
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-}
-
-.coord-panel {
-  border-radius: 16px;
-  border: 1px solid var(--coord-border);
-  background:
-    linear-gradient(180deg, rgba(0, 213, 192, 0.06), rgba(0, 49, 72, 0.01)),
-    var(--coord-bg);
-  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.05);
-}
-
-.coord-resource-left,
-.coord-resource-right {
-  padding: 0.9rem;
-  overflow-y: auto;
-}
-
-.coord-resource-empty-panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 240px;
+  border-bottom: 1px solid rgba(0, 208, 188, 0.2);
+  margin-bottom: 0.6rem;
 }
 
 .coord-pane-title {
   color: var(--coord-text);
   font-size: 1.14rem;
   font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* 返回按钮 */
+.coord-resource-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: rgba(0, 222, 200, 0.12);
+  color: #b4fff8;
+  padding: 0.32rem 0.64rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease;
+  margin-left: auto;
+}
+.coord-resource-back-btn:hover {
+  background: rgba(0, 222, 200, 0.24);
+  color: #e2fffc;
 }
 
 /* 筛选标签 */
 .coord-resource-filters {
   display: flex;
   flex-wrap: nowrap;
-  gap: 0.4rem;
+  gap: 0.3rem;
   overflow-x: auto;
-  padding-bottom: 0.2rem;
+  padding-bottom: 0;
   scrollbar-width: none;
   flex: 1;
 }
@@ -379,22 +422,23 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   position: relative;
   border: none;
   background: transparent;
-  color: rgba(196, 243, 248, 0.65);
-  padding: 0.4rem 0.5rem 0.55rem;
-  font-size: 0.88rem;
+  color: rgba(196, 243, 248, 0.6);
+  padding: 0.38rem 0.72rem 0.52rem;
+  font-size: 0.9rem;
   white-space: nowrap;
   font-weight: 600;
   cursor: pointer;
-  transition: color 180ms ease;
+  transition: color 180ms ease, background 180ms ease;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.3rem;
+  border-radius: 10px 10px 0 0;
 }
 
 .coord-resource-filter-btn::after {
   content: '';
   position: absolute;
-  bottom: 0;
+  bottom: -1px;
   left: 10%;
   width: 80%;
   height: 3px;
@@ -411,6 +455,8 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 
 .coord-resource-filter-btn.active {
   color: var(--coord-accent, #00dec8);
+  background: rgba(0, 222, 200, 0.1);
+  border-radius: 10px 10px 0 0;
 }
 
 .coord-resource-filter-btn.active::after {
@@ -427,17 +473,21 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   font-weight: 700;
 }
 
-/* 资源列表 */
-.coord-resource-list {
-  margin-top: 0.52rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.44rem;
+/* 列表视图 */
+.coord-resource-list-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 0.2rem;
 }
 
-.coord-resource-empty-state,
-.coord-resource-empty-copy {
-  margin-top: 0.72rem;
+.coord-resource-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.coord-resource-empty-state {
   border-radius: 12px;
   border: 1px dashed var(--coord-border-soft);
   color: rgba(226, 246, 248, 0.86);
@@ -445,31 +495,40 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   line-height: 1.7;
 }
 
-.coord-resource-item {
+/* 资源卡片 */
+.coord-resource-card {
+  position: relative;
   border-radius: 12px;
-  border: 1px solid var(--coord-border-soft);
-  background: rgba(1, 12, 18, 0.9);
-  color: var(--coord-text);
-  text-align: left;
-  padding: 0.58rem 0.64rem;
-  cursor: pointer;
+  border: 1px solid rgba(0, 208, 188, 0.28);
+  background: linear-gradient(180deg, rgba(0, 222, 200, 0.05), rgba(0, 222, 200, 0.015)), rgba(0, 16, 22, 0.68);
+  padding: 0.7rem 0.8rem;
+  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.05), 0 6px 14px rgba(0, 0, 0, 0.16);
   transition: border-color 160ms ease, background 160ms ease, box-shadow 200ms ease, transform 200ms ease;
 }
-.coord-resource-item:hover {
-  border-color: rgba(0, 222, 200, 0.45);
-  box-shadow: 0 0 0 2px rgba(0, 222, 200, 0.08), 0 4px 12px rgba(0, 0, 0, 0.2);
+.coord-resource-card:hover {
+  border-color: rgba(0, 222, 200, 0.5);
+  background: linear-gradient(180deg, rgba(0, 222, 200, 0.07), rgba(0, 222, 200, 0.025)), rgba(0, 18, 24, 0.75);
+  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.08), 0 8px 22px rgba(0, 0, 0, 0.22);
   transform: translateY(-1px);
 }
 
-.coord-resource-item.active {
-  border-color: rgba(0, 222, 200, 0.54);
-  background: linear-gradient(180deg, rgba(0, 222, 200, 0.1), rgba(0, 49, 72, 0.03)), rgba(1, 12, 18, 0.9);
+.coord-resource-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.coord-resource-item-top {
+.coord-resource-card-header {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.coord-resource-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
@@ -503,16 +562,9 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 }
 
 .coord-resource-name {
-  font-size: 0.9rem;
+  color: var(--coord-text);
+  font-size: 0.95rem;
   font-weight: 700;
-}
-
-.coord-resource-sub {
-  margin-top: 0.28rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
 }
 
 .coord-resource-type {
@@ -520,12 +572,86 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   font-size: 0.78rem;
 }
 
-.coord-resource-extra {
-  color: rgba(196, 243, 248, 0.7);
-  font-size: 0.76rem;
+/* 参数区域 — 网格块 */
+.coord-resource-card-params {
+  margin-top: 0.3rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.46rem;
 }
 
-/* 资源详情内联样式 */
+.coord-resource-param-cell {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 222, 200, 0.18);
+  background: rgba(2, 20, 27, 0.6);
+  padding: 0.44rem 0.52rem;
+  min-width: 0;
+}
+
+.coord-resource-param-label {
+  color: rgba(153, 218, 227, 0.85);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.coord-resource-param-value {
+  margin-top: 0.18rem;
+  color: rgba(241, 254, 255, 0.96);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.coord-resource-param-value.threat-low { color: #a8ff8a; }
+.coord-resource-param-value.threat-medium { color: #ffe08a; }
+.coord-resource-param-value.threat-high { color: #ff8a8a; }
+.coord-resource-param-value.threat-unknown { color: rgba(214, 237, 242, 0.7); }
+.coord-resource-param-value.status-online { color: #a8ff8a; }
+.coord-resource-param-value.status-offline { color: #ff8a8a; }
+.coord-resource-param-value.status-maintenance { color: #ffe08a; }
+.coord-resource-param-value.status-ready { color: #a8ff8a; }
+.coord-resource-param-value.status-standby { color: #ffe08a; }
+
+/* 详情按钮 */
+.coord-resource-detail-btn {
+  border: 1px solid rgba(0, 222, 200, 0.32);
+  background: rgba(0, 222, 200, 0.08);
+  color: #b4fff8;
+  padding: 0.36rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.coord-resource-detail-btn:hover {
+  background: rgba(0, 222, 200, 0.18);
+  border-color: rgba(0, 222, 200, 0.5);
+  color: #e2fffc;
+  box-shadow: 0 0 8px rgba(0, 222, 200, 0.12);
+}
+
+/* 详情视图 */
+.coord-resource-detail-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.coord-panel {
+  border-radius: 16px;
+  border: 1px solid var(--coord-border);
+  background:
+    linear-gradient(180deg, rgba(0, 213, 192, 0.06), rgba(0, 49, 72, 0.01)),
+    var(--coord-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.05);
+  padding: 0.9rem;
+}
+
+/* 资源详情样式 */
 .res-detail-header {
   display: flex;
   align-items: center;
@@ -629,8 +755,15 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 .res-detail-table-head { background: rgba(0, 222, 200, 0.1); color: #b9fffa; font-size: 0.78rem; font-weight: 700; }
 .res-detail-table-row { border-top: 1px solid rgba(0, 222, 200, 0.12); color: rgba(227, 248, 251, 0.92); font-size: 0.84rem; }
 
-@media (max-width: 980px) {
-  .coord-resource-layout {
+@media (max-width: 720px) {
+  .coord-resource-card {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .coord-resource-card-actions {
+    align-self: flex-end;
+  }
+  .res-detail-meta-grid {
     grid-template-columns: 1fr;
   }
 }
