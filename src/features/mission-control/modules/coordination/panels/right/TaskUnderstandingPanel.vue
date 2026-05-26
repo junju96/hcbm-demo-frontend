@@ -179,6 +179,7 @@ const buildCommandTargetAttrs = (command) => createInteractionTargetAttrs({
   width: 100%;
   min-height: fit-content;
   align-items: start;
+  padding-top: 0.2rem;
 }
 
 .coord-panel {
@@ -199,7 +200,7 @@ const buildCommandTargetAttrs = (command) => createInteractionTargetAttrs({
   transform: translateY(-1px);
 }
 
-.coord-left-pane { display: flex; flex-direction: column; padding: 0.9rem; padding-top: 1.1rem; }
+.coord-left-pane { display: flex; flex-direction: column; padding: 0.9rem; }
 .coord-pane-title { color: var(--coord-text); font-size: 1.24rem; font-weight: 800; letter-spacing: 0.01em; text-shadow: 0 0 14px rgba(0, 222, 200, 0.16); }
 .coord-command-list { margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.62rem; min-height: fit-content; }
 .coord-left-empty-state { margin-top: 0.8rem; }
