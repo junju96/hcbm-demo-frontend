@@ -188,6 +188,15 @@ const buildCommandTargetAttrs = (command) => createInteractionTargetAttrs({
     linear-gradient(180deg, rgba(0, 213, 192, 0.06), rgba(0, 49, 72, 0.01)),
     var(--coord-bg);
   box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.05);
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+.coord-panel:hover {
+  border-color: rgba(0, 222, 200, 0.55);
+  background:
+    linear-gradient(180deg, rgba(0, 213, 192, 0.09), rgba(0, 49, 72, 0.03)),
+    var(--coord-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.1), 0 8px 24px rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
 }
 
 .coord-left-pane { display: flex; flex-direction: column; padding: 0.9rem; }
@@ -220,7 +229,7 @@ const buildCommandTargetAttrs = (command) => createInteractionTargetAttrs({
 .coord-command-badge.pending { background: rgba(229, 168, 11, 0.2); color: #ffe28c; }
 .coord-command-badge.done { background: rgba(0, 222, 200, 0.2); color: #b4fff8; }
 
-.coord-right-pane { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; min-height: fit-content; }
+.coord-right-pane { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; min-height: fit-content; padding-top: 0.2rem; }
 
 .coord-empty-state { margin-top: 0.7rem; border-radius: 10px; border: 1px dashed var(--coord-border-soft); color: var(--coord-text-soft); padding: 0.9rem; }
 

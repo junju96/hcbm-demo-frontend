@@ -1107,6 +1107,15 @@ const getVehicleStageActions = (vid, stage) => {
     linear-gradient(180deg, rgba(0, 213, 192, 0.06), rgba(0, 49, 72, 0.01)),
     var(--planning-bg);
   box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.05);
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+.coord-panel:hover {
+  border-color: rgba(0, 222, 200, 0.55);
+  background:
+    linear-gradient(180deg, rgba(0, 213, 192, 0.09), rgba(0, 49, 72, 0.03)),
+    var(--planning-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.1), 0 8px 24px rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
 }
 
 .planning-left-pane {
@@ -1122,6 +1131,7 @@ const getVehicleStageActions = (vid, stage) => {
   flex-direction: column;
   gap: 0.8rem;
   padding: 0.9rem;
+  padding-top: 1.1rem;
   min-width: 0;
   min-height: fit-content;
 }
@@ -1282,6 +1292,12 @@ const getVehicleStageActions = (vid, stage) => {
   border: 1px solid rgba(0, 208, 188, 0.26);
   background: rgba(0, 16, 22, 0.62);
   padding: 0.7rem;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 200ms ease;
+}
+.mission-content-section:hover {
+  border-color: rgba(0, 222, 200, 0.42);
+  background: rgba(0, 18, 24, 0.72);
+  box-shadow: 0 0 0 1px rgba(0, 222, 200, 0.08);
 }
 
 .mission-content-text {
@@ -1335,6 +1351,13 @@ const getVehicleStageActions = (vid, stage) => {
   border: 1px solid var(--planning-border-soft);
   background: var(--planning-card-bg);
   padding: 0.8rem 0.9rem;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+.mission-relation-section:hover {
+  border-color: rgba(0, 222, 200, 0.42);
+  background: rgba(6, 24, 30, 0.92);
+  box-shadow: 0 0 0 1px rgba(0, 222, 200, 0.08), 0 4px 14px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
 }
 
 .planning-section-header {
@@ -2301,6 +2324,13 @@ const getVehicleStageActions = (vid, stage) => {
   border: 1px solid rgba(0, 222, 200, 0.18);
   background: rgba(0, 16, 22, 0.55);
   padding: 0.7rem 0.85rem;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+.stage-card:hover {
+  border-color: rgba(0, 222, 200, 0.4);
+  background: rgba(0, 18, 24, 0.65);
+  box-shadow: 0 0 0 1px rgba(0, 222, 200, 0.08), 0 6px 16px rgba(0, 0, 0, 0.18);
+  transform: translateY(-1px);
 }
 
 .stage-card-header {
