@@ -953,20 +953,22 @@ const toggleAllEntries = (e) => {
 };
 
 const getEntryActions = (entry) => {
-  // 根据条目状态返回不同的操作按钮
-  if (entry.operation === '侦察' || entry.operation === '跟踪') {
+  // 判断条目是否已有目标分配（任一装备的 target_name 非空）
+  const hasAllocation = (entry.executor_assignments || []).some(
+    (a) => a.target_name && a.target_name.trim() !== ''
+  );
+
+  if (hasAllocation) {
+    // 已分配目标：显示地图直配 + 调整分配
     return [
       { label: '地图直配', type: 'default' },
       { label: '调整分配', type: 'primary' },
     ];
   }
-  if (entry.operation === '定位') {
-    return [
-      { label: '待目标分配', type: 'warning' },
-      { label: '配置装备', type: 'primary' },
-    ];
-  }
+
+  // 未分配目标：显示待目标分配 + 配置装备
   return [
+    { label: '待目标分配', type: 'warning' },
     { label: '配置装备', type: 'primary' },
   ];
 };
