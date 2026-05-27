@@ -579,54 +579,92 @@ export const killChainList = [
   },
 ];
 
-export const killChainDetail = {
-  kill_chain_id: 'kc-demo-001',
-  title: '杀伤链方案 1',
-  state: 'ACTIVE',
-  description: '基于地图目标选择与F2/E6A动作规划形成的原始杀伤链表，可在此继续查看与调整。',
-  targets: [
-    { target_id: 'target-1', name: '目标1', source: '地图单选或框选结果' },
-    { target_id: 'target-2', name: '目标2', source: '地图单选或框选结果' },
-  ],
-  entries: [
-    {
-      entry_id: 'entry-001',
-      target_ids: ['target-1', 'target-2'],
-      target_names: ['目标1', '目标2'],
-      operation: '侦察',
-      executor_assignments: [
-        { executor_name: 'A', target_name: '1', locked: false },
-        { executor_name: 'A', target_name: '2', locked: false },
-      ],
-      source: 'mock-model',
-      valid: true,
-    },
-    {
-      entry_id: 'entry-002',
-      target_ids: ['target-1', 'target-2'],
-      target_names: ['目标1', '目标2'],
-      operation: '跟踪',
-      executor_assignments: [
-        { executor_name: 'B', target_name: '1', locked: true },
-        { executor_name: 'B', target_name: '2', locked: true },
-      ],
-      source: 'mock-model',
-      valid: false,
-    },
-    {
-      entry_id: 'entry-003',
-      target_ids: ['target-1', 'target-2'],
-      target_names: ['目标1', '目标2'],
-      operation: '定位',
-      executor_assignments: [
-        { executor_name: '装备A', target_name: '', locked: false },
-        { executor_name: '装备B', target_name: '', locked: false },
-      ],
-      source: 'mock-model',
-      valid: true,
-    },
-  ],
+export const killChainDetailMap = {
+  'kc-demo-001': {
+    kill_chain_id: 'kc-demo-001',
+    title: '杀伤链方案 1',
+    state: 'ACTIVE',
+    description: '基于地图目标选择与F2/E6A动作规划形成的原始杀伤链表，可在此继续查看与调整。',
+    targets: [
+      { target_id: 'target-1', name: '目标1', source: '地图单选或框选结果' },
+      { target_id: 'target-2', name: '目标2', source: '地图单选或框选结果' },
+    ],
+    entries: [
+      {
+        entry_id: 'entry-001',
+        target_ids: ['target-1', 'target-2'],
+        target_names: ['目标1', '目标2'],
+        operation: '侦察',
+        executor_assignments: [
+          { executor_name: 'A', target_name: '1', locked: false },
+          { executor_name: 'A', target_name: '2', locked: false },
+        ],
+        source: 'mock-model',
+        valid: true,
+      },
+      {
+        entry_id: 'entry-002',
+        target_ids: ['target-1', 'target-2'],
+        target_names: ['目标1', '目标2'],
+        operation: '跟踪',
+        executor_assignments: [
+          { executor_name: 'B', target_name: '1', locked: true },
+          { executor_name: 'B', target_name: '2', locked: true },
+        ],
+        source: 'mock-model',
+        valid: false,
+      },
+      {
+        entry_id: 'entry-003',
+        target_ids: ['target-1', 'target-2'],
+        target_names: ['目标1', '目标2'],
+        operation: '定位',
+        executor_assignments: [
+          { executor_name: '装备A', target_name: '', locked: false },
+          { executor_name: '装备B', target_name: '', locked: false },
+        ],
+        source: 'mock-model',
+        valid: true,
+      },
+    ],
+  },
+  'kc-demo-002': {
+    kill_chain_id: 'kc-demo-002',
+    title: '杀伤链方案 2',
+    state: 'INIT',
+    description: '基于地图目标选择与F2/E6A动作规划形成的原始杀伤链表，可在此继续查看与调整。',
+    targets: [
+      { target_id: 'target-3', name: '目标3', source: '地图单选或框选结果' },
+    ],
+    entries: [
+      {
+        entry_id: 'entry-201',
+        target_ids: ['target-3'],
+        target_names: ['目标3'],
+        operation: '侦察',
+        executor_assignments: [
+          { executor_name: 'C', target_name: '3', locked: false },
+        ],
+        source: 'mock-model',
+        valid: true,
+      },
+      {
+        entry_id: 'entry-202',
+        target_ids: ['target-3'],
+        target_names: ['目标3'],
+        operation: '打击',
+        executor_assignments: [
+          { executor_name: 'D', target_name: '3', locked: true },
+        ],
+        source: 'mock-model',
+        valid: true,
+      },
+    ],
+  },
 };
+
+// 兼容旧导出
+export const killChainDetail = killChainDetailMap['kc-demo-001'];
 
 // 状态标签映射
 export const STATE_LABELS = {

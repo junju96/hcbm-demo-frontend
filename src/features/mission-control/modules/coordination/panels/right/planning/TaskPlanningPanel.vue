@@ -756,10 +756,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import {
   missionsList, planCards, planDetail, STATE_LABELS, STATE_TONE,
-  killChainList, killChainDetail,
+  killChainList, killChainDetailMap,
 } from '../../../data/planningDataModel';
 import { resourceRecords, RESOURCE_TAGS } from '../../../data/commandDataModel';
 import EditAssociationDialog from './EditAssociationDialog.vue';
@@ -785,8 +785,14 @@ const selectedKillChain = computed(() =>
   killChains.find((kc) => kc.kill_chain_id === selectedKillChainId.value) || null
 );
 
-// 当前显示的杀伤链详情（先用假数据，后续接入API）
-const currentKillChainDetail = ref(killChainDetail);
+// 当前显示的杀伤链详情（根据选中ID动态切换，后续接入API）
+const currentKillChainDetail = computed(() => {
+  const detail = killChainDetailMap[selectedKillChainId.value];
+  if (detail) return detail;
+  // fallback：返回第一个
+  const firstId = killChains[0]?.kill_chain_id;
+  return firstId ? killChainDetailMap[firstId] : null;
+});
 
 // 杀伤链条目选择状态
 const selectedEntryIds = ref([]);
@@ -797,6 +803,11 @@ const toggleEntrySelection = (entryId) => {
     selectedEntryIds.value.push(entryId);
   }
 };
+
+// 切换杀伤链时清空条目选择
+watch(selectedKillChainId, () => {
+  selectedEntryIds.value = [];
+});
 
 // ========== 方案编辑二级分段控制器 ==========
 const planEditSteps = [
