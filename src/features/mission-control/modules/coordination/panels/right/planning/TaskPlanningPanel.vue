@@ -4,6 +4,26 @@
     <div v-if="viewMode === 'mission-list'" class="planning-layout">
       <!-- 左侧列表区 -->
       <aside class="coord-panel planning-left-pane">
+        <!-- 方案规划子分类切换（仅 mode='plan'） -->
+        <div v-if="mode === 'plan'" class="plan-list-sub-tabs">
+          <button
+            class="plan-list-sub-tab"
+            :class="{ active: planListSubMode === 'plan' }"
+            type="button"
+            @click="planListSubMode = 'plan'"
+          >
+            行动方案
+          </button>
+          <button
+            class="plan-list-sub-tab"
+            :class="{ active: planListSubMode === 'kill-chain' }"
+            type="button"
+            @click="planListSubMode = 'kill-chain'"
+          >
+            杀伤链方案
+          </button>
+        </div>
+
         <!-- 任务列表 -->
         <div v-if="mode === 'task' && missions.length" class="planning-mission-list">
           <button
@@ -28,7 +48,7 @@
           </button>
         </div>
         <!-- 方案列表 -->
-        <div v-else-if="mode === 'plan' && plans.length" class="planning-mission-list">
+        <div v-else-if="mode === 'plan' && planListSubMode === 'plan' && plans.length" class="planning-mission-list">
           <button
             v-for="p in plans"
             :key="p.plan_id"
@@ -50,8 +70,32 @@
             </div>
           </button>
         </div>
+        <!-- 杀伤链方案列表 -->
+        <div v-else-if="mode === 'plan' && planListSubMode === 'kill-chain' && killChains.length" class="planning-mission-list">
+          <button
+            v-for="kc in killChains"
+            :key="kc.kill_chain_id"
+            class="planning-mission-item"
+            :class="{ active: selectedKillChainId === kc.kill_chain_id }"
+            type="button"
+            @click="selectedKillChainId = kc.kill_chain_id"
+          >
+            <div class="planning-mission-top">
+              <span class="planning-mission-name">{{ kc.title }}</span>
+              <span class="planning-mission-state" :class="`state-${STATE_TONE[kc.state] || 'ready'}`">
+                {{ STATE_LABELS[kc.state] || kc.state }}
+              </span>
+            </div>
+            <div class="planning-mission-desc">{{ kc.description }}</div>
+            <div class="planning-mission-meta">
+              <span>目标 {{ kc.target_count }} 个</span>
+              <span>条目 {{ kc.entry_count }} 条</span>
+            </div>
+          </button>
+        </div>
         <div v-else-if="mode === 'task'" class="coord-empty-state">暂无任务数据</div>
-        <div v-else-if="mode === 'plan'" class="coord-empty-state">暂无方案数据</div>
+        <div v-else-if="mode === 'plan' && planListSubMode === 'plan'" class="coord-empty-state">暂无方案数据</div>
+        <div v-else-if="mode === 'plan' && planListSubMode === 'kill-chain'" class="coord-empty-state">暂无杀伤链方案</div>
       </aside>
 
       <!-- 右侧任务详情区 -->
@@ -117,7 +161,7 @@
       </section>
 
       <!-- 右侧方案详情区 -->
-      <section v-else-if="mode === 'plan' && selectedPlan" class="coord-panel planning-right-pane mission-detail-pane">
+      <section v-else-if="mode === 'plan' && planListSubMode === 'plan' && selectedPlan" class="coord-panel planning-right-pane mission-detail-pane">
         <div class="mission-detail-header">
           <h2 class="mission-detail-title">{{ selectedPlan.title }}</h2>
           <div class="mission-detail-actions">
@@ -174,9 +218,125 @@
         </div>
       </section>
 
+      <!-- 右侧杀伤链详情区 -->
+      <section v-else-if="mode === 'plan' && planListSubMode === 'kill-chain' && selectedKillChain" class="coord-panel planning-right-pane kill-chain-detail-pane">
+        <!-- 头部 -->
+        <div class="kill-chain-detail-header">
+          <div class="kill-chain-title-wrap">
+            <h2 class="mission-detail-title">{{ currentKillChainDetail.title }}</h2>
+            <span class="kill-chain-state-badge" :class="`state-${STATE_TONE[currentKillChainDetail.state] || 'ready'}`">
+              {{ STATE_LABELS[currentKillChainDetail.state] || currentKillChainDetail.state }}
+            </span>
+          </div>
+          <p class="kill-chain-desc">{{ currentKillChainDetail.description }}</p>
+        </div>
+
+        <!-- 信息概览卡片 -->
+        <div class="kill-chain-overview-cards">
+          <div class="kill-chain-info-card">
+            <div class="kill-chain-info-label">方案名称</div>
+            <div class="kill-chain-info-value">{{ currentKillChainDetail.title }}</div>
+            <div class="kill-chain-info-sub">{{ selectedKillChain.description }}</div>
+          </div>
+          <div class="kill-chain-info-card">
+            <div class="kill-chain-info-label">覆盖目标</div>
+            <div class="kill-chain-info-value">{{ currentKillChainDetail.targets.map(t => t.name).join('、') }}</div>
+            <div class="kill-chain-info-sub">来自地图单选或框选结果</div>
+          </div>
+          <div class="kill-chain-info-card">
+            <div class="kill-chain-info-label">杀伤链条目</div>
+            <div class="kill-chain-info-value count">{{ currentKillChainDetail.entries.length }} 条</div>
+            <div class="kill-chain-info-sub">多目标多装备支持手动与自动分配</div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="kill-chain-actions-bar">
+          <button class="planning-btn primary" type="button" @click="onAutoAllocate">
+            自动分配
+          </button>
+          <button class="planning-btn" type="button" @click="onEditKillChain">
+            编辑
+          </button>
+          <button class="planning-btn" type="button" @click="onAddKillChainEntry">
+            新增
+          </button>
+          <button class="planning-btn danger" type="button" @click="onDeleteKillChainEntry">
+            删除
+          </button>
+        </div>
+
+        <!-- 原始杀伤链表 -->
+        <div class="kill-chain-table-section">
+          <div class="kill-chain-table-header">
+            <div class="kill-chain-table-title">原始杀伤链表</div>
+            <div class="kill-chain-table-hint">单目标场景由地图直配；多目标多装备场景可在此手动分配，或批量自动分配。</div>
+          </div>
+          <div class="kill-chain-table-wrap">
+            <table class="kill-chain-table">
+              <thead>
+                <tr>
+                  <th class="col-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedEntryIds.length === currentKillChainDetail.entries.length && currentKillChainDetail.entries.length > 0"
+                      :indeterminate="selectedEntryIds.length > 0 && selectedEntryIds.length < currentKillChainDetail.entries.length"
+                      @change="toggleAllEntries"
+                    />
+                  </th>
+                  <th class="col-target">目标</th>
+                  <th class="col-operation">作战动作</th>
+                  <th class="col-executor">执行装备</th>
+                  <th class="col-source">校验来源</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in currentKillChainDetail.entries" :key="entry.entry_id" class="kill-chain-table-row">
+                  <td class="col-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedEntryIds.includes(entry.entry_id)"
+                      @change="toggleEntrySelection(entry.entry_id)"
+                    />
+                  </td>
+                  <td class="col-target">{{ entry.target_names.join('、') }}</td>
+                  <td class="col-operation">{{ entry.operation }}</td>
+                  <td class="col-executor">
+                    <div class="executor-assignments">
+                      <span
+                        v-for="(assign, idx) in entry.executor_assignments"
+                        :key="idx"
+                        class="executor-assign-tag"
+                        :class="{ locked: assign.locked }"
+                      >
+                        {{ assign.executor_name }}{{ assign.target_name ? '→' + assign.target_name : '' }}
+                        <span v-if="assign.locked" class="lock-icon">🔒</span>
+                      </span>
+                    </div>
+                    <div class="entry-row-actions">
+                      <button
+                        v-for="(action, aidx) in getEntryActions(entry)"
+                        :key="aidx"
+                        class="entry-action-btn"
+                        :class="action.type"
+                        type="button"
+                        @click="onEntryAction(entry, action)"
+                      >
+                        {{ action.label }}
+                      </button>
+                    </div>
+                  </td>
+                  <td class="col-source">{{ entry.source }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <div v-else class="coord-panel planning-right-pane planning-empty">
-        <div class="coord-pane-title">{{ mode === 'plan' ? '方案详情' : '任务详情' }}</div>
-        <div class="coord-empty-state">请从左侧选择一个{{ mode === 'plan' ? '方案' : '任务' }}</div>
+        <div class="coord-pane-title">{{ mode === 'plan' ? (planListSubMode === 'kill-chain' ? '杀伤链详情' : '方案详情') : '任务详情' }}</div>
+        <div class="coord-empty-state">请从左侧选择一个{{ mode === 'plan' ? (planListSubMode === 'kill-chain' ? '杀伤链方案' : '方案') : '任务' }}</div>
       </div>
     </div>
 
@@ -599,6 +759,7 @@
 import { ref, computed } from 'vue';
 import {
   missionsList, planCards, planDetail, STATE_LABELS, STATE_TONE,
+  killChainList, killChainDetail,
 } from '../../../data/planningDataModel';
 import { resourceRecords, RESOURCE_TAGS } from '../../../data/commandDataModel';
 import EditAssociationDialog from './EditAssociationDialog.vue';
@@ -613,6 +774,29 @@ const emit = defineEmits(['switch-tab']);
 // ========== 视图模式 ==========
 const viewMode = ref('mission-list'); // 'mission-list' | 'plan-edit'
 const planEditMode = ref('normal'); // 'normal' | 'ad-hoc'
+
+// ========== 方案列表子分类（仅 mode='plan'） ==========
+const planListSubMode = ref('plan'); // 'plan' | 'kill-chain'
+
+// ========== 杀伤链列表 ==========
+const killChains = killChainList;
+const selectedKillChainId = ref(killChains[0]?.kill_chain_id || '');
+const selectedKillChain = computed(() =>
+  killChains.find((kc) => kc.kill_chain_id === selectedKillChainId.value) || null
+);
+
+// 当前显示的杀伤链详情（先用假数据，后续接入API）
+const currentKillChainDetail = ref(killChainDetail);
+
+// 杀伤链条目选择状态
+const selectedEntryIds = ref([]);
+const toggleEntrySelection = (entryId) => {
+  if (selectedEntryIds.value.includes(entryId)) {
+    selectedEntryIds.value = selectedEntryIds.value.filter((id) => id !== entryId);
+  } else {
+    selectedEntryIds.value.push(entryId);
+  }
+};
 
 // ========== 方案编辑二级分段控制器 ==========
 const planEditSteps = [
@@ -718,6 +902,62 @@ const enterPlanEditFromPlan = () => {
 
 const onForwardPlan = () => {
   appendSystemMessage(`转发方案：${selectedPlan.value?.title}`);
+};
+
+// ========== 杀伤链操作 ==========
+const toggleAllEntries = (e) => {
+  if (e.target.checked) {
+    selectedEntryIds.value = currentKillChainDetail.value.entries.map((e) => e.entry_id);
+  } else {
+    selectedEntryIds.value = [];
+  }
+};
+
+const getEntryActions = (entry) => {
+  // 根据条目状态返回不同的操作按钮
+  if (entry.operation === '侦察' || entry.operation === '跟踪') {
+    return [
+      { label: '地图直配', type: 'default' },
+      { label: '调整分配', type: 'primary' },
+    ];
+  }
+  if (entry.operation === '定位') {
+    return [
+      { label: '待目标分配', type: 'warning' },
+      { label: '配置装备', type: 'primary' },
+    ];
+  }
+  return [
+    { label: '配置装备', type: 'primary' },
+  ];
+};
+
+const onEntryAction = (entry, action) => {
+  appendSystemMessage(`杀伤链条目【${entry.operation}】执行操作：${action.label}`);
+};
+
+const onAutoAllocate = () => {
+  appendSystemMessage('正在自动分配杀伤链资源…');
+  setTimeout(() => {
+    appendSystemMessage('自动分配完成');
+  }, 600);
+};
+
+const onEditKillChain = () => {
+  appendSystemMessage('编辑杀伤链方案（演示模式）');
+};
+
+const onAddKillChainEntry = () => {
+  appendSystemMessage('新增杀伤链条目（演示模式）');
+};
+
+const onDeleteKillChainEntry = () => {
+  if (selectedEntryIds.value.length === 0) {
+    appendSystemMessage('请先选择要删除的条目');
+    return;
+  }
+  appendSystemMessage(`删除 ${selectedEntryIds.value.length} 个杀伤链条目（演示模式）`);
+  selectedEntryIds.value = [];
 };
 
 // ========== 方案详情操作 ==========
@@ -3096,5 +3336,312 @@ const getVehicleStageActions = (vid, stage) => {
 .dialog-scale-leave-to .action-dialog {
   opacity: 0;
   transform: scale(0.96) translateY(-4px);
+}
+
+/* ===== 方案列表子分类切换 ===== */
+.plan-list-sub-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.7rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.15);
+}
+
+.plan-list-sub-tab {
+  flex: 1;
+  padding: 0.42rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 222, 200, 0.18);
+  background: rgba(0, 16, 22, 0.5);
+  color: rgba(196, 243, 248, 0.75);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 180ms ease;
+  text-align: center;
+}
+
+.plan-list-sub-tab:hover {
+  border-color: rgba(0, 222, 200, 0.35);
+  background: rgba(0, 222, 200, 0.08);
+  color: rgba(226, 246, 248, 0.95);
+}
+
+.plan-list-sub-tab.active {
+  border-color: rgba(0, 222, 200, 0.45);
+  background: linear-gradient(180deg, rgba(0, 173, 181, 0.28), rgba(0, 100, 108, 0.18));
+  color: #00e5ca;
+  box-shadow: 0 0 0 1px rgba(0, 222, 200, 0.1);
+}
+
+/* ===== 杀伤链详情面板 ===== */
+.kill-chain-detail-pane {
+  gap: 0.8rem;
+  padding: 0.9rem;
+}
+
+.kill-chain-detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.kill-chain-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.kill-chain-state-badge {
+  border-radius: 999px;
+  padding: 0.22rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.kill-chain-desc {
+  margin: 0;
+  color: rgba(226, 246, 248, 0.8);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* 信息概览卡片 */
+.kill-chain-overview-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.7rem;
+}
+
+@media (max-width: 900px) {
+  .kill-chain-overview-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kill-chain-info-card {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 222, 200, 0.18);
+  background: rgba(6, 20, 26, 0.7);
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+
+.kill-chain-info-card:hover {
+  border-color: rgba(0, 222, 200, 0.4);
+  background: rgba(6, 24, 30, 0.85);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 222, 200, 0.08);
+  transform: translateY(-1px);
+}
+
+.kill-chain-info-label {
+  color: rgba(196, 243, 248, 0.65);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.kill-chain-info-value {
+  color: #f7fdff;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.kill-chain-info-value.count {
+  color: #00e5ca;
+  font-size: 1.3rem;
+}
+
+.kill-chain-info-sub {
+  color: rgba(196, 243, 248, 0.6);
+  font-size: 0.8rem;
+}
+
+/* 操作按钮栏 */
+.kill-chain-actions-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  padding: 0.2rem 0;
+}
+
+/* 杀伤链表格区域 */
+.kill-chain-table-section {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 222, 200, 0.15);
+  background: rgba(6, 20, 26, 0.6);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.kill-chain-table-header {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.12);
+  background: rgba(0, 16, 22, 0.5);
+}
+
+.kill-chain-table-title {
+  color: #f7fdff;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.kill-chain-table-hint {
+  color: rgba(196, 243, 248, 0.65);
+  font-size: 0.82rem;
+  margin-top: 0.2rem;
+}
+
+.kill-chain-table-wrap {
+  overflow-x: auto;
+  flex: 1;
+}
+
+.kill-chain-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.kill-chain-table th {
+  text-align: left;
+  padding: 0.6rem 0.7rem;
+  color: rgba(196, 243, 248, 0.85);
+  font-weight: 700;
+  font-size: 0.84rem;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.18);
+  background: rgba(0, 16, 22, 0.4);
+  white-space: nowrap;
+}
+
+.kill-chain-table td {
+  padding: 0.7rem 0.7rem;
+  color: var(--planning-text-soft);
+  border-bottom: 1px solid rgba(0, 222, 200, 0.08);
+  vertical-align: top;
+}
+
+.kill-chain-table-row:hover td {
+  background: rgba(0, 222, 200, 0.04);
+}
+
+.kill-chain-table-row:last-child td {
+  border-bottom: none;
+}
+
+.col-checkbox {
+  width: 36px;
+  text-align: center;
+}
+
+.col-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #00dec8;
+  cursor: pointer;
+}
+
+.col-target {
+  min-width: 90px;
+  white-space: nowrap;
+}
+
+.col-operation {
+  min-width: 70px;
+  white-space: nowrap;
+  font-weight: 700;
+  color: #f1feff;
+}
+
+.col-executor {
+  min-width: 180px;
+}
+
+.col-source {
+  min-width: 90px;
+  white-space: nowrap;
+  color: rgba(196, 243, 248, 0.7);
+  font-size: 0.84rem;
+}
+
+/* 执行装备分配标签 */
+.executor-assignments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
+}
+
+.executor-assign-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  background: rgba(0, 222, 200, 0.1);
+  border: 1px solid rgba(0, 222, 200, 0.2);
+  color: var(--planning-accent);
+}
+
+.executor-assign-tag.locked {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: rgba(234, 179, 8, 0.25);
+  color: #fbbf24;
+}
+
+.lock-icon {
+  font-size: 0.72rem;
+}
+
+/* 条目行内操作按钮 */
+.entry-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.entry-action-btn {
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 222, 200, 0.22);
+  background: rgba(0, 16, 22, 0.5);
+  color: rgba(226, 246, 248, 0.85);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.entry-action-btn:hover {
+  border-color: rgba(0, 222, 200, 0.45);
+  background: rgba(0, 222, 200, 0.1);
+}
+
+.entry-action-btn.primary {
+  border-color: rgba(0, 173, 181, 0.4);
+  background: linear-gradient(180deg, rgba(0, 110, 116, 0.35), rgba(0, 56, 58, 0.55));
+  color: #b4fff8;
+}
+
+.entry-action-btn.primary:hover {
+  background: linear-gradient(180deg, rgba(0, 130, 136, 0.45), rgba(0, 66, 68, 0.65));
+}
+
+.entry-action-btn.warning {
+  border-color: rgba(234, 179, 8, 0.35);
+  background: rgba(234, 179, 8, 0.1);
+  color: #fde68a;
+}
+
+.entry-action-btn.warning:hover {
+  background: rgba(234, 179, 8, 0.18);
 }
 </style>
