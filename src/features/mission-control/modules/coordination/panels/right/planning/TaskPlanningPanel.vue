@@ -971,8 +971,13 @@ const getEntryActions = (entry) => {
   ];
 };
 
+// 判断按钮是否打开目标分配弹窗
+const isAllocAction = (label) => {
+  return label === '调整分配' || label === '配置装备';
+};
+
 const onEntryAction = (entry, action) => {
-  if (action.label === '调整分配') {
+  if (isAllocAction(action.label)) {
     openAllocDialog(entry);
     return;
   }

@@ -77,11 +77,11 @@ const filterTags = computed(() => {
   (props.entry?.target_names || []).forEach((t) => {
     tags.push({ key: t, label: t });
   });
-  // 添加装备数量标签
-  const equipCount = new Set((props.entry?.executor_assignments || []).map((a) => a.executor_name)).size;
-  if (equipCount > 0) {
-    tags.push({ key: 'equip', label: `装备 ${equipCount}` });
-  }
+  // 添加具体装备名称作为筛选标签
+  const equipNames = new Set((props.entry?.executor_assignments || []).map((a) => a.executor_name));
+  equipNames.forEach((name) => {
+    tags.push({ key: `equip-${name}`, label: name });
+  });
   return tags;
 });
 
