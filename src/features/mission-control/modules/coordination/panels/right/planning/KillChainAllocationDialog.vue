@@ -108,22 +108,15 @@ const displayedEquips = computed(() => {
 // 分配状态：{ 装备名: Set(目标名) }
 const allocationMap = ref(new Map());
 
-// 初始化分配状态
+// 初始化分配状态（target_name 直接存储目标名称）
 const initAllocation = () => {
   const map = new Map();
   (props.entry?.executor_assignments || []).forEach((a) => {
     if (!map.has(a.executor_name)) {
       map.set(a.executor_name, new Set());
     }
-    if (a.target_name) {
-      // 将数字索引转换回目标名称
-      const targetNames = props.entry?.target_names || [];
-      const idx = parseInt(a.target_name, 10);
-      if (idx >= 1 && idx <= targetNames.length) {
-        map.get(a.executor_name).add(targetNames[idx - 1]);
-      } else {
-        map.get(a.executor_name).add(a.target_name);
-      }
+    if (a.target_name && a.target_name.trim() !== '') {
+      map.get(a.executor_name).add(a.target_name);
     }
   });
   allocationMap.value = map;
@@ -157,9 +150,8 @@ const onClose = () => {
 };
 
 const onConfirm = () => {
-  // 构建新的 executor_assignments 数组
+  // 构建新的 executor_assignments 数组（直接存储目标名称）
   const assignments = [];
-  const targetNames = props.entry?.target_names || [];
   allocationMap.value.forEach((targets, equipName) => {
     if (targets.size === 0) {
       // 保留装备但未分配目标
@@ -170,10 +162,9 @@ const onConfirm = () => {
       });
     } else {
       targets.forEach((targetName) => {
-        const idx = targetNames.indexOf(targetName);
         assignments.push({
           executor_name: equipName,
-          target_name: idx >= 0 ? String(idx + 1) : targetName,
+          target_name: targetName,
           locked: false,
         });
       });

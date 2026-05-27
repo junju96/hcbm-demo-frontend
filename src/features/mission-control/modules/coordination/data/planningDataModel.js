@@ -596,8 +596,8 @@ export const killChainDetailMap = {
         target_names: ['目标1', '目标2'],
         operation: '侦察',
         executor_assignments: [
-          { executor_name: '装备A', target_name: '1', locked: false },
-          { executor_name: '装备A', target_name: '2', locked: false },
+          { executor_name: '装备A', target_name: '目标1', locked: false },
+          { executor_name: '装备A', target_name: '目标2', locked: false },
         ],
         source: 'mock-model',
         valid: true,
@@ -608,8 +608,8 @@ export const killChainDetailMap = {
         target_names: ['目标1', '目标2'],
         operation: '跟踪',
         executor_assignments: [
-          { executor_name: '装备B', target_name: '1', locked: true },
-          { executor_name: '装备B', target_name: '2', locked: true },
+          { executor_name: '装备B', target_name: '目标1', locked: true },
+          { executor_name: '装备B', target_name: '目标2', locked: true },
         ],
         source: 'mock-model',
         valid: false,
@@ -643,7 +643,7 @@ export const killChainDetailMap = {
         target_names: ['目标3'],
         operation: '侦察',
         executor_assignments: [
-          { executor_name: '装备C', target_name: '1', locked: false },
+          { executor_name: '装备C', target_name: '目标3', locked: false },
         ],
         source: 'mock-model',
         valid: true,
@@ -654,7 +654,7 @@ export const killChainDetailMap = {
         target_names: ['目标3'],
         operation: '打击',
         executor_assignments: [
-          { executor_name: '装备D', target_name: '1', locked: true },
+          { executor_name: '装备D', target_name: '目标3', locked: true },
         ],
         source: 'mock-model',
         valid: true,
