@@ -655,6 +655,13 @@
       @confirm="onAssocConfirm"
     />
 
+    <!-- 杀伤链目标分配弹窗 -->
+    <KillChainAllocationDialog
+      v-model:visible="allocDialogVisible"
+      :entry="allocDialogEntry"
+      @confirm="onAllocConfirm"
+    />
+
     <!-- 新建行动编组弹窗 -->
     <Transition name="dialog-scale">
     <div v-if="newTeamDialogVisible" class="team-dialog-mask" @click.self="newTeamDialogVisible = false">
@@ -763,6 +770,7 @@ import {
 } from '../../../data/planningDataModel';
 import { resourceRecords, RESOURCE_TAGS } from '../../../data/commandDataModel';
 import EditAssociationDialog from './EditAssociationDialog.vue';
+import KillChainAllocationDialog from './KillChainAllocationDialog.vue';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
@@ -770,6 +778,26 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['switch-tab']);
+
+// ========== 杀伤链目标分配弹窗 ==========
+const allocDialogVisible = ref(false);
+const allocDialogEntry = ref(null);
+
+const openAllocDialog = (entry) => {
+  allocDialogEntry.value = entry;
+  allocDialogVisible.value = true;
+};
+
+const onAllocConfirm = ({ entry_id, executor_assignments }) => {
+  // 更新当前杀伤链详情中的对应条目
+  const detail = currentKillChainDetail.value;
+  if (!detail || !detail.entries) return;
+  const entry = detail.entries.find((e) => e.entry_id === entry_id);
+  if (entry) {
+    entry.executor_assignments = executor_assignments;
+    appendSystemMessage(`已更新【${entry.operation}】的目标分配`);
+  }
+};
 
 // ========== 视图模式 ==========
 const viewMode = ref('mission-list'); // 'mission-list' | 'plan-edit'
@@ -944,6 +972,10 @@ const getEntryActions = (entry) => {
 };
 
 const onEntryAction = (entry, action) => {
+  if (action.label === '调整分配') {
+    openAllocDialog(entry);
+    return;
+  }
   appendSystemMessage(`杀伤链条目【${entry.operation}】执行操作：${action.label}`);
 };
 
