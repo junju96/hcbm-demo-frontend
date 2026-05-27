@@ -670,6 +670,7 @@ export const killChainDetail = killChainDetailMap['kc-demo-001'];
 export const STATE_LABELS = {
   READY: '就绪',
   DRAFT: '草稿',
+  INIT: '草稿',
   ACTIVE: '生效',
   COMPLETED: '完成',
   PENDING: '待处理',
@@ -678,6 +679,7 @@ export const STATE_LABELS = {
 export const STATE_TONE = {
   READY: 'ready',
   DRAFT: 'draft',
+  INIT: 'draft',
   ACTIVE: 'active',
   COMPLETED: 'completed',
   PENDING: 'pending',
