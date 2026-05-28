@@ -776,6 +776,7 @@ import {
   addKillChainEntry,
   deleteKillChainEntry,
   autoAllocateKillChainEntry,
+  batchAutoAllocateKillChain,
   manualAllocateKillChainEntry,
   updateKillChain,
 } from '../../../api/coordinationApi';
@@ -1068,25 +1069,25 @@ const onAutoAllocate = async () => {
     appendSystemMessage('请先选择杀伤链并确保有可用条目');
     return;
   }
-  appendSystemMessage('正在自动分配杀伤链资源…');
+  appendSystemMessage('正在调用 sichen 火力规划进行自动分配…');
   // 对选中的条目批量自动分配；若未选中任何条目，则对全部未分配条目执行
   const targetEntries =
     selectedEntryIds.value.length > 0
       ? detail.entries.filter((e) => selectedEntryIds.value.includes(e.entry_id))
       : detail.entries.filter((e) => !e.selected_executor);
 
-  let successCount = 0;
-  for (const entry of targetEntries) {
-    const result = await autoAllocateKillChainEntry(kcId, entry.entry_id, {
-      operation: entry.operation,
-      target_ids: entry.target_ids,
-      constraints: {},
-    });
-    if (result.ok) {
-      successCount++;
+  const entryIds = targetEntries.map((e) => e.entry_id);
+  const result = await batchAutoAllocateKillChain(kcId, entryIds);
+  if (result.ok && result.data?.data) {
+    const alloc = result.data.data.allocations || [];
+    appendSystemMessage(`sichen 自动分配完成：成功 ${alloc.length} / ${targetEntries.length} 条`);
+    if (result.data.data.sichen_report?.global_metrics) {
+      const m = result.data.data.sichen_report.global_metrics;
+      appendSystemMessage(`任务总耗时 ${m.total_mission_time_seconds?.toFixed(1) || '--'}s，完成率 ${m.mission_accomplishment_rate || '--'}`);
     }
+  } else {
+    appendSystemMessage('自动分配失败: ' + (result.data?.message || result.error || '未知错误'));
   }
-  appendSystemMessage(`自动分配完成：成功 ${successCount} / ${targetEntries.length} 条`);
   // 刷新详情
   await loadKillChainDetail(kcId);
 };

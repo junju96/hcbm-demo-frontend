@@ -125,11 +125,20 @@ export const deleteKillChainEntry = async (killChainId, entryId) => {
   return result;
 };
 
-/** 自动分配 */
+/** 自动分配（单条） */
 export const autoAllocateKillChainEntry = async (killChainId, entryId, payload) => {
   const result = await postJson(
     joinApiUrl(`/api/v1/kill-chains/${killChainId}/entries/${entryId}/auto-allocate`),
     payload
+  );
+  return result;
+};
+
+/** 批量自动分配 — 调用 sichen 火力规划 */
+export const batchAutoAllocateKillChain = async (killChainId, entryIds = []) => {
+  const result = await postJson(
+    joinApiUrl(`/api/v1/kill-chains/${killChainId}/batch-auto-allocate`),
+    { entry_ids: entryIds }
   );
   return result;
 };
