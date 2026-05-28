@@ -43,6 +43,14 @@
         :panel-definition="panelDefinition"
       />
 
+      <ActionSequencePanel
+        v-else-if="activeSubviewId === 'action-sequence'"
+        key="action-sequence"
+        :module-api="moduleApi"
+        :module-manifest="moduleManifest"
+        :panel-definition="panelDefinition"
+      />
+
       <div v-else key="placeholder" class="coord-placeholder">
         <div class="coord-pane-title">{{ activeSubviewTitle }}</div>
         <div class="coord-pane-subtitle">当前子面板暂未接入详细界面。</div>
@@ -57,6 +65,7 @@ import MissionRightPanelShell from '../../../shared/layout/MissionRightPanelShel
 import TaskUnderstandingPanel from './right/TaskUnderstandingPanel.vue';
 import PlanDesignPanel from './right/PlanDesignPanel.vue';
 import ResourceCatalogPanel from './right/ResourceCatalogPanel.vue';
+import ActionSequencePanel from './right/ActionSequencePanel.vue';
 
 const props = defineProps({
   moduleApi: {

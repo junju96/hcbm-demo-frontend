@@ -90,6 +90,11 @@ export const COORDINATION_API_URLS = Object.freeze({
  * }} UpdateResponse
  */
 
+/**
+ * 以下假数据仅用于命令/任务理解模块的本地 fallback。
+ * 资源、杀伤链、方案等数据已迁移至后端 API（见 coordinationApi.js）。
+ */
+
 export const commandRecords = Object.freeze([
   {
     commandId: 'CMD-20260401-001',

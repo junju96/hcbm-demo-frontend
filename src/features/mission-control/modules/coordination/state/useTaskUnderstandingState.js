@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted } from 'vue';
 import {
   COORDINATION_API_URLS,
   buildUpdateRequest,
@@ -6,8 +6,8 @@ import {
   commandRecords,
   createMockAnalysisByCommand,
   missionRecords,
-  resourceRecords,
 } from '../data/commandDataModel';
+import { fetchTaskPoolResources } from '../api/coordinationApi';
 import {
   loadTaskUnderstandingDb,
   saveTaskUnderstandingDb,
@@ -113,7 +113,18 @@ export function useTaskUnderstandingState({ moduleApi }) {
   const commands = ref(initialDb.commands);
   const mockAnalysisByCommandId = createMockAnalysisByCommand();
   const allMissions = ref(missionRecords);
-  const allResources = ref(resourceRecords);
+  const allResources = ref([]);
+
+  const loadAllResources = async () => {
+    const result = await fetchTaskPoolResources({ limit: 100 });
+    if (result.ok) {
+      allResources.value = result.data.items || [];
+    }
+  };
+
+  onMounted(() => {
+    loadAllResources();
+  });
 
   const selectedCommandId = ref(initialDb.selectedCommandId || commands.value[0]?.commandId || '');
   const parsing = ref(false);

@@ -119,8 +119,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { resourceRecords, RESOURCE_TAGS } from '../../../data/commandDataModel';
+import { ref, computed, onMounted } from 'vue';
+import { RESOURCE_TAGS } from '../../../data/commandDataModel';
+import { fetchTaskPoolResources } from '../../../api/coordinationApi';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -192,13 +193,29 @@ const POOL_NAME_MAP = Object.fromEntries(
   Object.entries(POOL_TAG_MAP).map(([name, tag]) => [tag, name])
 );
 
-const resourcePools = ref([
-  { name: '态势目标池', count: 3, desc: '点击进入该资源表选择资源' },
-  { name: '装备资源池', count: 4, desc: '点击进入该资源表选择资源' },
-  { name: '火力资源池', count: 4, desc: '点击进入该资源表选择资源' },
-  { name: '侦查资源池', count: 4, desc: '点击进入该资源表选择资源' },
-  { name: '保障资源池', count: 4, desc: '点击进入该资源表选择资源' },
-]);
+const resourcePools = ref([]);
+const poolResourcesMap = ref({});
+
+const loadPools = async () => {
+  const result = await fetchTaskPoolResources({ limit: 100 });
+  if (!result.ok) return;
+  const items = result.data.items || [];
+  const pools = [];
+  const map = {};
+  for (const [name, tag] of Object.entries(POOL_TAG_MAP)) {
+    const poolItems = items.filter((r) => r.resource_tag === tag);
+    if (poolItems.length > 0) {
+      pools.push({ name, count: poolItems.length, desc: '点击进入该资源表选择资源' });
+      map[tag] = poolItems;
+    }
+  }
+  resourcePools.value = pools;
+  poolResourcesMap.value = map;
+};
+
+onMounted(() => {
+  loadPools();
+});
 
 // 资源选择视图
 const resourceViewMode = ref('pools'); // 'pools' | 'resources'
@@ -207,7 +224,7 @@ const selectedResourceIds = ref([]);
 
 const currentPoolResources = computed(() => {
   if (!selectedPoolTag.value) return [];
-  return resourceRecords.filter((r) => r.resource_tag === selectedPoolTag.value);
+  return poolResourcesMap.value[selectedPoolTag.value] || [];
 });
 
 const currentPoolName = computed(() => POOL_NAME_MAP[selectedPoolTag.value] || '');

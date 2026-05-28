@@ -147,7 +147,7 @@
             <div class="mission-relation-label">已关联方案</div>
             <div class="mission-relation-tags">
               <span class="mission-relation-tag plan">方案 1</span>
-              <span class="mission-relation-tag plan-title">{{ planCards[0]?.title || '侦察任务 行动方案' }}</span>
+              <span class="mission-relation-tag plan-title">{{ plans[0]?.title || '侦察任务 行动方案' }}</span>
             </div>
           </div>
         </div>
@@ -763,14 +763,22 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import {
   missionsList, planCards, planDetail, STATE_LABELS, STATE_TONE,
-  killChainList, killChainDetailMap,
 } from '../../../data/planningDataModel';
-import { resourceRecords, RESOURCE_TAGS } from '../../../data/commandDataModel';
+import { RESOURCE_TAGS } from '../../../data/commandDataModel';
 import EditAssociationDialog from './EditAssociationDialog.vue';
 import KillChainAllocationDialog from './KillChainAllocationDialog.vue';
+import {
+  fetchTaskPoolResources,
+  fetchKillChainDetail,
+  addKillChainEntry,
+  deleteKillChainEntry,
+  autoAllocateKillChainEntry,
+  manualAllocateKillChainEntry,
+  updateKillChain,
+} from '../../../api/coordinationApi';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
@@ -788,15 +796,34 @@ const openAllocDialog = (entry) => {
   allocDialogVisible.value = true;
 };
 
-const onAllocConfirm = ({ entry_id, executor_assignments }) => {
-  // 更新当前杀伤链详情中的对应条目
+const onAllocConfirm = async ({ entry_id, executor_assignments }) => {
+  const kcId = selectedKillChainId.value;
   const detail = currentKillChainDetail.value;
   if (!detail || !detail.entries) return;
   const entry = detail.entries.find((e) => e.entry_id === entry_id);
-  if (entry) {
-    entry.executor_assignments = executor_assignments;
-    appendSystemMessage(`已更新【${entry.operation}】的目标分配`);
+  if (!entry) return;
+
+  // 调用后端人工分配接口
+  if (kcId && executor_assignments?.length) {
+    const firstAssign = executor_assignments[0];
+    const executorId = firstAssign.executor_name || '';
+    if (executorId) {
+      const result = await manualAllocateKillChainEntry(kcId, entry_id, {
+        selected_executor: executorId,
+        allocation_type: 'manual',
+        reason: '前端人工分配',
+      });
+      if (result.ok) {
+        appendSystemMessage(`已更新【${entry.operation}】的目标分配（后端已同步）`);
+      } else {
+        appendSystemMessage(`目标分配后端同步失败：${result.error}`);
+      }
+    }
   }
+
+  // 同步更新前端状态
+  entry.executor_assignments = executor_assignments;
+  await loadKillChainDetail(kcId);
 };
 
 // ========== 视图模式 ==========
@@ -806,20 +833,67 @@ const planEditMode = ref('normal'); // 'normal' | 'ad-hoc'
 // ========== 方案列表子分类（仅 mode='plan'） ==========
 const planListSubMode = ref('plan'); // 'plan' | 'kill-chain'
 
-// ========== 杀伤链列表 ==========
-const killChains = killChainList;
-const selectedKillChainId = ref(killChains[0]?.kill_chain_id || '');
+// ========== 杀伤链列表（从后端 API 获取） ==========
+const killChains = ref([]);
+const killChainLoading = ref(false);
+const selectedKillChainId = ref('');
 const selectedKillChain = computed(() =>
-  killChains.find((kc) => kc.kill_chain_id === selectedKillChainId.value) || null
+  killChains.value.find((kc) => kc.kill_chain_id === selectedKillChainId.value) || null
 );
 
-// 当前显示的杀伤链详情（根据选中ID动态切换，后续接入API）
+// 当前显示的杀伤链详情（从后端 API 获取）
+const killChainDetailMap = ref({});
 const currentKillChainDetail = computed(() => {
-  const detail = killChainDetailMap[selectedKillChainId.value];
+  const detail = killChainDetailMap.value[selectedKillChainId.value];
   if (detail) return detail;
   // fallback：返回第一个
-  const firstId = killChains[0]?.kill_chain_id;
-  return firstId ? killChainDetailMap[firstId] : null;
+  const firstId = killChains.value[0]?.kill_chain_id;
+  return firstId ? killChainDetailMap.value[firstId] : null;
+});
+
+const loadKillChainList = async () => {
+  killChainLoading.value = true;
+  const result = await fetchTaskPoolResources({ task_type: 'KILL_CHAIN', limit: 50 });
+  if (result.ok) {
+    killChains.value = (result.data.items || []).map((item) => {
+      // adaptBackendResource 把原始字段放在 resource_detail 中
+      const detail = item.resource_detail || item;
+      return {
+        kill_chain_id: detail.kill_chain_id || item.resource_id,
+        title: detail.title || item.resource_name || '未命名杀伤链',
+        description: detail.description || '',
+        state: detail.state || 'INIT',
+        target_count: detail.target_count || 0,
+        entry_count: detail.entry_count || 0,
+        resource_id: detail.resource_id || item.resource_id,
+      };
+    });
+    if (killChains.value.length && !selectedKillChainId.value) {
+      selectedKillChainId.value = killChains.value[0].kill_chain_id;
+    }
+  }
+  killChainLoading.value = false;
+};
+
+const loadKillChainDetail = async (id) => {
+  if (!id) return;
+  const result = await fetchKillChainDetail(id);
+  if (result.ok && result.data) {
+    killChainDetailMap.value = {
+      ...killChainDetailMap.value,
+      [id]: result.data,
+    };
+  }
+};
+
+watch(selectedKillChainId, (id) => {
+  if (id && !killChainDetailMap.value[id]) {
+    loadKillChainDetail(id);
+  }
+});
+
+onMounted(() => {
+  loadKillChainList();
 });
 
 // 杀伤链条目选择状态
@@ -846,13 +920,14 @@ const planEditSteps = [
 ];
 const planEditSubTab = ref('basic');
 
-// ========== 任务列表 ==========
+// ========== 任务列表（后端暂无数据，保留本地假数据） ==========
 const missions = missionsList;
 const selectedMissionId = ref(missions[0]?.mission_id || '');
 const selectedMission = computed(() =>
   missions.find((m) => m.mission_id === selectedMissionId.value) || null
 );
 
+// ========== 方案列表（保留本地假数据） ==========
 const plans = planCards;
 const selectedPlanId = ref(plans[0]?.plan_id || '');
 const selectedPlan = computed(() =>
@@ -986,28 +1061,101 @@ const onEntryAction = (entry, action) => {
   appendSystemMessage(`杀伤链条目【${entry.operation}】执行操作：${action.label}`);
 };
 
-const onAutoAllocate = () => {
+const onAutoAllocate = async () => {
+  const kcId = selectedKillChainId.value;
+  const detail = currentKillChainDetail.value;
+  if (!kcId || !detail || !detail.entries?.length) {
+    appendSystemMessage('请先选择杀伤链并确保有可用条目');
+    return;
+  }
   appendSystemMessage('正在自动分配杀伤链资源…');
-  setTimeout(() => {
-    appendSystemMessage('自动分配完成');
-  }, 600);
+  // 对选中的条目批量自动分配；若未选中任何条目，则对全部未分配条目执行
+  const targetEntries =
+    selectedEntryIds.value.length > 0
+      ? detail.entries.filter((e) => selectedEntryIds.value.includes(e.entry_id))
+      : detail.entries.filter((e) => !e.selected_executor);
+
+  let successCount = 0;
+  for (const entry of targetEntries) {
+    const result = await autoAllocateKillChainEntry(kcId, entry.entry_id, {
+      operation: entry.operation,
+      target_ids: entry.target_ids,
+      constraints: {},
+    });
+    if (result.ok) {
+      successCount++;
+    }
+  }
+  appendSystemMessage(`自动分配完成：成功 ${successCount} / ${targetEntries.length} 条`);
+  // 刷新详情
+  await loadKillChainDetail(kcId);
 };
 
-const onEditKillChain = () => {
-  appendSystemMessage('编辑杀伤链方案（演示模式）');
+const onEditKillChain = async () => {
+  const kcId = selectedKillChainId.value;
+  const detail = currentKillChainDetail.value;
+  if (!kcId || !detail) {
+    appendSystemMessage('请先选择一个杀伤链');
+    return;
+  }
+  const newTitle = prompt('编辑杀伤链标题', detail.title);
+  if (newTitle === null || newTitle.trim() === '') return;
+  const newDesc = prompt('编辑杀伤链描述', detail.description || '');
+  if (newDesc === null) return;
+
+  const result = await updateKillChain(kcId, {
+    title: newTitle.trim(),
+    description: newDesc.trim(),
+  });
+  if (result.ok) {
+    appendSystemMessage('杀伤链已更新');
+    await loadKillChainDetail(kcId);
+    await loadKillChainList();
+  } else {
+    appendSystemMessage(`更新杀伤链失败：${result.error}`);
+  }
 };
 
-const onAddKillChainEntry = () => {
-  appendSystemMessage('新增杀伤链条目（演示模式）');
+const onAddKillChainEntry = async () => {
+  const kcId = selectedKillChainId.value;
+  if (!kcId) {
+    appendSystemMessage('请先选择一个杀伤链');
+    return;
+  }
+  // 默认新增一条侦察条目（演示态，实际应由用户输入）
+  const nextSeq = (currentKillChainDetail.value?.entries?.length || 0) + 1;
+  const result = await addKillChainEntry(kcId, {
+    entry_seq: nextSeq,
+    target_ids: [],
+    operation: '侦察',
+    notes: '前端新增条目',
+  });
+  if (result.ok) {
+    appendSystemMessage(`新增杀伤链条目成功（seq=${nextSeq}）`);
+    await loadKillChainDetail(kcId);
+  } else {
+    appendSystemMessage(`新增杀伤链条目失败：${result.error}`);
+  }
 };
 
-const onDeleteKillChainEntry = () => {
+const onDeleteKillChainEntry = async () => {
+  const kcId = selectedKillChainId.value;
+  if (!kcId) {
+    appendSystemMessage('请先选择一个杀伤链');
+    return;
+  }
   if (selectedEntryIds.value.length === 0) {
     appendSystemMessage('请先选择要删除的条目');
     return;
   }
-  appendSystemMessage(`删除 ${selectedEntryIds.value.length} 个杀伤链条目（演示模式）`);
+  let successCount = 0;
+  for (const entryId of selectedEntryIds.value) {
+    const result = await deleteKillChainEntry(kcId, entryId);
+    if (result.ok) successCount++;
+  }
+  appendSystemMessage(`删除完成：成功 ${successCount} / ${selectedEntryIds.value.length} 个条目`);
   selectedEntryIds.value = [];
+  await loadKillChainDetail(kcId);
 };
 
 // ========== 方案详情操作 ==========
@@ -1107,9 +1255,21 @@ const onAssocConfirm = ({ commandIds, taskIds }) => {
 const resourcePickerVisible = ref(false);
 const selectedResourceIds = ref([]);
 
-const equipmentResources = computed(() =>
-  resourceRecords.filter((r) => r.resource_tag === RESOURCE_TAGS.EQUIPMENT)
-);
+// ========== 装备资源（从后端 API 获取） ==========
+const equipmentResources = ref([]);
+
+const loadEquipmentResources = async () => {
+  const result = await fetchTaskPoolResources({ task_type: 'EQUIPMENT', limit: 50 });
+  if (result.ok) {
+    equipmentResources.value = (result.data.items || []).filter(
+      (r) => r.resource_tag === RESOURCE_TAGS.EQUIPMENT
+    );
+  }
+};
+
+onMounted(() => {
+  loadEquipmentResources();
+});
 
 const equipmentDescMap = {
   101: { typeLabel: '中型履带平台', desc: '承担侦察确认与近距打击支援' },

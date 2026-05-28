@@ -19,7 +19,7 @@
       <span class="resource-pool-total">共 {{ resources.length }} 条</span>
     </div>
 
-    <!-- 分类区域 -->
+    <!-- 分类表格区域 -->
     <div class="resource-pool-body">
       <div
         v-for="group in groupedResources"
@@ -29,161 +29,50 @@
         <!-- 分类标题栏 -->
         <div class="resource-category-header">
           <div class="resource-category-title">
-            <span
-              class="resource-category-dot"
-              :class="`dot-${group.tag}`"
-            />
+            <span class="resource-category-dot" :class="`dot-${group.tag}`" />
             <span class="resource-category-name">{{ group.label }}</span>
-            <span class="resource-category-count">{{ group.items.length }}</span>
+            <span class="resource-category-count">{{ group.items.length }} 条</span>
           </div>
         </div>
 
-        <!-- 横向排列的卡片行 -->
-        <div class="resource-category-row">
-          <div
-            v-for="resource in group.items"
-            :key="resource.resource_id"
-            class="resource-full-card"
-            v-bind="buildResourceTargetAttrs(resource)"
-          >
-            <!-- 卡片头部 -->
-            <div class="rfc-header">
-              <span
-                class="rfc-tag"
-                :class="`tag-${resource.resource_tag}`"
+        <!-- Excel 表格 -->
+        <div class="resource-table-wrap">
+          <table class="resource-table">
+            <thead>
+              <tr>
+                <th
+                  v-for="col in getColumns(group.tag)"
+                  :key="col.key"
+                  :class="{ 'col-center': col.key === 'seq' }"
+                  :style="col.width ? { width: col.width } : {}"
+                >
+                  {{ col.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(item, idx) in group.items"
+                :key="item.resource_id"
+                v-bind="buildResourceTargetAttrs(item)"
               >
-                {{ tagLabel(resource.resource_tag) }}
-              </span>
-              <span class="rfc-type">{{ RESOURCE_TYPE_LABELS[resource.resource_type] || resource.resource_type }}</span>
-              <span class="rfc-name">{{ resource.resource_name }}</span>
-            </div>
-
-            <!-- 卡片内容：完整详情 -->
-            <div class="rfc-body">
-              <!-- 通用元信息 -->
-              <div class="rfc-meta">
-                <div class="rfc-meta-item">
-                  <span class="rfc-meta-label">编号</span>
-                  <span class="rfc-meta-value">{{ resource.resource_id }}</span>
-                </div>
-                <div class="rfc-meta-item">
-                  <span class="rfc-meta-label">关联命令</span>
-                  <span class="rfc-meta-value">{{ connectedCommandsText(resource) }}</span>
-                </div>
-                <div class="rfc-meta-item">
-                  <span class="rfc-meta-label">关联计划</span>
-                  <span class="rfc-meta-value">{{ connectedPlansText(resource) }}</span>
-                </div>
-              </div>
-
-              <!-- 态势目标详情 -->
-              <template v-if="resource.resource_tag === 'TS_TARGET'">
-                <div class="rfc-section">
-                  <div class="rfc-section-title">态势属性</div>
-                  <div class="rfc-kv-grid">
-                    <div class="rfc-kv"><span class="rfc-kv-key">敌我类型</span><span class="rfc-kv-val">{{ t(resource.resource_detail?.type) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">威胁等级</span><span class="rfc-kv-val" :class="`threat-${resource.resource_detail?.threat_level}`">{{ t(resource.resource_detail?.threat_level) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">威胁值</span><span class="rfc-kv-val">{{ t(resource.resource_detail?.value) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">运动状态</span><span class="rfc-kv-val">{{ t(resource.resource_detail?.motion) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">意图</span><span class="rfc-kv-val">{{ t(resource.resource_detail?.intent) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">处理等级</span><span class="rfc-kv-val">{{ t(resource.resource_detail?.handle_tier) }}</span></div>
-                    <div class="rfc-kv wide"><span class="rfc-kv-key">建议处置</span><span class="rfc-kv-val">{{ resource.resource_detail?.suggestion }}</span></div>
-                  </div>
-                </div>
-                <div class="rfc-section">
-                  <div class="rfc-section-title">区域坐标</div>
-                  <div class="rfc-table">
-                    <div class="rfc-table-head"><span>点位</span><span>纬度</span><span>经度</span><span>高度</span></div>
-                    <div v-for="point in resource.resource_detail?.location" :key="point.point" class="rfc-table-row">
-                      <span>{{ point.point }}</span><span>{{ point.latitude }}</span><span>{{ point.longitude }}</span><span>{{ point.altitude }}</span>
-                    </div>
-                  </div>
-                </div>
-              </template>
-
-              <!-- 装备详情 -->
-              <template v-if="resource.resource_tag === 'EQUIPMENT'">
-                <div class="rfc-section">
-                  <div class="rfc-section-title">平台信息</div>
-                  <div class="rfc-kv-grid cols-3">
-                    <div class="rfc-kv"><span class="rfc-kv-key">平台类型</span><span class="rfc-kv-val">{{ t(resource.resource_detail?.platform_type) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">运行状态</span><span class="rfc-kv-val" :class="`status-${resource.resource_detail?.running_status}`">{{ t(resource.resource_detail?.running_status) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">当前任务</span><span class="rfc-kv-val">{{ resource.resource_detail?.current_task }}</span></div>
-                  </div>
-                </div>
-                <div class="rfc-section">
-                  <div class="rfc-section-title">载荷模块</div>
-                  <div class="rfc-tags">
-                    <span v-for="mod in resource.resource_detail?.payload_modules" :key="mod" class="rfc-tag-chip">{{ mod }}</span>
-                  </div>
-                </div>
-                <div class="rfc-section">
-                  <div class="rfc-section-title">能力参数</div>
-                  <div class="rfc-kv-grid cols-2">
-                    <div class="rfc-kv"><span class="rfc-kv-key">最大航程</span><span class="rfc-kv-val">{{ resource.resource_detail?.mobility?.max_range_km }} km</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">最大速度</span><span class="rfc-kv-val">{{ resource.resource_detail?.mobility?.max_speed_kmh }} km/h</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">地形适应</span><span class="rfc-kv-val">{{ t(resource.resource_detail?.mobility?.terrain_adaptability) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">打击射程</span><span class="rfc-kv-val">{{ resource.resource_detail?.strike_capability?.max_range_km }} km</span></div>
-                    <div class="rfc-kv wide"><span class="rfc-kv-key">武器类型</span><span class="rfc-kv-val">{{ (resource.resource_detail?.strike_capability?.weapon_types || []).map(t).join('、') || '无' }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">侦察射程</span><span class="rfc-kv-val">{{ resource.resource_detail?.recon_capability?.max_range_km }} km</span></div>
-                    <div class="rfc-kv wide"><span class="rfc-kv-key">侦察方式</span><span class="rfc-kv-val">{{ (resource.resource_detail?.recon_capability?.methods || []).map(t).join('、') || '无' }}</span></div>
-                  </div>
-                </div>
-              </template>
-
-              <!-- 火力详情 -->
-              <template v-if="resource.resource_tag === 'FIREPOWER'">
-                <div class="rfc-section">
-                  <div class="rfc-section-title">火力参数</div>
-                  <div class="rfc-kv-grid cols-3">
-                    <div class="rfc-kv"><span class="rfc-kv-key">数量</span><span class="rfc-kv-val">{{ resource.resource_detail?.quantity }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">武器类型</span><span class="rfc-kv-val">{{ t(resource.resource_detail?.weapon_type) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">弹药状态</span><span class="rfc-kv-val" :class="`status-${resource.resource_detail?.ammo_status}`">{{ t(resource.resource_detail?.ammo_status) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">打击范围</span><span class="rfc-kv-val">{{ resource.resource_detail?.strike_range_km }} km</span></div>
-                    <div class="rfc-kv wide"><span class="rfc-kv-key">所属装备</span><span class="rfc-kv-val">{{ resource.resource_detail?.belonging_equipment?.resource_name }} (#{{ resource.resource_detail?.belonging_equipment?.resource_id }})</span></div>
-                    <div class="rfc-kv wide"><span class="rfc-kv-key">杀伤效能</span><span class="rfc-kv-val">{{ t(resource.resource_detail?.lethality?.effect_type) }} — {{ resource.resource_detail?.lethality?.effect_value }}</span></div>
-                  </div>
-                </div>
-              </template>
-
-              <!-- 侦察详情 -->
-              <template v-if="resource.resource_tag === 'RECON'">
-                <div class="rfc-section">
-                  <div class="rfc-section-title">侦察参数</div>
-                  <div class="rfc-kv-grid cols-2">
-                    <div class="rfc-kv"><span class="rfc-kv-key">侦察方式</span><span class="rfc-kv-val">{{ (resource.resource_detail?.recon_methods || []).map(t).join('、') }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">侦察范围</span><span class="rfc-kv-val">{{ resource.resource_detail?.recon_range_km ?? '—' }} km</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">在线状态</span><span class="rfc-kv-val" :class="`status-${resource.resource_detail?.online_status}`">{{ t(resource.resource_detail?.online_status) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">所属平台</span><span class="rfc-kv-val">{{ resource.resource_detail?.resource_platform?.resource_name }} (#{{ resource.resource_detail?.resource_platform?.resource_id }})</span></div>
-                    <div class="rfc-kv wide"><span class="rfc-kv-key">覆盖范围</span><span class="rfc-kv-val">{{ resource.resource_detail?.coverage_focus }}</span></div>
-                  </div>
-                </div>
-              </template>
-
-              <!-- 保障详情 -->
-              <template v-if="resource.resource_tag === 'SUPPORT'">
-                <div class="rfc-section">
-                  <div class="rfc-section-title">保障参数</div>
-                  <div class="rfc-kv-grid cols-2">
-                    <div class="rfc-kv"><span class="rfc-kv-key">保障单位</span><span class="rfc-kv-val">{{ resource.resource_detail?.support_unit }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">保障能力</span><span class="rfc-kv-val">{{ resource.resource_detail?.support_capability }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">机动能力</span><span class="rfc-kv-val">{{ resource.resource_detail?.mobility_capability }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">当前状态</span><span class="rfc-kv-val" :class="`status-${resource.resource_detail?.current_status}`">{{ t(resource.resource_detail?.current_status) }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">保障类别</span><span class="rfc-kv-val">{{ t(resource.resource_detail?.support_category) }}</span></div>
-                  </div>
-                </div>
-                <div class="rfc-section">
-                  <div class="rfc-section-title">部署位置</div>
-                  <div class="rfc-kv-grid cols-2">
-                    <div class="rfc-kv wide"><span class="rfc-kv-key">位置名称</span><span class="rfc-kv-val">{{ resource.resource_detail?.deployment_location?.location_name || '—' }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">纬度</span><span class="rfc-kv-val">{{ resource.resource_detail?.deployment_location?.latitude }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">经度</span><span class="rfc-kv-val">{{ resource.resource_detail?.deployment_location?.longitude }}</span></div>
-                    <div class="rfc-kv"><span class="rfc-kv-key">高度</span><span class="rfc-kv-val">{{ resource.resource_detail?.deployment_location?.altitude }} m</span></div>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </div>
+                <td
+                  v-for="col in getColumns(group.tag)"
+                  :key="col.key"
+                  :class="[col.class, col.key === 'seq' ? 'col-center' : '']"
+                >
+                  <span
+                    v-if="col.badge"
+                    class="cell-badge"
+                    :class="`badge-${getCellValue(item, col.key, idx, group.tag)}`"
+                  >
+                    {{ getCellValue(item, col.key, idx, group.tag) }}
+                  </span>
+                  <span v-else>{{ getCellValue(item, col.key, idx, group.tag) }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -196,41 +85,56 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { createInteractionTargetAttrs } from '../../../../shared/interaction/createInteractionTarget';
 import {
-  commandRecords,
-  resourceRecords,
   RESOURCE_TAGS,
   RESOURCE_TAG_LABELS,
   RESOURCE_TYPE_LABELS,
   translateResourceField,
+  resourceRecords,
 } from '../../data/commandDataModel';
-import { loadTaskUnderstandingDb } from '../../state/taskUnderstandingLocalDb';
+import { fetchTaskPoolResources } from '../../api/coordinationApi';
 
-/* ---------- 数据加载 ---------- */
-const taskDb = loadTaskUnderstandingDb({ mockCommands: commandRecords });
+/* ---------- 数据加载（从后端 API 获取） ---------- */
+const resources = ref([]);
+const resourcesLoading = ref(false);
 
-const parsedResourceIds = new Set(
-  Object.values(taskDb.analysisResultMap || {})
-    .flatMap((item) => item?.resources || [])
-    .map((item) => item?.resource_id)
-    .filter((id) => id !== null && id !== undefined)
-);
+const loadResources = async () => {
+  resourcesLoading.value = true;
+  const result = await fetchTaskPoolResources({ limit: 100 });
+  let apiItems = [];
+  if (result.ok) {
+    // 资源池只显示真正的资源类型，过滤掉杀伤链、方案等非资源条目
+    apiItems = (result.data.items || []).filter((r) =>
+      tagOrder.includes(r.resource_tag)
+    );
+  }
 
-const resources = resourceRecords.filter((item) => parsedResourceIds.has(item.resource_id));
+  // 数据服务器暂不支持火力/侦察/保障，用本地 mock 数据补充
+  const localMockItems = (resourceRecords || []).filter((r) =>
+    ['FIREPOWER', 'RECON', 'SUPPORT'].includes(r.resource_tag)
+  );
+
+  resources.value = [...apiItems, ...localMockItems];
+  resourcesLoading.value = false;
+};
+
+onMounted(() => {
+  loadResources();
+});
 
 /* ---------- 筛选状态 ---------- */
 const activeFilterTag = ref('ALL');
 
 const filterTabs = computed(() => {
-  const allCount = resources.length;
+  const allCount = resources.value.length;
   const tabs = [
     { tag: 'ALL', label: '全部', count: allCount },
     ...Object.values(RESOURCE_TAGS).map((tag) => ({
       tag,
       label: RESOURCE_TAG_LABELS[tag],
-      count: resources.filter((r) => r.resource_tag === tag).length,
+      count: resources.value.filter((r) => r.resource_tag === tag).length,
     })),
   ];
   return tabs;
@@ -242,11 +146,10 @@ const tagOrder = ['TS_TARGET', 'EQUIPMENT', 'FIREPOWER', 'RECON', 'SUPPORT'];
 const groupedResources = computed(() => {
   const groups = [];
   for (const tag of tagOrder) {
-    // 如果激活了筛选标签，只显示匹配的分类
     if (activeFilterTag.value !== 'ALL' && activeFilterTag.value !== tag) {
       continue;
     }
-    const items = resources.filter((r) => r.resource_tag === tag);
+    const items = resources.value.filter((r) => r.resource_tag === tag);
     if (items.length > 0) {
       groups.push({
         tag,
@@ -258,17 +161,107 @@ const groupedResources = computed(() => {
   return groups;
 });
 
-/* ---------- 辅助函数 ---------- */
-const tagLabel = (tag) => RESOURCE_TAG_LABELS[tag] || tag;
-const t = translateResourceField;
-
-const connectedCommandsText = (resource) => {
-  const ids = resource.connections?.connected_commands || [];
-  return ids.length ? ids.map((id) => `命令${id}`).join('、') : '无';
+/* ---------- 表格列配置 ---------- */
+const COLUMN_CONFIG = {
+  TS_TARGET: [
+    { key: 'seq', label: '序号', width: '50px' },
+    { key: 'resource_name', label: '目标名称' },
+    { key: 'resource_id', label: '目标编号' },
+    { key: 'type', label: '敌我类型' },
+    { key: 'threat_level', label: '威胁等级', badge: true },
+    { key: 'longitude', label: '经度' },
+    { key: 'latitude', label: '纬度' },
+    { key: 'altitude', label: '高度(m)' },
+    { key: 'motion', label: '运动状态' },
+    { key: 'handle_tier', label: '处理等级' },
+  ],
+  EQUIPMENT: [
+    { key: 'seq', label: '序号', width: '50px' },
+    { key: 'resource_name', label: '装备名称' },
+    { key: 'resource_id', label: '装备编号' },
+    { key: 'platform_type', label: '平台类型' },
+    { key: 'running_status', label: '运行状态', badge: true },
+    { key: 'current_task', label: '当前任务' },
+    { key: 'max_range_km', label: '最大航程(km)' },
+    { key: 'max_speed_kmh', label: '最大速度(km/h)' },
+    { key: 'strike_range_km', label: '打击射程(km)' },
+    { key: 'recon_range_km', label: '侦察射程(km)' },
+  ],
+  FIREPOWER: [
+    { key: 'seq', label: '序号', width: '50px' },
+    { key: 'resource_name', label: '火力名称' },
+    { key: 'resource_id', label: '火力编号' },
+    { key: 'weapon_type', label: '武器类型' },
+    { key: 'quantity', label: '数量' },
+    { key: 'ammo_status', label: '弹药状态', badge: true },
+    { key: 'strike_range_km', label: '打击范围(km)' },
+  ],
+  RECON: [
+    { key: 'seq', label: '序号', width: '50px' },
+    { key: 'resource_name', label: '侦察名称' },
+    { key: 'resource_id', label: '侦察编号' },
+    { key: 'recon_methods', label: '侦察方式' },
+    { key: 'recon_range_km', label: '侦察范围(km)' },
+    { key: 'online_status', label: '在线状态', badge: true },
+  ],
+  SUPPORT: [
+    { key: 'seq', label: '序号', width: '50px' },
+    { key: 'resource_name', label: '保障名称' },
+    { key: 'resource_id', label: '保障编号' },
+    { key: 'support_unit', label: '保障单位' },
+    { key: 'support_capability', label: '保障能力' },
+    { key: 'current_status', label: '当前状态', badge: true },
+  ],
 };
-const connectedPlansText = (resource) => {
-  const ids = resource.connections?.connected_plans || [];
-  return ids.length ? ids.map((id) => `方案${id}`).join('、') : '无';
+
+const getColumns = (tag) => COLUMN_CONFIG[tag] || [];
+
+const getCellValue = (item, key, idx, tag) => {
+  if (key === 'seq') return idx + 1;
+
+  const detail = item.resource_detail || {};
+
+  const mapping = {
+    // 通用
+    resource_name: item.resource_name || '—',
+    resource_id: item.resource_id || '—',
+    resource_type: RESOURCE_TYPE_LABELS[item.resource_type] || item.resource_type || '—',
+
+    // 态势目标
+    type: translateResourceField(detail.type),
+    threat_level: translateResourceField(detail.threat_level),
+    motion: translateResourceField(detail.motion),
+    handle_tier: translateResourceField(detail.handle_tier),
+    longitude: detail.location?.[0]?.longitude ?? '—',
+    latitude: detail.location?.[0]?.latitude ?? '—',
+    altitude: detail.location?.[0]?.altitude ?? '—',
+
+    // 装备
+    platform_type: translateResourceField(detail.platform_type),
+    running_status: translateResourceField(detail.running_status),
+    current_task: detail.current_task || '—',
+    max_range_km: detail.mobility?.max_range_km ?? '—',
+    max_speed_kmh: detail.mobility?.max_speed_kmh ?? '—',
+    // 支持 API 嵌套格式 或 本地 mock 平铺格式
+    strike_range_km: detail.strike_capability?.max_range_km ?? detail.strike_range_km ?? '—',
+    recon_range_km: detail.recon_capability?.max_range_km ?? detail.recon_range_km ?? '—',
+
+    // 火力
+    weapon_type: translateResourceField(detail.weapon_type),
+    quantity: detail.quantity ?? '—',
+    ammo_status: translateResourceField(detail.ammo_status),
+
+    // 侦察
+    recon_methods: (detail.recon_methods || []).map(translateResourceField).join('、') || '—',
+    online_status: translateResourceField(detail.online_status),
+
+    // 保障
+    support_unit: detail.support_unit || '—',
+    support_capability: detail.support_capability || '—',
+    current_status: translateResourceField(detail.current_status),
+  };
+
+  return mapping[key] ?? '—';
 };
 
 /* ---------- 语义目标 ---------- */
@@ -326,9 +319,7 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   flex: 1;
   scrollbar-width: none;
 }
-.resource-pool-filters::-webkit-scrollbar {
-  display: none;
-}
+.resource-pool-filters::-webkit-scrollbar { display: none; }
 
 .resource-pool-filter-btn {
   position: relative;
@@ -403,7 +394,6 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   padding-right: 0.3rem;
 }
 
-/* 自定义滚动条 */
 .resource-pool-body::-webkit-scrollbar {
   width: 5px;
 }
@@ -422,7 +412,7 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
 .resource-category {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .resource-category-header {
@@ -465,250 +455,130 @@ const buildResourceTargetAttrs = (resource) => createInteractionTargetAttrs({
   font-weight: 700;
 }
 
-/* ========== 横向卡片行 ========== */
-.resource-category-row {
-  display: flex;
-  flex-direction: row;
-  gap: 0.8rem;
+/* ========== Excel 表格 ========== */
+.resource-table-wrap {
   overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0.2rem 0.1rem 0.6rem;
-  scroll-behavior: smooth;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 208, 188, 0.25);
+  background: rgba(0, 16, 22, 0.55);
 }
 
-/* 横向滚动条 */
-.resource-category-row::-webkit-scrollbar {
-  height: 5px;
+.resource-table-wrap::-webkit-scrollbar {
+  height: 6px;
 }
-.resource-category-row::-webkit-scrollbar-track {
+.resource-table-wrap::-webkit-scrollbar-track {
   background: transparent;
 }
-.resource-category-row::-webkit-scrollbar-thumb {
+.resource-table-wrap::-webkit-scrollbar-thumb {
   background: rgba(0, 222, 200, 0.25);
   border-radius: 999px;
 }
-.resource-category-row::-webkit-scrollbar-thumb:hover {
+.resource-table-wrap::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 222, 200, 0.45);
 }
 
-/* ========== 完整详情卡片 ========== */
-.resource-full-card {
-  flex: 0 0 340px;
-  max-width: 340px;
-  min-width: 340px;
-  display: flex;
-  flex-direction: column;
-  border-radius: 14px;
-  border: 1px solid rgba(0, 208, 188, 0.28);
-  background: linear-gradient(180deg, rgba(0, 222, 200, 0.05), rgba(0, 222, 200, 0.015)), rgba(0, 16, 22, 0.68);
-  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.05), 0 6px 14px rgba(0, 0, 0, 0.16);
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 200ms ease, transform 200ms ease;
-  overflow: hidden;
-}
-
-.resource-full-card:hover {
-  border-color: rgba(0, 222, 200, 0.5);
-  background: linear-gradient(180deg, rgba(0, 222, 200, 0.07), rgba(0, 222, 200, 0.025)), rgba(0, 18, 24, 0.75);
-  box-shadow: inset 0 0 0 1px rgba(0, 222, 200, 0.08), 0 8px 22px rgba(0, 0, 0, 0.22);
-  transform: translateY(-1px);
-}
-
-/* 卡片头部 */
-.rfc-header {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.6rem 0.7rem 0.5rem;
-  border-bottom: 1px solid rgba(0, 222, 200, 0.12);
-  flex-wrap: wrap;
-}
-
-.rfc-tag {
-  border-radius: 999px;
-  padding: 0.08rem 0.4rem;
-  font-size: 0.7rem;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.rfc-tag.tag-TS_TARGET { background: rgba(255, 183, 77, 0.16); color: #ffd180; }
-.rfc-tag.tag-EQUIPMENT { background: rgba(77, 182, 255, 0.16); color: #a8d8ff; }
-.rfc-tag.tag-FIREPOWER { background: rgba(255, 82, 82, 0.16); color: #ffadad; }
-.rfc-tag.tag-RECON     { background: rgba(156, 77, 255, 0.16); color: #d4b3ff; }
-.rfc-tag.tag-SUPPORT   { background: rgba(77, 255, 136, 0.16); color: #b3ffcc; }
-
-.rfc-type {
-  color: rgba(214, 237, 242, 0.82);
-  font-size: 0.76rem;
-}
-
-.rfc-name {
-  color: var(--rp-text);
-  font-size: 0.92rem;
-  font-weight: 700;
-}
-
-/* 卡片内容区 */
-.rfc-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 0.5rem 0.6rem 0.7rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-/* 卡片内滚动条 */
-.rfc-body::-webkit-scrollbar {
-  width: 4px;
-}
-.rfc-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-.rfc-body::-webkit-scrollbar-thumb {
-  background: rgba(0, 222, 200, 0.2);
-  border-radius: 999px;
-}
-
-/* 通用元信息 */
-.rfc-meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.4rem;
-  padding-bottom: 0.3rem;
-  border-bottom: 1px solid rgba(0, 222, 200, 0.1);
-}
-
-.rfc-meta-item {
-  border-radius: 8px;
-  border: 1px solid rgba(0, 222, 200, 0.15);
-  background: rgba(0, 16, 22, 0.5);
-  padding: 0.38rem 0.46rem;
-}
-
-.rfc-meta-label {
-  color: rgba(196, 243, 248, 0.85);
-  font-size: 0.72rem;
-  font-weight: 700;
-  display: block;
-}
-
-.rfc-meta-value {
-  display: block;
-  margin-top: 0.14rem;
-  color: #ecfbff;
-  font-size: 0.82rem;
-  font-weight: 700;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-/* 详情区块 */
-.rfc-section {
-  padding-top: 0.4rem;
-  border-top: 1px solid rgba(0, 222, 200, 0.1);
-}
-.rfc-section:first-of-type {
-  border-top: none;
-  padding-top: 0.2rem;
-}
-
-.rfc-section-title {
-  color: #eefcff;
-  font-size: 0.86rem;
-  font-weight: 800;
-  margin-bottom: 0.3rem;
-}
-
-/* KV 网格 */
-.rfc-kv-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.36rem;
-}
-.rfc-kv-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.rfc-kv-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-.rfc-kv {
-  border-radius: 8px;
-  border: 1px solid rgba(0, 222, 200, 0.14);
-  background: rgba(0, 16, 22, 0.55);
-  padding: 0.4rem 0.48rem;
-}
-.rfc-kv.wide { grid-column: 1 / -1; }
-
-.rfc-kv-key {
-  color: rgba(196, 243, 248, 0.88);
-  font-size: 0.74rem;
-  font-weight: 700;
-  display: block;
-}
-
-.rfc-kv-val {
-  display: block;
-  margin-top: 0.14rem;
-  color: #ecfbff;
+.resource-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
   font-size: 0.84rem;
-  font-weight: 700;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-.rfc-kv-val.threat-low { color: #a8ff8a; }
-.rfc-kv-val.threat-medium { color: #ffe08a; }
-.rfc-kv-val.threat-high { color: #ff8a8a; }
-.rfc-kv-val.threat-unknown { color: rgba(214, 237, 242, 0.7); }
-.rfc-kv-val.status-online { color: #a8ff8a; }
-.rfc-kv-val.status-offline { color: #ff8a8a; }
-.rfc-kv-val.status-maintenance { color: #ffe08a; }
-.rfc-kv-val.status-ready { color: #a8ff8a; }
-.rfc-kv-val.status-standby { color: #ffe08a; }
-
-/* 标签组 */
-.rfc-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.32rem;
-}
-
-.rfc-tag-chip {
-  border-radius: 7px;
-  padding: 0.26rem 0.48rem;
-  background: rgba(0, 222, 200, 0.1);
-  border: 1px solid rgba(0, 222, 200, 0.28);
-  color: #b4fff8;
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-/* 表格 */
-.rfc-table {
-  border-radius: 8px;
-  border: 1px solid rgba(0, 222, 200, 0.2);
-  background: rgba(2, 18, 26, 0.55);
-  overflow: hidden;
-}
-
-.rfc-table-head,
-.rfc-table-row {
-  display: grid;
-  grid-template-columns: 1.15fr 1fr 1fr 0.8fr;
-  gap: 0.4rem;
-  align-items: center;
-  padding: 0.4rem 0.48rem;
-}
-
-.rfc-table-head {
-  background: rgba(0, 222, 200, 0.1);
-  color: #b9fffa;
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
-.rfc-table-row {
-  border-top: 1px solid rgba(0, 222, 200, 0.1);
   color: rgba(227, 248, 251, 0.92);
+  table-layout: fixed;
+}
+
+.resource-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.resource-table th {
+  background: rgba(0, 222, 200, 0.12);
+  color: #b9fffa;
+  font-weight: 700;
   font-size: 0.8rem;
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(0, 208, 188, 0.3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resource-table td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid rgba(0, 208, 188, 0.1);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resource-table .col-center {
+  text-align: center;
+}
+
+.resource-table tbody tr:hover {
+  background: rgba(0, 222, 200, 0.06);
+}
+
+.resource-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 单元格徽章 */
+.cell-badge {
+  display: inline-block;
+  border-radius: 6px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* 威胁等级颜色 */
+.cell-badge.badge-低,
+.cell-badge.badge-low {
+  background: rgba(120, 220, 100, 0.15);
+  color: #a8ff8a;
+}
+.cell-badge.badge-中,
+.cell-badge.badge-medium {
+  background: rgba(255, 200, 80, 0.15);
+  color: #ffe08a;
+}
+.cell-badge.badge-高,
+.cell-badge.badge-high {
+  background: rgba(255, 100, 100, 0.15);
+  color: #ff8a8a;
+}
+.cell-badge.badge-未知,
+.cell-badge.badge-unknown {
+  background: rgba(160, 180, 200, 0.15);
+  color: #cbd5e1;
+}
+
+/* 状态颜色 */
+.cell-badge.badge-在线,
+.cell-badge.badge-online,
+.cell-badge.badge-ready {
+  background: rgba(120, 220, 100, 0.15);
+  color: #a8ff8a;
+}
+.cell-badge.badge-离线,
+.cell-badge.badge-offline {
+  background: rgba(255, 100, 100, 0.15);
+  color: #ff8a8a;
+}
+.cell-badge.badge-维护中,
+.cell-badge.badge-maintenance {
+  background: rgba(255, 200, 80, 0.15);
+  color: #ffe08a;
+}
+.cell-badge.badge-待命,
+.cell-badge.badge-standby {
+  background: rgba(160, 180, 200, 0.15);
+  color: #cbd5e1;
 }
 
 /* 空状态 */

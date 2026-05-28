@@ -1,0 +1,351 @@
+// coordinationApi.js — 协同指控模块后端 API 封装
+// 职责：统一 HTTP 请求 + 后端数据 → 前端数据模型适配
+
+const COORDINATION_BASE_URL = 'http://localhost:28600';
+
+const joinApiUrl = (path) => {
+  const base = COORDINATION_BASE_URL.replace(/\/+$/, '');
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  return `${base}/${normalizedPath}`;
+};
+
+export const safeFetch = async (url, options) => {
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      return { ok: false, error: `HTTP ${response.status}`, data: null };
+    }
+    const data = await response.json();
+    return { ok: true, error: null, data };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Network error', data: null };
+  }
+};
+
+/* ==================== 通用工具 ==================== */
+
+const postJson = (url, body) =>
+  safeFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+const getJson = (url) =>
+  safeFetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+const deleteJson = (url) =>
+  safeFetch(url, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+const patchJson = (url, body) =>
+  safeFetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+/* ==================== Task Pool 资源查询 ==================== */
+
+/**
+ * 查询资源列表（通用）
+ * @param {{task_type?: string, limit?: number, keyword?: string, state?: string}} query
+ */
+export const fetchTaskPoolResources = async (query = {}) => {
+  const result = await postJson(joinApiUrl('/api/v1/task_pool/resources/query'), {
+    limit: 50,
+    ...query,
+  });
+  if (!result.ok) return result;
+  const items = (result.data?.data?.items || []).map(adaptBackendResource);
+  return { ok: true, data: { items, total: result.data?.data?.total || 0 } };
+};
+
+/**
+ * 按标签查询资源
+ * @param {string} tag - 如 'EQUIPMENT', 'TARGET', 'KILL_CHAIN', 'PLAN'
+ */
+export const fetchResourcesByTag = async (tag) =>
+  fetchTaskPoolResources({ task_type: tag });
+
+/* ==================== 杀伤链 API ==================== */
+
+/** 获取杀伤链详情 */
+export const fetchKillChainDetail = async (killChainId) => {
+  const result = await getJson(joinApiUrl(`/api/v1/kill-chains/${killChainId}`));
+  if (!result.ok) return result;
+  const raw = result.data?.data || {};
+  // 适配为前端杀伤链详情格式
+  const detail = {
+    kill_chain_id: raw.kill_chain_id,
+    title: raw.title,
+    state: raw.state,
+    description: raw.description,
+    targets: (raw.target_ids || []).map((tid) => ({
+      target_id: tid.replace('target:', ''),
+      name: tid.replace('target_', '目标').replace('target-', '目标'),
+      source: '地图单选或框选结果',
+    })),
+    entries: (raw.raw_entries || []).map((e) => adaptKillChainEntry(e, raw)),
+    assigned_entries: (raw.assigned_entries || []).map((e) => adaptKillChainEntry(e, raw)),
+    network: raw.network,
+    mapping_summary: raw.mapping_summary,
+    // 保留原始字段供调试
+    _raw: raw,
+  };
+  return { ok: true, data: detail };
+};
+
+/** 更新杀伤链（title / description / state 等通用字段） */
+export const updateKillChain = async (killChainId, payload) => {
+  const result = await patchJson(joinApiUrl(`/api/v1/kill-chains/${killChainId}`), payload);
+  if (!result.ok) return result;
+  return { ok: true, data: result.data?.data || {} };
+};
+
+/** 增加杀伤链条目 */
+export const addKillChainEntry = async (killChainId, payload) => {
+  const result = await postJson(
+    joinApiUrl(`/api/v1/kill-chains/${killChainId}/entries`),
+    payload
+  );
+  return result;
+};
+
+/** 删除杀伤链条目 */
+export const deleteKillChainEntry = async (killChainId, entryId) => {
+  const result = await deleteJson(
+    joinApiUrl(`/api/v1/kill-chains/${killChainId}/entries/${entryId}`)
+  );
+  return result;
+};
+
+/** 自动分配 */
+export const autoAllocateKillChainEntry = async (killChainId, entryId, payload) => {
+  const result = await postJson(
+    joinApiUrl(`/api/v1/kill-chains/${killChainId}/entries/${entryId}/auto-allocate`),
+    payload
+  );
+  return result;
+};
+
+/** 人工分配 */
+export const manualAllocateKillChainEntry = async (killChainId, entryId, payload) => {
+  const result = await postJson(
+    joinApiUrl(`/api/v1/kill-chains/${killChainId}/entries/${entryId}/allocate`),
+    payload
+  );
+  return result;
+};
+
+/** 生成行动方案 */
+export const generatePlanFromKillChain = async (killChainId, payload) => {
+  const result = await postJson(
+    joinApiUrl(`/api/v1/kill-chains/${killChainId}/generate-plan`),
+    payload
+  );
+  return result;
+};
+
+/** 激活杀伤链 */
+export const activateKillChain = async (killChainId) => {
+  const result = await postJson(
+    joinApiUrl(`/api/v1/kill-chains/${killChainId}/activate`),
+    {}
+  );
+  return result;
+};
+
+/** 静默杀伤链 */
+export const deactivateKillChain = async (killChainId) => {
+  const result = await postJson(
+    joinApiUrl(`/api/v1/kill-chains/${killChainId}/deactivate`),
+    {}
+  );
+  return result;
+};
+
+/* ==================== 数据适配 ==================== */
+
+function adaptKillChainEntry(entry, parentRaw) {
+  const targetDisplay = parentRaw?.attributes?.target_display || {};
+  const targetNames = (entry.target_ids || []).map((tid) => {
+    return targetDisplay[tid] || tid.replace('target:', '');
+  });
+
+  return {
+    entry_id: entry.entry_id,
+    target_ids: entry.target_ids || [],
+    target_names: targetNames,
+    operation: entry.operation,
+    source: entry.phase === 'ASSIGNED' ? 'assigned-model' : 'raw-model',
+    valid: entry.is_valid !== false,
+    executor_assignments: (entry.executor_options || []).map((opt) => ({
+      executor_name: opt.executor_id?.replace('equipment:', '') || opt.executor_id,
+      target_name: targetNames[0] || '',
+      locked: opt.locked || false,
+      note: opt.note,
+      allocation_count: opt.allocation_count,
+    })),
+    selected_executor: entry.selected_executor,
+    locked: entry.locked,
+    notes: entry.notes,
+    _raw: entry,
+  };
+}
+
+/**
+ * 将后端资源对象适配为前端 ResourceCatalogPanel 期望的格式
+ */
+export function adaptBackendResource(backendItem) {
+  if (!backendItem || typeof backendItem !== 'object') return backendItem;
+
+  const taskType = backendItem.task_type;
+
+  // 通用字段
+  const base = {
+    resource_id: backendItem.resource_id,
+    resource_name:
+      backendItem.resource_name ||
+      backendItem.target_name ||
+      backendItem.title ||
+      backendItem.name ||
+      '',
+    resource_tag: backendItem.resource_tag || mapTaskTypeToTag(taskType),
+    resource_type: backendItem.resource_type || taskType || 'UNKNOWN',
+    connections: {
+      connected_commands: [],
+      connected_plans: [],
+      connected_instant_plans: [],
+      connected_resources: [],
+    },
+  };
+
+  switch (taskType) {
+    case 'TARGET':
+      base.resource_detail = adaptTargetDetail(backendItem);
+      break;
+    case 'EQUIPMENT':
+      base.resource_detail = adaptEquipmentDetail(backendItem);
+      break;
+    case 'KILL_CHAIN':
+      base.resource_detail = { ...backendItem };
+      break;
+    case 'PLAN':
+      base.resource_detail = { ...backendItem };
+      break;
+    default:
+      base.resource_detail = { ...backendItem };
+  }
+
+  return base;
+}
+
+function mapTaskTypeToTag(taskType) {
+  const map = {
+    TARGET: 'TS_TARGET',
+    EQUIPMENT: 'EQUIPMENT',
+    FIREPOWER: 'FIREPOWER',
+    RECON: 'RECON',
+    SUPPORT: 'SUPPORT',
+    KILL_CHAIN: 'KILL_CHAIN',
+    PLAN: 'PLAN',
+    MISSION: 'MISSION',
+  };
+  return map[taskType] || taskType || 'UNKNOWN';
+}
+
+function adaptTargetDetail(item) {
+  const loc = item.location || {};
+  const locationArr =
+    loc.latitude !== undefined
+      ? [
+          {
+            point: 'point-1',
+            latitude: String(loc.latitude),
+            longitude: String(loc.longitude),
+            altitude: String(loc.altitude ?? 0),
+          },
+        ]
+      : [];
+
+  return {
+    type: (item.foe || 'unknown').toLowerCase(),
+    threat_level: (item.threat_level || 'unknown').toLowerCase(),
+    value: 'unknown',
+    motion: 'static',
+    intent: 'unknown',
+    handle_tier: (item.threat_level || 'unknown').toLowerCase(),
+    suggestion: '无',
+    location: locationArr,
+  };
+}
+
+function adaptEquipmentDetail(item) {
+  const cap = item.capacity || {};
+  return {
+    platform_type: item.resource_type || 'UNKNOWN',
+    running_status: (item.online_status || 'unknown').toLowerCase(),
+    payload_modules: [],
+    mobility: {
+      max_range_km: cap.max_range_km ?? '—',
+      max_speed_kmh: cap.max_speed_kmh ?? '—',
+      terrain_adaptability: 'complex_ground',
+    },
+    strike_capability: {
+      max_range_km: cap.strike_range_km ?? 0,
+      weapon_types: cap.strike_range_km ? ['打击武器'] : [],
+    },
+    recon_capability: {
+      max_range_km: cap.recon_range_km ?? 0,
+      methods: cap.recon_range_km ? ['侦察'] : [],
+    },
+    current_task: item.online_status === 'ONLINE' ? '在线待命' : '离线',
+  };
+}
+
+/* ==================== 命令分解 / 更新（已有逻辑迁移至此） ==================== */
+
+export const COORDINATION_API_URLS = Object.freeze({
+  decompose: '/commandAndControl/command_decompose',
+  update: '/commandAndControl/command_update',
+});
+
+const nowId = () => String(Date.now()).slice(-8);
+
+export const buildDecomposeRequest = (commandId, requestId = nowId()) => ({
+  RequestType: 'DECOMPOSE',
+  RequestID: requestId,
+  RequestData: { CommandID: commandId },
+});
+
+export const buildUpdateRequest = ({
+  operation,
+  commandIds = [],
+  missionIds = [],
+  resourceIds = [],
+  requestId = nowId(),
+}) => ({
+  RequestType: 'UPDATE',
+  RequestID: requestId,
+  RequestData: {
+    UpdateDetail: {
+      operation,
+      master_type: 'command',
+      command_id: commandIds,
+      mission_id: missionIds,
+      resource_id: resourceIds,
+    },
+  },
+});
+
+export const buildUpdateResponse = ({ operation, requestId = nowId(), result = 'success' }) => ({
+  code: 200,
+  responseID: requestId,
+  data: { operation, result },
+});
