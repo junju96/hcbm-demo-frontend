@@ -309,6 +309,48 @@ function adaptEquipmentDetail(item) {
   };
 }
 
+/* ==================== 行动序列 API ==================== */
+
+/** 获取行动方案列表 */
+export const fetchActionSequencePlans = async () => {
+  const result = await getJson(joinApiUrl('/api/v1/action-sequences/plans'));
+  if (!result.ok) return result;
+  const items = result.data?.data?.items || [];
+  return { ok: true, data: { items, total: result.data?.data?.total || 0 } };
+};
+
+/** 获取方案详情（含行动序列） */
+export const fetchActionSequencePlanDetail = async (planId) => {
+  const result = await getJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}`));
+  if (!result.ok) return result;
+  const raw = result.data?.data || {};
+  return { ok: true, data: raw };
+};
+
+/** 开始执行 */
+export const startActionSequence = async (planId) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}/start`), {});
+  return result;
+};
+
+/** 暂停执行 */
+export const pauseActionSequence = async (planId) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}/pause`), {});
+  return result;
+};
+
+/** 继续执行 */
+export const resumeActionSequence = async (planId) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}/resume`), {});
+  return result;
+};
+
+/** 停止/重置 */
+export const stopActionSequence = async (planId) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}/stop`), {});
+  return result;
+};
+
 /* ==================== 命令分解 / 更新（已有逻辑迁移至此） ==================== */
 
 export const COORDINATION_API_URLS = Object.freeze({
