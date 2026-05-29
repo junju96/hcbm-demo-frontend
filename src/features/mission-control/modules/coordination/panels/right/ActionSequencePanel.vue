@@ -110,18 +110,22 @@
                     class="as-action-card"
                     :class="`state-${(action.state || 'SCHEDULED').toLowerCase()}`"
                   >
-                    <div class="as-card-header">{{ action.name }}</div>
+                    <div class="as-card-header" :title="action.name">
+                      <span class="marquee-text">{{ action.name }}</span>
+                    </div>
                     <div class="as-card-meta">
-                      <span class="as-card-stage">{{ action.stage_title }}</span>
+                      <span class="as-card-stage" :title="action.stage_title">
+                        <span class="marquee-text">{{ action.stage_title }}</span>
+                      </span>
                       <span class="as-card-state">{{ actionStateLabel(action.state) }}</span>
                     </div>
                     <div class="as-card-body">
                       <span class="as-card-seq">{{ idx + 1 }}</span>
-                      <span v-if="action.param?.waypoints" class="as-card-waypoints">
-                        {{ action.param.waypoints.length }} 个航路点
+                      <span v-if="action.param?.waypoints" class="as-card-waypoints" :title="`${action.param.waypoints.length} 个航路点`">
+                        <span class="marquee-text">{{ action.param.waypoints.length }} 个航路点</span>
                       </span>
-                      <span v-else-if="action.description" class="as-card-desc">
-                        {{ action.description }}
+                      <span v-else-if="action.description" class="as-card-desc" :title="action.description">
+                        <span class="marquee-text">{{ action.description }}</span>
                       </span>
                     </div>
                   </div>
@@ -141,7 +145,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import {
   fetchActionSequencePlans,
   fetchActionSequencePlanDetail,
@@ -313,9 +317,32 @@ const onStop = async () => {
   }
 };
 
+/* ---------- 跑马灯溢出检测 ---------- */
+const updateMarqueeStates = () => {
+  nextTick(() => {
+    document.querySelectorAll('.as-action-card .marquee-text').forEach((el) => {
+      const track = el.parentElement;
+      if (!track) return;
+      const overflow = el.scrollWidth > track.clientWidth;
+      if (overflow) {
+        el.classList.add('marquee-active');
+        track.style.setProperty('--track-width', `${track.clientWidth}px`);
+      } else {
+        el.classList.remove('marquee-active');
+        track.style.removeProperty('--track-width');
+      }
+    });
+  });
+};
+
+watch(selectedPlan, () => {
+  updateMarqueeStates();
+});
+
 /* ---------- 生命周期 ---------- */
 onMounted(() => {
   loadPlans();
+  updateMarqueeStates();
 });
 </script>
 
@@ -698,10 +725,28 @@ onMounted(() => {
   color: #f7fdff;
   line-height: 1.35;
   min-height: 2.4em;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 跑马灯 */
+.marquee-text {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.as-action-card:hover .marquee-text.marquee-active {
+  animation: marquee-scroll 5s linear infinite alternate;
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(-100% + var(--track-width, 130px)));
+  }
 }
 
 .as-card-meta {
@@ -718,6 +763,8 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 84px;
 }
 
 .as-card-state {

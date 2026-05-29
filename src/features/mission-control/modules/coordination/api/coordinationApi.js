@@ -91,8 +91,15 @@ export const fetchKillChainDetail = async (killChainId) => {
       name: tid.replace('target_', '目标').replace('target-', '目标'),
       source: '地图单选或框选结果',
     })),
-    entries: (raw.raw_entries || []).map((e) => adaptKillChainEntry(e, raw)),
-    assigned_entries: (raw.assigned_entries || []).map((e) => adaptKillChainEntry(e, raw)),
+    // entries 合并 raw_entries 和 assigned_entries，assigned 覆盖 raw（保留原始 entry_id）
+    entries: (() => {
+      const rawMap = new Map((raw.raw_entries || []).map((e) => [e.entry_id, adaptKillChainEntry(e, raw)]));
+      (raw.assigned_entries || []).forEach((a) => {
+        const adapted = adaptKillChainEntry(a, raw);
+        rawMap.set(a.entry_id, adapted);
+      });
+      return Array.from(rawMap.values()).sort((a, b) => (a.entry_seq || 0) - (b.entry_seq || 0));
+    })(),
     network: raw.network,
     mapping_summary: raw.mapping_summary,
     // 保留原始字段供调试
@@ -156,6 +163,15 @@ export const manualAllocateKillChainEntry = async (killChainId, entryId, payload
 export const generatePlanFromKillChain = async (killChainId, payload) => {
   const result = await postJson(
     joinApiUrl(`/api/v1/kill-chains/${killChainId}/generate-plan`),
+    payload
+  );
+  return result;
+};
+
+/** 下发杀伤链分配方案（把本地修改提交到后端并发送给无人车） */
+export const dispatchKillChain = async (killChainId, payload) => {
+  const result = await postJson(
+    joinApiUrl(`/api/v1/kill-chains/${killChainId}/dispatch`),
     payload
   );
   return result;

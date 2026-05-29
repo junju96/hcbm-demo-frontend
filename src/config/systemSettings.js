@@ -10,7 +10,7 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  apiBaseURL: 'http://localhost:28000',
+  apiBaseURL: 'http://localhost:28600',
   notificationBaseURL: 'http://localhost:28004',
   endpoints: {
     ...DEFAULT_ENDPOINTS,

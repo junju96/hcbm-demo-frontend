@@ -252,6 +252,9 @@
 
         <!-- 操作按钮 -->
         <div class="kill-chain-actions-bar">
+          <button class="planning-btn dispatch" type="button" @click="onDispatchKillChain">
+            下发
+          </button>
           <button class="planning-btn primary" type="button" @click="onAutoAllocate">
             自动分配
           </button>
@@ -284,8 +287,8 @@
                       @change="toggleAllEntries"
                     />
                   </th>
-                  <th class="col-target">目标</th>
                   <th class="col-operation">作战动作</th>
+                  <th class="col-target">目标</th>
                   <th class="col-executor">执行装备</th>
                   <th class="col-source">校验来源</th>
                 </tr>
@@ -299,8 +302,8 @@
                       @change="toggleEntrySelection(entry.entry_id)"
                     />
                   </td>
-                  <td class="col-target">{{ entry.target_names.join('、') }}</td>
                   <td class="col-operation">{{ entry.operation }}</td>
+                  <td class="col-target">{{ entry.target_names.join('、') }}</td>
                   <td class="col-executor">
                     <div class="executor-assignments">
                       <span
@@ -779,6 +782,7 @@ import {
   batchAutoAllocateKillChain,
   manualAllocateKillChainEntry,
   updateKillChain,
+  dispatchKillChain,
 } from '../../../api/coordinationApi';
 
 const props = defineProps({
@@ -797,34 +801,43 @@ const openAllocDialog = (entry) => {
   allocDialogVisible.value = true;
 };
 
-const onAllocConfirm = async ({ entry_id, executor_assignments }) => {
+const onAllocConfirm = ({ entry_id, executor_assignments }) => {
   const kcId = selectedKillChainId.value;
   const detail = currentKillChainDetail.value;
   if (!detail || !detail.entries) return;
-  const entry = detail.entries.find((e) => e.entry_id === entry_id);
-  if (!entry) return;
 
-  // 调用后端人工分配接口
-  if (kcId && executor_assignments?.length) {
-    const firstAssign = executor_assignments[0];
-    const executorId = firstAssign.executor_name || '';
-    if (executorId) {
-      const result = await manualAllocateKillChainEntry(kcId, entry_id, {
-        selected_executor: executorId,
-        allocation_type: 'manual',
-        reason: '前端人工分配',
-      });
-      if (result.ok) {
-        appendSystemMessage(`已更新【${entry.operation}】的目标分配（后端已同步）`);
-      } else {
-        appendSystemMessage(`目标分配后端同步失败：${result.error}`);
-      }
-    }
+  // 获取或创建草稿（深拷贝原始数据）
+  let draft = killChainDraftMap.value[kcId];
+  if (!draft) {
+    draft = JSON.parse(JSON.stringify(detail));
+    killChainDraftMap.value[kcId] = draft;
   }
 
-  // 同步更新前端状态
+  const entry = draft.entries.find((e) => e.entry_id === entry_id);
+  if (!entry) return;
+
+  // 更新本地草稿中的分配信息
   entry.executor_assignments = executor_assignments;
-  await loadKillChainDetail(kcId);
+
+  // 更新 selected_executor（取第一个有目标分配的 executor_name）
+  const firstAlloc = executor_assignments.find(
+    (a) => a.target_name && a.target_name.trim() !== ''
+  );
+  entry.selected_executor = firstAlloc?.executor_name || null;
+
+  // 同步更新 _raw（下发时用于重建后端格式）
+  if (entry._raw) {
+    entry._raw.executor_options = executor_assignments.map((a) => ({
+      executor_id: a.executor_name,
+      allocation_count: a.allocation_count || 1,
+      locked: a.locked || false,
+      note: a.note || '',
+    }));
+    entry._raw.selected_executor = entry.selected_executor;
+    entry._raw.phase = entry.selected_executor ? 'ASSIGNED' : 'RAW';
+  }
+
+  appendSystemMessage(`已更新【${entry.operation}】的目标分配（未下发）`);
 };
 
 // ========== 视图模式 ==========
@@ -844,12 +857,21 @@ const selectedKillChain = computed(() =>
 
 // 当前显示的杀伤链详情（从后端 API 获取）
 const killChainDetailMap = ref({});
+// 本地草稿：用户手动调整分配的临时状态（未下发前保留）
+const killChainDraftMap = ref({});
+
 const currentKillChainDetail = computed(() => {
-  const detail = killChainDetailMap.value[selectedKillChainId.value];
+  const kcId = selectedKillChainId.value;
+  if (!kcId) return null;
+  // 优先返回草稿（有本地未下发修改时）
+  const draft = killChainDraftMap.value[kcId];
+  if (draft) return draft;
+  // fallback 到原始后端数据
+  const detail = killChainDetailMap.value[kcId];
   if (detail) return detail;
-  // fallback：返回第一个
   const firstId = killChains.value[0]?.kill_chain_id;
-  return firstId ? killChainDetailMap.value[firstId] : null;
+  if (!firstId) return null;
+  return killChainDraftMap.value[firstId] || killChainDetailMap.value[firstId] || null;
 });
 
 const loadKillChainList = async () => {
@@ -887,7 +909,11 @@ const loadKillChainDetail = async (id) => {
   }
 };
 
-watch(selectedKillChainId, (id) => {
+watch(selectedKillChainId, (id, oldId) => {
+  // 切换杀伤链时清除旧杀伤链的草稿（未下发修改视为放弃）
+  if (oldId && killChainDraftMap.value[oldId]) {
+    delete killChainDraftMap.value[oldId];
+  }
   if (id && !killChainDetailMap.value[id]) {
     loadKillChainDetail(id);
   }
@@ -1062,6 +1088,41 @@ const onEntryAction = (entry, action) => {
   appendSystemMessage(`杀伤链条目【${entry.operation}】执行操作：${action.label}`);
 };
 
+// 下发杀伤链：把本地草稿中的分配修改提交到后端
+const onDispatchKillChain = async () => {
+  const kcId = selectedKillChainId.value;
+  const draft = killChainDraftMap.value[kcId];
+  if (!kcId || !draft) {
+    appendSystemMessage('当前杀伤链没有待下发的修改');
+    return;
+  }
+
+  // 构建下发数据：只发送有分配的条目
+  const dispatchEntries = draft.entries
+    .filter((e) => e.selected_executor)
+    .map((e) => ({
+      entry_id: e.entry_id,
+      selected_executor: e.selected_executor,
+      executor_assignments: e.executor_assignments || [],
+    }));
+
+  if (dispatchEntries.length === 0) {
+    appendSystemMessage('没有可下发的分配信息');
+    return;
+  }
+
+  appendSystemMessage('正在下发杀伤链分配方案…');
+  const result = await dispatchKillChain(kcId, { entries: dispatchEntries });
+  if (result.ok) {
+    appendSystemMessage(`杀伤链分配方案已下发：${result.data?.data?.dispatched || dispatchEntries.length} 条`);
+    // 清除草稿并刷新原始数据
+    delete killChainDraftMap.value[kcId];
+    await loadKillChainDetail(kcId);
+  } else {
+    appendSystemMessage(`下发失败：${result.error || result.data?.message || '未知错误'}`);
+  }
+};
+
 const onAutoAllocate = async () => {
   const kcId = selectedKillChainId.value;
   const detail = currentKillChainDetail.value;
@@ -1069,6 +1130,13 @@ const onAutoAllocate = async () => {
     appendSystemMessage('请先选择杀伤链并确保有可用条目');
     return;
   }
+
+  // 自动分配前清除当前杀伤链的本地草稿（未下发修改视为放弃）
+  if (killChainDraftMap.value[kcId]) {
+    delete killChainDraftMap.value[kcId];
+    appendSystemMessage('已放弃未下发的本地修改，开始自动分配…');
+  }
+
   appendSystemMessage('正在调用 sichen 火力规划进行自动分配…');
   // 对选中的条目批量自动分配；若未选中任何条目，则对全部未分配条目执行
   const targetEntries =
@@ -1528,6 +1596,10 @@ const getVehicleStageActions = (vid, stage) => {
 .planning-btn.danger:hover {
   border-color: rgba(243, 98, 98, 0.7);
   box-shadow: 0 0 0 2px rgba(243, 98, 98, 0.15);
+}
+.planning-btn.dispatch {
+  border-color: rgba(160, 160, 160, 0.35);
+  background: linear-gradient(180deg, rgba(100, 100, 100, 0.55), rgba(70, 70, 70, 0.6));
 }
 .planning-btn.small {
   min-height: 32px;

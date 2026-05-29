@@ -87,12 +87,19 @@ const filterTags = computed(() => {
 
 const activeFilter = ref('all');
 
-// 从 entry 提取所有装备名称
+// 从 entry 提取所有装备名称：优先取原始 executor_options（包含所有候选装备）
 const allEquipNames = computed(() => {
   const names = new Set();
-  (props.entry?.executor_assignments || []).forEach((a) => {
-    names.add(a.executor_name);
+  // 原始可选装备列表
+  (props.entry?._raw?.executor_options || []).forEach((opt) => {
+    names.add(opt.executor_id?.replace('equipment:', '') || opt.executor_id);
   });
+  // 兜底：如果原始列表为空，从已分配记录取
+  if (names.size === 0) {
+    (props.entry?.executor_assignments || []).forEach((a) => {
+      names.add(a.executor_name);
+    });
+  }
   return Array.from(names);
 });
 
@@ -111,12 +118,18 @@ const allocationMap = ref(new Map());
 // 初始化分配状态（target_name 直接存储目标名称）
 const initAllocation = () => {
   const map = new Map();
+  // 先用所有可选装备初始化空 Set
+  allEquipNames.value.forEach((name) => {
+    map.set(name, new Set());
+  });
+  // 再填入已分配的目标
   (props.entry?.executor_assignments || []).forEach((a) => {
-    if (!map.has(a.executor_name)) {
-      map.set(a.executor_name, new Set());
-    }
     if (a.target_name && a.target_name.trim() !== '') {
-      map.get(a.executor_name).add(a.target_name);
+      const name = a.executor_name;
+      if (!map.has(name)) {
+        map.set(name, new Set());
+      }
+      map.get(name).add(a.target_name);
     }
   });
   allocationMap.value = map;

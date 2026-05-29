@@ -49,7 +49,7 @@ const getNotificationBaseURL = () => {
     return settings.notificationBaseURL;
   }
   try {
-    const url = new URL(settings.apiBaseURL || 'http://localhost:28000');
+    const url = new URL(settings.apiBaseURL || 'http://localhost:28600');
     url.port = '28004';
     return url.origin;
   } catch {
