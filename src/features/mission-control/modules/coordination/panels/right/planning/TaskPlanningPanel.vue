@@ -252,20 +252,14 @@
 
         <!-- 操作按钮 -->
         <div class="kill-chain-actions-bar">
-          <button class="planning-btn dispatch" type="button" @click="onDispatchKillChain">
-            下发
-          </button>
           <button class="planning-btn primary" type="button" @click="onAutoAllocate">
             自动分配
           </button>
-          <button class="planning-btn" type="button" @click="onEditKillChain">
-            编辑
+          <button class="planning-btn" type="button" @click="onSaveKillChain">
+            保存
           </button>
-          <button class="planning-btn" type="button" @click="onAddKillChainEntry">
-            新增
-          </button>
-          <button class="planning-btn danger" type="button" @click="onDeleteKillChainEntry">
-            删除
+          <button class="planning-btn primary" type="button" @click="onMapToPlan">
+            映射为行动方案
           </button>
         </div>
 
@@ -768,7 +762,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
 import {
-  missionsList, planCards, planDetail, STATE_LABELS, STATE_TONE,
+  missionsList, planDetail, STATE_LABELS, STATE_TONE,
 } from '../../../data/planningDataModel';
 import { RESOURCE_TAGS } from '../../../data/commandDataModel';
 import EditAssociationDialog from './EditAssociationDialog.vue';
@@ -783,6 +777,10 @@ import {
   manualAllocateKillChainEntry,
   updateKillChain,
   dispatchKillChain,
+  importResources,
+  commitResources,
+  generatePlanFromKillChain,
+  fetchActionSequencePlans,
 } from '../../../api/coordinationApi';
 
 const props = defineProps({
@@ -891,8 +889,11 @@ const loadKillChainList = async () => {
         resource_id: detail.resource_id || item.resource_id,
       };
     });
-    if (killChains.value.length && !selectedKillChainId.value) {
-      selectedKillChainId.value = killChains.value[0].kill_chain_id;
+    if (killChains.value.length) {
+      const exists = killChains.value.some((kc) => kc.kill_chain_id === selectedKillChainId.value);
+      if (!exists) {
+        selectedKillChainId.value = killChains.value[0].kill_chain_id;
+      }
     }
   }
   killChainLoading.value = false;
@@ -921,6 +922,7 @@ watch(selectedKillChainId, (id, oldId) => {
 
 onMounted(() => {
   loadKillChainList();
+  loadPlans();
 });
 
 // 杀伤链条目选择状态
@@ -954,12 +956,22 @@ const selectedMission = computed(() =>
   missions.find((m) => m.mission_id === selectedMissionId.value) || null
 );
 
-// ========== 方案列表（保留本地假数据） ==========
-const plans = planCards;
-const selectedPlanId = ref(plans[0]?.plan_id || '');
+// ========== 方案列表（从数据服务器获取） ==========
+const plans = ref([]);
+const selectedPlanId = ref('');
 const selectedPlan = computed(() =>
-  plans.find((p) => p.plan_id === selectedPlanId.value) || null
+  plans.value.find((p) => p.plan_id === selectedPlanId.value) || null
 );
+
+const loadPlans = async () => {
+  const result = await fetchActionSequencePlans();
+  if (result.ok) {
+    plans.value = result.data.items || [];
+    if (plans.value.length > 0 && !selectedPlanId.value) {
+      selectedPlanId.value = plans.value[0].plan_id;
+    }
+  }
+};
 
 const expandedStageIds = ref([]);
 const toggleStage = (stageId) => {
@@ -1120,6 +1132,74 @@ const onDispatchKillChain = async () => {
     await loadKillChainDetail(kcId);
   } else {
     appendSystemMessage(`下发失败：${result.error || result.data?.message || '未知错误'}`);
+  }
+};
+
+// 保存杀伤链：直接 PATCH 数据服务器，更新修改的字段
+const onSaveKillChain = async () => {
+  const kcId = selectedKillChainId.value;
+  const detail = currentKillChainDetail.value;
+  if (!kcId || !detail) {
+    appendSystemMessage('请先选择一个杀伤链');
+    return;
+  }
+
+  // 优先使用草稿数据（本地修改后的状态）
+  const draft = killChainDraftMap.value[kcId];
+  const dataToSave = draft ? JSON.parse(JSON.stringify(draft)) : JSON.parse(JSON.stringify(detail));
+
+  // 构造 PATCH body（只传变更字段）
+  const patchBody = {};
+  if (dataToSave.title !== undefined) patchBody.title = dataToSave.title;
+  if (dataToSave.description !== undefined) patchBody.description = dataToSave.description;
+  if (dataToSave.state !== undefined) patchBody.state = dataToSave.state;
+  if (dataToSave.raw_entries !== undefined) patchBody.raw_entries = dataToSave.raw_entries;
+  if (dataToSave.assigned_entries !== undefined) patchBody.assigned_entries = dataToSave.assigned_entries;
+  if (dataToSave.entries !== undefined) patchBody.raw_entries = dataToSave.entries;
+  if (dataToSave.target_ids !== undefined) patchBody.target_ids = dataToSave.target_ids;
+  if (dataToSave.resource_ids !== undefined) patchBody.resource_ids = dataToSave.resource_ids;
+
+  if (Object.keys(patchBody).length === 0) {
+    appendSystemMessage('没有需要保存的修改');
+    return;
+  }
+
+  appendSystemMessage('正在保存杀伤链…');
+  const result = await updateKillChain(kcId, patchBody);
+  if (result.ok) {
+    appendSystemMessage('杀伤链已保存');
+    delete killChainDraftMap.value[kcId];
+    await loadKillChainDetail(kcId);
+    await loadKillChainList();
+  } else {
+    appendSystemMessage(`保存失败：${result.error || result.data?.message || '未知错误'}`);
+  }
+};
+
+// 映射为行动方案：调用后端生成方案接口
+const onMapToPlan = async () => {
+  const kcId = selectedKillChainId.value;
+  const detail = currentKillChainDetail.value;
+  if (!kcId || !detail) {
+    appendSystemMessage('请先选择一个杀伤链');
+    return;
+  }
+
+  appendSystemMessage('正在将杀伤链映射为行动方案…');
+  const result = await generatePlanFromKillChain(kcId, {
+    selected_entry_ids: [],
+    plan_config: {
+      title: `${detail.title || kcId}_行动方案`,
+      description: `由杀伤链 ${kcId} 映射生成的行动方案`,
+    },
+  });
+  if (result.ok) {
+    const planId = result.data?.data?.plan_id || '';
+    appendSystemMessage(`行动方案已生成：${planId}`);
+    await loadKillChainList();
+    await loadPlans();
+  } else {
+    appendSystemMessage(`映射失败：${result.error || result.data?.message || '未知错误'}`);
   }
 };
 

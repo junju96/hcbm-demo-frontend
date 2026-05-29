@@ -57,6 +57,14 @@
               {{ controlLoading ? '处理中…' : '开始执行' }}
             </button>
             <button
+              class="as-btn primary"
+              type="button"
+              :disabled="controlLoading"
+              @click="onDispatch"
+            >
+              {{ controlLoading ? '处理中…' : '下发' }}
+            </button>
+            <button
               v-if="runtimeState === 'ACTIVE'"
               class="as-btn warn"
               type="button"
@@ -153,6 +161,7 @@ import {
   pauseActionSequence,
   resumeActionSequence,
   stopActionSequence,
+  dispatchActionSequence,
 } from '../../api/coordinationApi';
 
 const props = defineProps({
@@ -314,6 +323,21 @@ const onStop = async () => {
     appendSystemMessage('行动序列已停止并重置');
   } else {
     appendSystemMessage('停止失败: ' + (result.data?.message || result.error || '未知错误'));
+  }
+};
+
+const onDispatch = async () => {
+  controlLoading.value = true;
+  const result = await dispatchActionSequence(selectedPlanId.value, {
+    // 可在此扩展 vehicle_vmfs / vehicle_ips / tid / vehicle_topic
+    vehicle_topic: 'ZD04',
+  });
+  controlLoading.value = false;
+  if (result.ok) {
+    const data = result.data?.data || {};
+    appendSystemMessage(`行动序列已下发 | topic=${data.topic || ''} | tid=${data.mission_tid || ''}`);
+  } else {
+    appendSystemMessage('下发失败: ' + (result.data?.message || result.error || '未知错误'));
   }
 };
 

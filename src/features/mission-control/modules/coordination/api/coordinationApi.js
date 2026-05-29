@@ -195,6 +195,24 @@ export const deactivateKillChain = async (killChainId) => {
   return result;
 };
 
+/** 批量导入资源到 task_pool */
+export const importResources = async (resources, ignoreErrors = false) => {
+  const result = await postJson(
+    joinApiUrl('/api/v1/task_pool/ingestion/import'),
+    { resources, ignore_errors: ignoreErrors }
+  );
+  return result;
+};
+
+/** 提交 pending 资源 */
+export const commitResources = async (cacheKeys = []) => {
+  const result = await postJson(
+    joinApiUrl('/api/v1/task_pool/ingestion/commit'),
+    { cache_keys: cacheKeys }
+  );
+  return result;
+};
+
 /* ==================== 数据适配 ==================== */
 
 function adaptKillChainEntry(entry, parentRaw) {
@@ -373,6 +391,12 @@ export const resumeActionSequence = async (planId) => {
 /** 停止/重置 */
 export const stopActionSequence = async (planId) => {
   const result = await postJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}/stop`), {});
+  return result;
+};
+
+/** 下发行动序列到无人车（通过 Zenoh MissionService/send_mission） */
+export const dispatchActionSequence = async (planId, payload = {}) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}/dispatch`), payload);
   return result;
 };
 
