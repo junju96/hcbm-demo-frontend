@@ -188,6 +188,8 @@ import {
   resumeOperatorPlan,
   stopOperatorPlan,
   dispatchOperatorPlan,
+  batchAddMapObjects,
+  deleteMapObject,
 } from '../../api/coordinationApi';
 
 const props = defineProps({
@@ -212,6 +214,169 @@ const runtimeState = ref('SCHEDULED');
 const loadingPlans = ref(false);
 const loadingDetail = ref(false);
 const controlLoading = ref(false);
+
+/* ---------- 地图上图 ---------- */
+const currentMapObjectIds = ref([]);
+
+const VEHICLE_COLORS = [
+  '#22c55e', // 绿
+  '#3b82f6', // 蓝
+  '#f59e0b', // 橙
+  '#ef4444', // 红
+  '#8b5cf6', // 紫
+  '#06b6d4', // 青
+  '#ec4899', // 粉
+  '#84cc16', // 黄绿
+];
+
+const getVehicleColor = (vid, vehicleList) => {
+  const idx = vehicleList.findIndex((v) => v.vid === vid);
+  return VEHICLE_COLORS[idx % VEHICLE_COLORS.length];
+};
+
+const isValidWaypoints = (wps) => {
+  if (!Array.isArray(wps) || wps.length === 0) return false;
+  return wps.every((wp) => {
+    const lat = Number(wp?.latitude ?? wp?.lat);
+    const lon = Number(wp?.longitude ?? wp?.lon);
+    return !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0;
+  });
+};
+
+const sanitizeId = (s) => String(s || '').replace(/[:\/\s#%&?]+/g, '-');
+
+const buildLineObject = (action, planId, vid, color) => {
+  const wps = action.param?.waypoints || [];
+  if (!isValidWaypoints(wps) || wps.length < 2) return null;
+  const coordinates = wps.map((wp) => [
+    Number(wp.longitude ?? wp.lon),
+    Number(wp.latitude ?? wp.lat),
+    Number(wp.altitude ?? wp.alt ?? 0),
+  ]);
+  const uid = `as-${sanitizeId(planId)}-${sanitizeId(vid)}-${sanitizeId(action.action_id || action.action_seq)}-line`;
+  return {
+    unique_id: uid,
+    object_type: 'line',
+    object_subtype: 'standard_line',
+    name: `${vid} - ${action.name || ''}`,
+    color,
+    geometry: {
+      type: 'LineString',
+      coordinates,
+    },
+  };
+};
+
+const buildAreaObject = (action, planId, vid, color) => {
+  const wps = action.param?.waypoints || [];
+  if (!isValidWaypoints(wps) || wps.length < 3) return null;
+  const coordinates = wps.map((wp) => [
+    Number(wp.longitude ?? wp.lon),
+    Number(wp.latitude ?? wp.lat),
+    Number(wp.altitude ?? wp.alt ?? 0),
+  ]);
+  // Polygon 要求首尾闭合
+  if (
+    coordinates[0][0] !== coordinates[coordinates.length - 1][0] ||
+    coordinates[0][1] !== coordinates[coordinates.length - 1][1]
+  ) {
+    coordinates.push([...coordinates[0]]);
+  }
+  const uid = `as-${sanitizeId(planId)}-${sanitizeId(vid)}-${sanitizeId(action.action_id || action.action_seq)}-area`;
+  return {
+    unique_id: uid,
+    object_type: 'area',
+    object_subtype: 'polygon_area',
+    name: `${vid} - ${action.name || ''}`,
+    color,
+    geometry: {
+      type: 'Polygon',
+      coordinates: [coordinates],
+    },
+  };
+};
+
+const drawPlanOnMap = async (plan) => {
+  if (!plan) {
+    console.log('[MapDraw] drawPlanOnMap skipped: plan is null');
+    return;
+  }
+  const vehicleList = plan.vehicle_summary || [];
+  const items = [];
+  const ids = [];
+
+  console.log(`[MapDraw] start drawPlanOnMap, plan_id=${plan.plan_id}, vehicles=${vehicleList.length}`);
+
+  for (const vehicle of vehicleList) {
+    const color = getVehicleColor(vehicle.vid, vehicleList);
+    const actions = (vehicle.stages || []).flatMap((s) => s.actions || []);
+    console.log(`[MapDraw] vehicle=${vehicle.vid}, actions=${actions.length}`);
+
+    for (const action of actions) {
+      const atype = (action.action_type || '').toLowerCase();
+      const wps = action.param?.waypoints;
+      console.log(`[MapDraw]   action=${action.name}, action_type=${action.action_type}, waypoints=${wps?.length ?? 0}`);
+
+      if (atype === 'auto-move') {
+        const obj = buildLineObject(action, plan.plan_id, vehicle.vid, color);
+        if (obj) {
+          items.push(obj);
+          ids.push(obj.unique_id);
+          console.log(`[MapDraw]   -> line built, uid=${obj.unique_id}, coords=${obj.geometry.coordinates.length}`);
+        } else {
+          console.log(`[MapDraw]   -> line skipped (invalid waypoints)`);
+        }
+      } else if (atype === 'lens-recon') {
+        const obj = buildAreaObject(action, plan.plan_id, vehicle.vid, color);
+        if (obj) {
+          items.push(obj);
+          ids.push(obj.unique_id);
+          console.log(`[MapDraw]   -> area built, uid=${obj.unique_id}, coords=${obj.geometry.coordinates[0].length}`);
+        } else {
+          console.log(`[MapDraw]   -> area skipped (invalid waypoints, need >=3)`);
+        }
+      } else {
+        console.log(`[MapDraw]   -> ignored action_type=${atype}`);
+      }
+    }
+  }
+
+  console.log(`[MapDraw] total items to draw: ${items.length}`, items);
+
+  if (items.length === 0) {
+    console.log('[MapDraw] no drawable objects, skip batchAdd');
+    return;
+  }
+
+  console.log('[MapDraw] calling batchAddMapObjects...');
+  const result = await batchAddMapObjects(items);
+  console.log('[MapDraw] batchAddMapObjects result:', result);
+
+  if (result.ok) {
+    currentMapObjectIds.value = ids;
+    appendSystemMessage(`地图上图成功: ${items.length} 个对象`);
+    console.log('[MapDraw] success, stored uids:', ids);
+  } else {
+    appendSystemMessage('地图上图失败: ' + (result.error || '未知错误'));
+    console.log('[MapDraw] failed:', result.error);
+  }
+};
+
+const clearPlanOnMap = async () => {
+  const ids = currentMapObjectIds.value;
+  console.log(`[MapDraw] clearPlanOnMap, ids=${ids.length}`, ids);
+  if (ids.length === 0) return;
+  for (const uid of ids) {
+    try {
+      console.log(`[MapDraw] deleting uid=${uid}`);
+      const r = await deleteMapObject(uid);
+      console.log(`[MapDraw] delete result for ${uid}:`, r);
+    } catch (e) {
+      console.log(`[MapDraw] delete error for ${uid}:`, e);
+    }
+  }
+  currentMapObjectIds.value = [];
+};
 
 /* ---------- 计算属性 ---------- */
 const runtimeStateLabel = computed(() => {
@@ -312,6 +477,9 @@ const refreshDetail = async (planId) => {
 };
 
 const selectPlan = async (planId) => {
+  console.log(`[MapDraw] selectPlan called, planId=${planId}, isControlMode=${isControlMode.value}`);
+  // 切换 plan 时先清除旧地图对象
+  await clearPlanOnMap();
   selectedPlanId.value = planId;
   loadingDetail.value = true;
   // 协同席从协同席数据服务查详情，操控端从操控席数据服务查详情
@@ -319,9 +487,16 @@ const selectPlan = async (planId) => {
     ? await fetchOperatorPlanDetail(planId)
     : await fetchActionSequencePlanDetail(planId);
   loadingDetail.value = false;
+  console.log(`[MapDraw] selectPlan result.ok=${result.ok}, error=${result.error || 'none'}`);
   if (result.ok) {
     selectedPlan.value = result.data;
     runtimeState.value = result.data.runtime_state?.state || 'SCHEDULED';
+    const vs = result.data.vehicle_summary || [];
+    const firstAction = (vs[0]?.stages || [{}])[0]?.actions?.[0];
+    console.log('[MapDraw] selectPlan firstAction keys:', firstAction ? Object.keys(firstAction) : 'no actions');
+    console.log('[MapDraw] selectPlan firstAction action_type:', firstAction?.action_type);
+    // 新 plan 加载成功后自动上图
+    await drawPlanOnMap(selectedPlan.value);
   } else {
     selectedPlan.value = null;
     appendSystemMessage('获取方案详情失败: ' + (result.error || '未知错误'));
@@ -439,6 +614,25 @@ watch(selectedPlan, () => {
   updateMarqueeStates();
 });
 
+// 当 selectedPlan 数据刷新（自动刷新导致）时，重绘地图
+watch(
+  () => selectedPlan.value?.plan_id,
+  async (newPlanId, oldPlanId) => {
+    if (newPlanId && newPlanId === oldPlanId) {
+      // plan 内容刷新（同一 plan），重绘地图
+      await clearPlanOnMap();
+      await drawPlanOnMap(selectedPlan.value);
+    }
+  }
+);
+
+// 当无选中方案时，清空地图对象
+watch(selectedPlanId, async (newId) => {
+  if (!newId) {
+    await clearPlanOnMap();
+  }
+});
+
 /* ---------- 自动刷新 ---------- */
 let autoRefreshTimer = null;
 const startAutoRefresh = () => {
@@ -462,6 +656,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopAutoRefresh();
+  clearPlanOnMap();
 });
 </script>
 
@@ -767,7 +962,7 @@ onUnmounted(() => {
   align-items: stretch;
   gap: 0;
   overflow-x: auto;
-  padding: 0.4rem 0.2rem;
+  padding: 0.4rem 0.8rem;
   min-height: 120px;
 }
 
@@ -822,16 +1017,20 @@ onUnmounted(() => {
   border-color: rgba(0, 222, 200, 0.4);
 }
 
-/* 执行中 — 呼吸灯效果 */
+/* 执行中 — 呼吸灯效果（box-shadow 限制在卡片 margin 内，避免被父容器 overflow 裁切） */
 @keyframes breathe-active {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.3);
     border-color: rgba(59, 130, 246, 0.4);
   }
   50% {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.2);
-    border-color: rgba(59, 130, 246, 0.7);
+    box-shadow: 0 0 14px rgba(59, 130, 246, 0.55), 0 0 28px rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.75);
   }
+}
+
+.as-action-card {
+  margin: 3px; /* 给阴影留出溢出空间 */
 }
 
 .as-action-card.state-active {

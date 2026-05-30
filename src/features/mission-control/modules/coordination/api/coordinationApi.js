@@ -448,6 +448,28 @@ export const dispatchOperatorPlan = async (planId, payload = {}) => {
   return result;
 };
 
+/* ==================== 地图服务 API ==================== */
+
+const MAP_SERVICE_BASE_URL = 'http://25.11.1.180:28001';
+
+const joinMapUrl = (path) => {
+  const base = MAP_SERVICE_BASE_URL.replace(/\/+$/, '');
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  return `${base}/${normalizedPath}`;
+};
+
+/** 批量添加地图对象 */
+export const batchAddMapObjects = async (items) => {
+  const result = await postJson(joinMapUrl('/map/object/batch/add'), { items });
+  return result;
+};
+
+/** 删除单个地图对象 */
+export const deleteMapObject = async (uniqueId) => {
+  const result = await deleteJson(joinMapUrl(`/map/object/delete/${uniqueId}`));
+  return result;
+};
+
 /* ==================== 命令分解 / 更新（已有逻辑迁移至此） ==================== */
 
 export const COORDINATION_API_URLS = Object.freeze({
