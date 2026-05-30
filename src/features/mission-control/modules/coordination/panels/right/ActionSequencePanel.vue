@@ -47,50 +47,69 @@
             </div>
           </div>
           <div class="as-control-bar">
-            <button
-              v-if="runtimeState === 'SCHEDULED'"
-              class="as-btn primary"
-              type="button"
-              :disabled="controlLoading"
-              @click="onStart"
-            >
-              {{ controlLoading ? '处理中…' : '开始执行' }}
-            </button>
-            <button
-              class="as-btn primary"
-              type="button"
-              :disabled="controlLoading"
-              @click="onDispatch"
-            >
-              {{ controlLoading ? '处理中…' : '下发' }}
-            </button>
-            <button
-              v-if="runtimeState === 'ACTIVE'"
-              class="as-btn warn"
-              type="button"
-              :disabled="controlLoading"
-              @click="onPause"
-            >
-              {{ controlLoading ? '处理中…' : '暂停' }}
-            </button>
-            <button
-              v-if="runtimeState === 'PAUSED'"
-              class="as-btn primary"
-              type="button"
-              :disabled="controlLoading"
-              @click="onResume"
-            >
-              {{ controlLoading ? '处理中…' : '继续' }}
-            </button>
-            <button
-              v-if="runtimeState !== 'SCHEDULED'"
-              class="as-btn danger"
-              type="button"
-              :disabled="controlLoading"
-              @click="onStop"
-            >
-              {{ controlLoading ? '处理中…' : '停止' }}
-            </button>
+            <!-- 行动序列模块（协同席）：只保留下发按钮 -->
+            <template v-if="!isControlMode">
+              <button
+                class="as-btn primary"
+                type="button"
+                :disabled="controlLoading"
+                @click="onDispatch"
+              >
+                {{ controlLoading ? '处理中…' : '下发' }}
+              </button>
+            </template>
+
+            <!-- 操控端行动序列模块：下发 + 执行控制 -->
+            <template v-if="isControlMode">
+              <button
+                class="as-btn primary"
+                type="button"
+                :disabled="controlLoading"
+                @click="onDispatchActive"
+              >
+                {{ controlLoading ? '处理中…' : '下发' }}
+              </button>
+              <template v-if="runtimeState === 'SCHEDULED'">
+                <button
+                  class="as-btn primary"
+                  type="button"
+                  :disabled="controlLoading"
+                  @click="onStart"
+                >
+                  {{ controlLoading ? '处理中…' : '开始执行' }}
+                </button>
+              </template>
+              <template v-if="runtimeState === 'ACTIVE'">
+                <button
+                  class="as-btn warn"
+                  type="button"
+                  :disabled="controlLoading"
+                  @click="onPause"
+                >
+                  {{ controlLoading ? '处理中…' : '暂停' }}
+                </button>
+              </template>
+              <template v-if="runtimeState === 'PAUSED'">
+                <button
+                  class="as-btn primary"
+                  type="button"
+                  :disabled="controlLoading"
+                  @click="onResume"
+                >
+                  {{ controlLoading ? '处理中…' : '继续' }}
+                </button>
+              </template>
+              <template v-if="runtimeState !== 'SCHEDULED'">
+                <button
+                  class="as-btn danger"
+                  type="button"
+                  :disabled="controlLoading"
+                  @click="onStop"
+                >
+                  {{ controlLoading ? '处理中…' : '停止' }}
+                </button>
+              </template>
+            </template>
           </div>
         </div>
 
@@ -153,7 +172,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import {
   fetchActionSequencePlans,
   fetchActionSequencePlanDetail,
@@ -162,6 +181,13 @@ import {
   resumeActionSequence,
   stopActionSequence,
   dispatchActionSequence,
+  fetchOperatorPlans,
+  fetchOperatorPlanDetail,
+  startOperatorPlan,
+  pauseOperatorPlan,
+  resumeOperatorPlan,
+  stopOperatorPlan,
+  dispatchOperatorPlan,
 } from '../../api/coordinationApi';
 
 const props = defineProps({
@@ -173,6 +199,10 @@ const props = defineProps({
 const appendSystemMessage = (text) => {
   props.moduleApi.chat?.appendSystemMessage?.(`[行动序列] ${text}`);
 };
+
+/* ---------- 模式判断 ---------- */
+const subviewId = computed(() => props.moduleApi?.coordination?.activeSubviewId || '');
+const isControlMode = computed(() => subviewId.value === 'action-sequence-control');
 
 /* ---------- 状态 ---------- */
 const plans = ref([]);
@@ -242,15 +272,29 @@ const flattenActions = (vehicle) => {
     .sort((a, b) => (a.stage_seq - b.stage_seq) || ((a.action_seq || 0) - (b.action_seq || 0)));
 };
 
-const loadPlans = async () => {
-  loadingPlans.value = true;
-  const result = await fetchActionSequencePlans();
-  loadingPlans.value = false;
+const loadPlans = async (silent = false) => {
+  if (!silent) loadingPlans.value = true;
+  // 协同席从协同席数据服务查，操控端从操控席数据服务查
+  const result = isControlMode.value
+    ? await fetchOperatorPlans()
+    : await fetchActionSequencePlans();
+  if (!silent) loadingPlans.value = false;
   if (result.ok) {
+    const prevId = selectedPlanId.value;
     plans.value = result.data.items || [];
-    // 默认优先选中有行动序列的方案，否则选第一个
-    if (plans.value.length > 0 && !selectedPlanId.value) {
-      const withActions = plans.value.find(p => (p.stages_count || 0) > 0);
+
+    if (plans.value.length === 0) {
+      selectedPlanId.value = '';
+      selectedPlan.value = null;
+      return;
+    }
+
+    // 如果之前有选中项，检查是否还存在；不存在则自动选中第一项
+    const exists = plans.value.some((p) => p.plan_id === prevId);
+    if (exists && prevId) {
+      refreshDetail(prevId);
+    } else {
+      const withActions = plans.value.find((p) => (p.stages_count || 0) > 0);
       selectPlan((withActions || plans.value[0]).plan_id);
     }
   } else {
@@ -258,10 +302,22 @@ const loadPlans = async () => {
   }
 };
 
+const refreshDetail = async (planId) => {
+  if (!planId) return;
+  const result = await fetchActionSequencePlanDetail(planId);
+  if (result.ok) {
+    selectedPlan.value = result.data;
+    runtimeState.value = result.data.runtime_state?.state || 'SCHEDULED';
+  }
+};
+
 const selectPlan = async (planId) => {
   selectedPlanId.value = planId;
   loadingDetail.value = true;
-  const result = await fetchActionSequencePlanDetail(planId);
+  // 协同席从协同席数据服务查详情，操控端从操控席数据服务查详情
+  const result = isControlMode.value
+    ? await fetchOperatorPlanDetail(planId)
+    : await fetchActionSequencePlanDetail(planId);
   loadingDetail.value = false;
   if (result.ok) {
     selectedPlan.value = result.data;
@@ -280,7 +336,9 @@ const onRefresh = () => {
 
 const onStart = async () => {
   controlLoading.value = true;
-  const result = await startActionSequence(selectedPlanId.value);
+  const result = isControlMode.value
+    ? await startOperatorPlan(selectedPlanId.value)
+    : await startActionSequence(selectedPlanId.value);
   controlLoading.value = false;
   if (result.ok) {
     runtimeState.value = 'ACTIVE';
@@ -292,7 +350,9 @@ const onStart = async () => {
 
 const onPause = async () => {
   controlLoading.value = true;
-  const result = await pauseActionSequence(selectedPlanId.value);
+  const result = isControlMode.value
+    ? await pauseOperatorPlan(selectedPlanId.value)
+    : await pauseActionSequence(selectedPlanId.value);
   controlLoading.value = false;
   if (result.ok) {
     runtimeState.value = 'PAUSED';
@@ -304,7 +364,9 @@ const onPause = async () => {
 
 const onResume = async () => {
   controlLoading.value = true;
-  const result = await resumeActionSequence(selectedPlanId.value);
+  const result = isControlMode.value
+    ? await resumeOperatorPlan(selectedPlanId.value)
+    : await resumeActionSequence(selectedPlanId.value);
   controlLoading.value = false;
   if (result.ok) {
     runtimeState.value = 'ACTIVE';
@@ -316,7 +378,9 @@ const onResume = async () => {
 
 const onStop = async () => {
   controlLoading.value = true;
-  const result = await stopActionSequence(selectedPlanId.value);
+  const result = isControlMode.value
+    ? await stopOperatorPlan(selectedPlanId.value)
+    : await stopActionSequence(selectedPlanId.value);
   controlLoading.value = false;
   if (result.ok) {
     runtimeState.value = 'SCHEDULED';
@@ -327,9 +391,21 @@ const onStop = async () => {
 };
 
 const onDispatch = async () => {
+  // 协同席 — 将方案下发到操控席数据服务端
   controlLoading.value = true;
-  const result = await dispatchActionSequence(selectedPlanId.value, {
-    // 可在此扩展 vehicle_vmfs / vehicle_ips / tid / vehicle_topic
+  const result = await dispatchActionSequence(selectedPlanId.value, {});
+  controlLoading.value = false;
+  if (result.ok) {
+    appendSystemMessage('行动方案已下发到操控席');
+  } else {
+    appendSystemMessage('下发到操控席失败: ' + (result.data?.message || result.error || '未知错误'));
+  }
+};
+
+const onDispatchActive = async () => {
+  // 操控端行动序列模块：走 zenoh send_mission（操控端接口）
+  controlLoading.value = true;
+  const result = await dispatchOperatorPlan(selectedPlanId.value, {
     vehicle_topic: 'ZD04',
   });
   controlLoading.value = false;
@@ -363,10 +439,29 @@ watch(selectedPlan, () => {
   updateMarqueeStates();
 });
 
+/* ---------- 自动刷新 ---------- */
+let autoRefreshTimer = null;
+const startAutoRefresh = () => {
+  autoRefreshTimer = setInterval(() => {
+    loadPlans(true); // silent: 自动刷新不显示 loading，避免闪烁
+  }, 5000);
+};
+const stopAutoRefresh = () => {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer);
+    autoRefreshTimer = null;
+  }
+};
+
 /* ---------- 生命周期 ---------- */
 onMounted(() => {
   loadPlans();
   updateMarqueeStates();
+  startAutoRefresh();
+});
+
+onUnmounted(() => {
+  stopAutoRefresh();
 });
 </script>
 
@@ -727,10 +822,21 @@ onMounted(() => {
   border-color: rgba(0, 222, 200, 0.4);
 }
 
+/* 执行中 — 呼吸灯效果 */
+@keyframes breathe-active {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.7);
+  }
+}
+
 .as-action-card.state-active {
-  border-color: rgba(59, 130, 246, 0.45);
-  background: linear-gradient(180deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.03));
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.04));
+  animation: breathe-active 2s ease-in-out infinite;
 }
 
 .as-action-card.state-done {

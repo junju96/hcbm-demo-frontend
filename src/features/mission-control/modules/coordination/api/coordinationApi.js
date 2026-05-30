@@ -400,6 +400,54 @@ export const dispatchActionSequence = async (planId, payload = {}) => {
   return result;
 };
 
+/* ==================== 操控端行动序列 API ==================== */
+
+/** 操控端 — 获取行动方案列表 */
+export const fetchOperatorPlans = async () => {
+  const result = await getJson(joinApiUrl('/api/v1/action-sequences/operator/plans'));
+  if (!result.ok) return result;
+  const items = result.data?.data?.items || [];
+  return { ok: true, data: { items, total: result.data?.data?.total || 0 } };
+};
+
+/** 操控端 — 获取方案详情 */
+export const fetchOperatorPlanDetail = async (planId) => {
+  const result = await getJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}`));
+  if (!result.ok) return result;
+  const raw = result.data?.data || {};
+  return { ok: true, data: raw };
+};
+
+/** 操控端 — 开始执行 */
+export const startOperatorPlan = async (planId) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/start`), {});
+  return result;
+};
+
+/** 操控端 — 暂停执行 */
+export const pauseOperatorPlan = async (planId) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/pause`), {});
+  return result;
+};
+
+/** 操控端 — 继续执行 */
+export const resumeOperatorPlan = async (planId) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/resume`), {});
+  return result;
+};
+
+/** 操控端 — 停止/重置 */
+export const stopOperatorPlan = async (planId) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/stop`), {});
+  return result;
+};
+
+/** 操控端 — 下发到无人车（Zenoh send_mission） */
+export const dispatchOperatorPlan = async (planId, payload = {}) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/dispatch`), payload);
+  return result;
+};
+
 /* ==================== 命令分解 / 更新（已有逻辑迁移至此） ==================== */
 
 export const COORDINATION_API_URLS = Object.freeze({

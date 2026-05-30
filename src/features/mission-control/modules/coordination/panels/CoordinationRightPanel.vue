@@ -51,6 +51,14 @@
         :panel-definition="panelDefinition"
       />
 
+      <ActionSequencePanel
+        v-else-if="activeSubviewId === 'action-sequence-control'"
+        key="action-sequence-control"
+        :module-api="moduleApi"
+        :module-manifest="moduleManifest"
+        :panel-definition="panelDefinition"
+      />
+
       <div v-else key="placeholder" class="coord-placeholder">
         <div class="coord-pane-title">{{ activeSubviewTitle }}</div>
         <div class="coord-pane-subtitle">当前子面板暂未接入详细界面。</div>
