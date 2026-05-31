@@ -419,26 +419,30 @@ export const fetchOperatorPlanDetail = async (planId) => {
 };
 
 /** 操控端 — 开始执行 */
-export const startOperatorPlan = async (planId) => {
-  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/start`), {});
+export const startOperatorPlan = async (planId, vehicleVid = null) => {
+  const qs = vehicleVid ? `?vehicle_vid=${encodeURIComponent(vehicleVid)}` : '';
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/start${qs}`), {});
   return result;
 };
 
 /** 操控端 — 暂停执行 */
-export const pauseOperatorPlan = async (planId) => {
-  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/pause`), {});
+export const pauseOperatorPlan = async (planId, vehicleVid = null) => {
+  const qs = vehicleVid ? `?vehicle_vid=${encodeURIComponent(vehicleVid)}` : '';
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/pause${qs}`), {});
   return result;
 };
 
 /** 操控端 — 继续执行 */
-export const resumeOperatorPlan = async (planId) => {
-  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/resume`), {});
+export const resumeOperatorPlan = async (planId, vehicleVid = null) => {
+  const qs = vehicleVid ? `?vehicle_vid=${encodeURIComponent(vehicleVid)}` : '';
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/resume${qs}`), {});
   return result;
 };
 
 /** 操控端 — 停止/重置 */
-export const stopOperatorPlan = async (planId) => {
-  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/stop`), {});
+export const stopOperatorPlan = async (planId, vehicleVid = null) => {
+  const qs = vehicleVid ? `?vehicle_vid=${encodeURIComponent(vehicleVid)}` : '';
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/stop${qs}`), {});
   return result;
 };
 

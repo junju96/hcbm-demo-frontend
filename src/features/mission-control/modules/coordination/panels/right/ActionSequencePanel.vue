@@ -168,6 +168,38 @@
         <div v-if="loadingDetail" class="as-loading-detail">加载详情中…</div>
       </div>
     </div>
+
+    <!-- 车辆选择弹窗 -->
+    <div v-if="showVehicleDialog" class="as-dialog-overlay" @click.self="showVehicleDialog = false">
+      <div class="as-dialog">
+        <div class="as-dialog-header">选择控制车辆</div>
+        <div class="as-dialog-body">
+          <label class="as-dialog-item">
+            <input
+              type="checkbox"
+              :checked="selectedVehicleVids.length === getUgvVehicles().length && getUgvVehicles().length > 0"
+              @change="toggleSelectAll"
+            />
+            <span>全部车辆</span>
+          </label>
+          <label v-for="v in getUgvVehicles()" :key="v.vid" class="as-dialog-item">
+            <input type="checkbox" :value="v.vid" v-model="selectedVehicleVids" />
+            <span>{{ v.vid }} {{ v.resource_type ? '(' + v.resource_type + ')' : '' }}</span>
+          </label>
+        </div>
+        <div class="as-dialog-footer">
+          <button class="as-btn" type="button" @click="showVehicleDialog = false">取消</button>
+          <button
+            class="as-btn primary"
+            type="button"
+            :disabled="selectedVehicleVids.length === 0"
+            @click="confirmVehicleSelection"
+          >
+            确认
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -214,6 +246,11 @@ const runtimeState = ref('SCHEDULED');
 const loadingPlans = ref(false);
 const loadingDetail = ref(false);
 const controlLoading = ref(false);
+
+/* ---------- 多车控制弹窗 ---------- */
+const showVehicleDialog = ref(false);
+const pendingControlAction = ref('');
+const selectedVehicleVids = ref([]);
 
 /* ---------- 地图上图 ---------- */
 const currentMapObjectIds = ref([]);
@@ -509,60 +546,92 @@ const onRefresh = () => {
   appendSystemMessage('已刷新');
 };
 
-const onStart = async () => {
+const onStart = async () => { handleControlAction('start'); };
+const onPause = async () => { handleControlAction('pause'); };
+const onResume = async () => { handleControlAction('resume'); };
+const onStop = async () => { handleControlAction('stop'); };
+
+const getUgvVehicles = () => {
+  const all = selectedPlan.value?.vehicle_summary || [];
+  // 过滤 resource_type 为 UGV 的；若无 resource_type 字段则全部视为 UGV（兼容旧数据）
+  const ugvs = all.filter((v) => !v.resource_type || v.resource_type === 'UGV');
+  return ugvs;
+};
+
+const handleControlAction = (actionType) => {
+  const ugvs = getUgvVehicles();
+  if (ugvs.length <= 1) {
+    // 单车直接执行（也覆盖 0 辆车时的空操作）
+    executeControl(actionType, ugvs.map((v) => v.vid));
+    return;
+  }
+  // 多车打开弹窗
+  pendingControlAction.value = actionType;
+  selectedVehicleVids.value = ugvs.map((v) => v.vid); // 默认全选
+  showVehicleDialog.value = true;
+};
+
+const executeControl = async (actionType, vids) => {
+  if (!vids || vids.length === 0) return;
   controlLoading.value = true;
-  const result = isControlMode.value
-    ? await startOperatorPlan(selectedPlanId.value)
-    : await startActionSequence(selectedPlanId.value);
-  controlLoading.value = false;
-  if (result.ok) {
-    runtimeState.value = 'ACTIVE';
-    appendSystemMessage('行动序列已开始执行');
-  } else {
-    appendSystemMessage('开始失败: ' + (result.data?.message || result.error || '未知错误'));
+  try {
+    const planId = selectedPlanId.value;
+    let apiFn;
+    let successState;
+    let successMsg;
+    switch (actionType) {
+      case 'start':
+        apiFn = isControlMode.value ? startOperatorPlan : startActionSequence;
+        successState = 'ACTIVE';
+        successMsg = '行动序列已开始执行';
+        break;
+      case 'pause':
+        apiFn = isControlMode.value ? pauseOperatorPlan : pauseActionSequence;
+        successState = 'PAUSED';
+        successMsg = '行动序列已暂停';
+        break;
+      case 'resume':
+        apiFn = isControlMode.value ? resumeOperatorPlan : resumeActionSequence;
+        successState = 'ACTIVE';
+        successMsg = '行动序列已继续';
+        break;
+      case 'stop':
+        apiFn = isControlMode.value ? stopOperatorPlan : stopActionSequence;
+        successState = 'SCHEDULED';
+        successMsg = '行动序列已停止并重置';
+        break;
+    }
+    // 多车并行调用，单车直接调用
+    const results = await Promise.all(vids.map((vid) => apiFn(planId, vid)));
+    const allOk = results.every((r) => r.ok);
+    if (allOk) {
+      runtimeState.value = successState;
+      appendSystemMessage(
+        `${successMsg} (${vids.length > 1 ? vids.length + '辆车' : vids[0]})`
+      );
+    } else {
+      const errs = results
+        .filter((r) => !r.ok)
+        .map((r) => r.data?.message || r.error)
+        .join(', ');
+      appendSystemMessage(`${successMsg}失败: ${errs}`);
+    }
+  } finally {
+    controlLoading.value = false;
   }
 };
 
-const onPause = async () => {
-  controlLoading.value = true;
-  const result = isControlMode.value
-    ? await pauseOperatorPlan(selectedPlanId.value)
-    : await pauseActionSequence(selectedPlanId.value);
-  controlLoading.value = false;
-  if (result.ok) {
-    runtimeState.value = 'PAUSED';
-    appendSystemMessage('行动序列已暂停');
+const toggleSelectAll = (e) => {
+  if (e.target.checked) {
+    selectedVehicleVids.value = getUgvVehicles().map((v) => v.vid);
   } else {
-    appendSystemMessage('暂停失败: ' + (result.data?.message || result.error || '未知错误'));
+    selectedVehicleVids.value = [];
   }
 };
 
-const onResume = async () => {
-  controlLoading.value = true;
-  const result = isControlMode.value
-    ? await resumeOperatorPlan(selectedPlanId.value)
-    : await resumeActionSequence(selectedPlanId.value);
-  controlLoading.value = false;
-  if (result.ok) {
-    runtimeState.value = 'ACTIVE';
-    appendSystemMessage('行动序列已继续');
-  } else {
-    appendSystemMessage('继续失败: ' + (result.data?.message || result.error || '未知错误'));
-  }
-};
-
-const onStop = async () => {
-  controlLoading.value = true;
-  const result = isControlMode.value
-    ? await stopOperatorPlan(selectedPlanId.value)
-    : await stopActionSequence(selectedPlanId.value);
-  controlLoading.value = false;
-  if (result.ok) {
-    runtimeState.value = 'SCHEDULED';
-    appendSystemMessage('行动序列已停止并重置');
-  } else {
-    appendSystemMessage('停止失败: ' + (result.data?.message || result.error || '未知错误'));
-  }
+const confirmVehicleSelection = () => {
+  showVehicleDialog.value = false;
+  executeControl(pendingControlAction.value, selectedVehicleVids.value);
 };
 
 const onDispatch = async () => {
@@ -1162,6 +1231,77 @@ onUnmounted(() => {
   text-align: center;
   color: rgba(226, 246, 248, 0.6);
   font-size: 0.9rem;
+}
+
+/* 车辆选择弹窗 */
+.as-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.as-dialog {
+  background: linear-gradient(180deg, rgba(0, 32, 40, 0.96), rgba(0, 16, 22, 0.98));
+  border: 1px solid rgba(0, 222, 200, 0.35);
+  border-radius: 12px;
+  min-width: 280px;
+  max-width: 400px;
+  color: var(--as-text);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.as-dialog-header {
+  padding: 0.85rem 1rem;
+  font-weight: 800;
+  font-size: 1rem;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.15);
+  color: #f7fdff;
+}
+
+.as-dialog-body {
+  padding: 0.7rem 1rem;
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.as-dialog-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: color 120ms ease;
+}
+
+.as-dialog-item:hover {
+  color: #fff;
+}
+
+.as-dialog-item input[type='checkbox'] {
+  accent-color: var(--as-accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.as-dialog-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(0, 222, 200, 0.15);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
 }
 
 @media (max-width: 900px) {
