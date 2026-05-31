@@ -41,7 +41,7 @@
             <div class="as-detail-title">{{ selectedPlan.title || selectedPlan.plan_id }}</div>
             <div class="as-detail-desc">{{ selectedPlan.description || '暂无描述' }}</div>
             <div class="as-detail-meta">
-              <span>状态: <strong>{{ runtimeStateLabel }}</strong></span>
+              <span>状态: <strong>{{ stateLabel(selectedPlan.state) }}</strong></span>
               <span>阶段: {{ (selectedPlan.stages || []).length }}</span>
               <span>编组: {{ (selectedPlan.teams || []).length }}</span>
             </div>
