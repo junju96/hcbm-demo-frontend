@@ -464,7 +464,16 @@ const joinMapUrl = (path) => {
 
 /** 批量添加地图对象 */
 export const batchAddMapObjects = async (items) => {
-  const result = await postJson(joinMapUrl('/map/object/batch/add'), { items });
+  const url = joinMapUrl('/map/object/batch/add');
+  console.log('[MAP-API] ====== 地图上图请求 ======');
+  console.log(`[MAP-API] URL=${url}`);
+  console.log(`[MAP-API] items_count=${items.length}`);
+  console.log(`[MAP-API] items=${JSON.stringify(items, null, 2)}`);
+  const result = await postJson(url, { items });
+  console.log(`[MAP-API] response.ok=${result.ok}`);
+  console.log(`[MAP-API] response.data=${JSON.stringify(result.data, null, 2)}`);
+  console.log(`[MAP-API] response.error=${result.error}`);
+  console.log('[MAP-API] ====== 地图上图结束 ======');
   return result;
 };
 

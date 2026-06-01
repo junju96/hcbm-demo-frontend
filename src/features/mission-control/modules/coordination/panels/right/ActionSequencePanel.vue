@@ -123,7 +123,7 @@
               class="as-vehicle-card"
             >
               <div class="as-vehicle-header">
-                <span class="as-vehicle-name">{{ vehicle.vid }}</span>
+                <span class="as-vehicle-name">{{ vehicle.vid?.replace('equipment:', '') || vehicle.vid }}</span>
                 <span class="as-vehicle-count">{{ vehicle.total_actions }} 个行动</span>
               </div>
               <div class="as-action-cards">
@@ -169,7 +169,7 @@
       </div>
     </div>
 
-    <!-- 车辆选择弹窗 -->
+    <!-- 车辆选择弹窗（多车控制用：开始/暂停/继续/停止） -->
     <div v-if="showVehicleDialog" class="as-dialog-overlay" @click.self="showVehicleDialog = false">
       <div class="as-dialog">
         <div class="as-dialog-header">选择控制车辆</div>
@@ -184,7 +184,7 @@
           </label>
           <label v-for="v in getUgvVehicles()" :key="v.vid" class="as-dialog-item">
             <input type="checkbox" :value="v.vid" v-model="selectedVehicleVids" />
-            <span>{{ v.vid }} {{ v.resource_type ? '(' + v.resource_type + ')' : '' }}</span>
+            <span>{{ v.vid?.replace('equipment:', '') || v.vid }} {{ v.resource_type ? '(' + v.resource_type + ')' : '' }}</span>
           </label>
         </div>
         <div class="as-dialog-footer">
@@ -196,6 +196,30 @@
             @click="confirmVehicleSelection"
           >
             确认
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 下发车辆选择弹窗（单选：一次只能下发一辆车） -->
+    <div v-if="showDispatchVehicleDialog" class="as-dialog-overlay" @click.self="cancelDispatchVehicleSelection">
+      <div class="as-dialog">
+        <div class="as-dialog-header">选择要下发的车辆</div>
+        <div class="as-dialog-body">
+          <label v-for="v in getAllVehicles()" :key="v.vid" class="as-dialog-item">
+            <input type="radio" :value="v.vid" v-model="selectedDispatchVid" />
+            <span>{{ v.vid?.replace('equipment:', '') || v.vid }} {{ v.resource_type ? '(' + v.resource_type + ')' : '' }} — {{ v.total_actions || 0 }} 个行动</span>
+          </label>
+        </div>
+        <div class="as-dialog-footer">
+          <button class="as-btn" type="button" @click="cancelDispatchVehicleSelection">取消</button>
+          <button
+            class="as-btn primary"
+            type="button"
+            :disabled="!selectedDispatchVid"
+            @click="confirmDispatchVehicleSelection"
+          >
+            确认下发
           </button>
         </div>
       </div>
@@ -252,6 +276,10 @@ const showVehicleDialog = ref(false);
 const pendingControlAction = ref('');
 const selectedVehicleVids = ref([]);
 
+/* ---------- 操控端下发弹窗（单选） ---------- */
+const showDispatchVehicleDialog = ref(false);
+const selectedDispatchVid = ref('');
+
 /* ---------- 地图上图 ---------- */
 const currentMapObjectIds = ref([]);
 
@@ -280,16 +308,49 @@ const isValidWaypoints = (wps) => {
   });
 };
 
+const isValidPoint = (pt) => {
+  if (!pt || typeof pt !== 'object') return false;
+  const lat = Number(pt?.latitude ?? pt?.lat);
+  const lon = Number(pt?.longitude ?? pt?.lon);
+  return !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0;
+};
+
+/**
+ * 从 action.param 中提取坐标点列表
+ * 兼容 waypoints(列表) / recon_position / fire_position / target_position / position(单点)
+ */
+const extractCoordinates = (param) => {
+  if (!param || typeof param !== 'object') return [];
+  // 1) 优先 waypoints 列表
+  const wps = param.waypoints;
+  if (Array.isArray(wps) && wps.length > 0) {
+    return wps.filter(isValidPoint).map((wp) => ({
+      lon: Number(wp.longitude ?? wp.lon),
+      lat: Number(wp.latitude ?? wp.lat),
+      alt: Number(wp.altitude ?? wp.alt ?? 0),
+    }));
+  }
+  // 2) 尝试单点坐标字段
+  const keys = ['recon_position', 'fire_position', 'target_position', 'position'];
+  for (const key of keys) {
+    const pt = param[key];
+    if (isValidPoint(pt)) {
+      return [{
+        lon: Number(pt.longitude ?? pt.lon),
+        lat: Number(pt.latitude ?? pt.lat),
+        alt: Number(pt.altitude ?? pt.alt ?? 0),
+      }];
+    }
+  }
+  return [];
+};
+
 const sanitizeId = (s) => String(s || '').replace(/[:\/\s#%&?]+/g, '-');
 
 const buildLineObject = (action, planId, vid, color) => {
-  const wps = action.param?.waypoints || [];
-  if (!isValidWaypoints(wps) || wps.length < 2) return null;
-  const coordinates = wps.map((wp) => [
-    Number(wp.longitude ?? wp.lon),
-    Number(wp.latitude ?? wp.lat),
-    Number(wp.altitude ?? wp.alt ?? 0),
-  ]);
+  const points = extractCoordinates(action.param);
+  if (points.length < 2) return null;
+  const coordinates = points.map((p) => [p.lon, p.lat, p.alt]);
   const uid = `as-${sanitizeId(planId)}-${sanitizeId(vid)}-${sanitizeId(action.action_id || action.action_seq)}-line`;
   return {
     unique_id: uid,
@@ -305,13 +366,9 @@ const buildLineObject = (action, planId, vid, color) => {
 };
 
 const buildAreaObject = (action, planId, vid, color) => {
-  const wps = action.param?.waypoints || [];
-  if (!isValidWaypoints(wps) || wps.length < 3) return null;
-  const coordinates = wps.map((wp) => [
-    Number(wp.longitude ?? wp.lon),
-    Number(wp.latitude ?? wp.lat),
-    Number(wp.altitude ?? wp.alt ?? 0),
-  ]);
+  const points = extractCoordinates(action.param);
+  if (points.length < 3) return null;
+  const coordinates = points.map((p) => [p.lon, p.lat, p.alt]);
   // Polygon 要求首尾闭合
   if (
     coordinates[0][0] !== coordinates[coordinates.length - 1][0] ||
@@ -558,6 +615,11 @@ const getUgvVehicles = () => {
   return ugvs;
 };
 
+const getAllVehicles = () => {
+  // 下发时列出所有车辆，不限于 UGV
+  return selectedPlan.value?.vehicle_summary || [];
+};
+
 const handleControlAction = (actionType) => {
   const ugvs = getUgvVehicles();
   if (ugvs.length <= 1) {
@@ -601,13 +663,14 @@ const executeControl = async (actionType, vids) => {
         successMsg = '行动序列已停止并重置';
         break;
     }
-    // 多车并行调用，单车直接调用
-    const results = await Promise.all(vids.map((vid) => apiFn(planId, vid)));
+    // 多车并行调用，单车直接调用（去掉 equipment: 前缀）
+    const results = await Promise.all(vids.map((vid) => apiFn(planId, vid?.replace('equipment:', '') || vid)));
     const allOk = results.every((r) => r.ok);
     if (allOk) {
       runtimeState.value = successState;
+      const cleanVids = vids.map((v) => v?.replace('equipment:', '') || v);
       appendSystemMessage(
-        `${successMsg} (${vids.length > 1 ? vids.length + '辆车' : vids[0]})`
+        `${successMsg} (${cleanVids.length > 1 ? cleanVids.length + '辆车' : cleanVids[0]})`
       );
     } else {
       const errs = results
@@ -648,17 +711,58 @@ const onDispatch = async () => {
 
 const onDispatchActive = async () => {
   // 操控端行动序列模块：走 zenoh send_mission（操控端接口）
+  const vehicles = getAllVehicles();
+  if (vehicles.length > 1) {
+    // 多车时弹出单选框，一次只能下发一辆车
+    selectedDispatchVid.value = '';
+    showDispatchVehicleDialog.value = true;
+    return;
+  }
+  // 单车直接下发
+  const vid = vehicles[0]?.vid || '';
+  await doDispatchActive(vid);
+};
+
+const doDispatchActive = async (vehicleVid) => {
+  if (!vehicleVid) {
+    appendSystemMessage('下发失败: 未指定车辆');
+    return;
+  }
   controlLoading.value = true;
-  const result = await dispatchOperatorPlan(selectedPlanId.value, {
-    vehicle_topic: 'ZD04',
-  });
+
+  // 在终端打印下发报文详细日志
+  console.log('[DISPATCH-FRONT] ====== 操控端下发请求 ======');
+  console.log(`[DISPATCH-FRONT] plan_id=${selectedPlanId.value}`);
+  console.log(`[DISPATCH-FRONT] vehicle_vid=${vehicleVid}`);
+
+  // 去掉 equipment: 前缀（如 equipment:XL01 → XL01）
+  const cleanVid = String(vehicleVid).replace('equipment:', '');
+  const payload = { vehicle_vid: cleanVid };
+  console.log(`[DISPATCH-FRONT] payload=${JSON.stringify(payload, null, 2)}`);
+
+  const result = await dispatchOperatorPlan(selectedPlanId.value, payload);
+
+  console.log(`[DISPATCH-FRONT] response.ok=${result.ok}`);
+  console.log(`[DISPATCH-FRONT] response.data=`, result.data);
+  console.log('[DISPATCH-FRONT] ====== 下发请求结束 ======');
+
   controlLoading.value = false;
   if (result.ok) {
     const data = result.data?.data || {};
-    appendSystemMessage(`行动序列已下发 | topic=${data.topic || ''} | tid=${data.mission_tid || ''}`);
+    appendSystemMessage(`行动序列已下发 | vehicle=${data.vehicle_vid || vehicleVid} | topic=${data.topic || ''} | tid=${data.mission_tid || ''}`);
   } else {
     appendSystemMessage('下发失败: ' + (result.data?.message || result.error || '未知错误'));
   }
+};
+
+const confirmDispatchVehicleSelection = () => {
+  showDispatchVehicleDialog.value = false;
+  doDispatchActive(selectedDispatchVid.value);
+};
+
+const cancelDispatchVehicleSelection = () => {
+  showDispatchVehicleDialog.value = false;
+  selectedDispatchVid.value = '';
 };
 
 /* ---------- 跑马灯溢出检测 ---------- */
@@ -701,6 +805,22 @@ watch(selectedPlanId, async (newId) => {
     await clearPlanOnMap();
   }
 });
+
+// 全部行动完成后，自动重置控制按钮状态
+watch(
+  selectedPlan,
+  (newPlan) => {
+    if (!newPlan || runtimeState.value !== 'ACTIVE') return;
+    const allActions = (newPlan.vehicle_summary || []).flatMap((v) =>
+      (v.stages || []).flatMap((s) => s.actions || [])
+    );
+    if (allActions.length > 0 && allActions.every((a) => a.state === 'DONE')) {
+      runtimeState.value = 'SCHEDULED';
+      appendSystemMessage('全部行动已完成，控制按钮已重置为开始执行');
+    }
+  },
+  { deep: true }
+);
 
 /* ---------- 自动刷新 ---------- */
 let autoRefreshTimer = null;
@@ -1288,7 +1408,8 @@ onUnmounted(() => {
   color: #fff;
 }
 
-.as-dialog-item input[type='checkbox'] {
+.as-dialog-item input[type='checkbox'],
+.as-dialog-item input[type='radio'] {
   accent-color: var(--as-accent);
   width: 16px;
   height: 16px;

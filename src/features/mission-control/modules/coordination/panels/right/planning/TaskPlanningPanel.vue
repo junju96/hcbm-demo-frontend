@@ -611,7 +611,7 @@
                 :style="{ gridTemplateColumns: `56px ${planDraft.stages.map((_, i) => i < planDraft.stages.length - 1 ? 'minmax(180px, 1fr) 2px' : 'minmax(180px, 1fr)').join(' ')}` }"
               >
                 <template v-for="vid in team.equipment" :key="vid">
-                  <div class="swimlane-vehicle-cell"><span class="swimlane-vid">{{ vid }}</span></div>
+                  <div class="swimlane-vehicle-cell"><span class="swimlane-vid">{{ vid?.replace('equipment:', '') || vid }}</span></div>
                   <template v-for="(stage, sIndex) in planDraft.stages" :key="stage.stage_id">
                     <div class="swimlane-stage-cell" :class="`swimlane-stage-col-${sIndex % 4}`">
                       <div v-if="getVehicleStageActions(vid, stage).length" class="swimlane-action-list">
