@@ -59,7 +59,7 @@
               </button>
             </template>
 
-            <!-- 操控端行动序列模块：下发 + 执行控制 -->
+            <!-- 操控端行动序列模块：只保留下发按钮，单车控制按钮放在各车卡片上 -->
             <template v-if="isControlMode">
               <button
                 class="as-btn primary"
@@ -69,46 +69,6 @@
               >
                 {{ controlLoading ? '处理中…' : '下发' }}
               </button>
-              <template v-if="runtimeState === 'SCHEDULED'">
-                <button
-                  class="as-btn primary"
-                  type="button"
-                  :disabled="controlLoading"
-                  @click="onStart"
-                >
-                  {{ controlLoading ? '处理中…' : '开始执行' }}
-                </button>
-              </template>
-              <template v-if="runtimeState === 'ACTIVE'">
-                <button
-                  class="as-btn warn"
-                  type="button"
-                  :disabled="controlLoading"
-                  @click="onPause"
-                >
-                  {{ controlLoading ? '处理中…' : '暂停' }}
-                </button>
-              </template>
-              <template v-if="runtimeState === 'PAUSED'">
-                <button
-                  class="as-btn primary"
-                  type="button"
-                  :disabled="controlLoading"
-                  @click="onResume"
-                >
-                  {{ controlLoading ? '处理中…' : '继续' }}
-                </button>
-              </template>
-              <template v-if="runtimeState !== 'SCHEDULED'">
-                <button
-                  class="as-btn danger"
-                  type="button"
-                  :disabled="controlLoading"
-                  @click="onStop"
-                >
-                  {{ controlLoading ? '处理中…' : '停止' }}
-                </button>
-              </template>
             </template>
           </div>
         </div>
@@ -124,7 +84,24 @@
             >
               <div class="as-vehicle-header">
                 <span class="as-vehicle-name">{{ vehicle.vid?.replace('equipment:', '') || vehicle.vid }}</span>
-                <span class="as-vehicle-count">{{ vehicle.total_actions }} 个行动</span>
+                <div class="as-vehicle-controls" v-if="isControlMode">
+                  <template v-if="getVehicleRuntimeState(vehicle) === 'SCHEDULED'">
+                    <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('start', [vehicle.vid])">开始</button>
+                  </template>
+                  <template v-if="getVehicleRuntimeState(vehicle) === 'ACTIVE'">
+                    <button class="as-btn mini warn" type="button" :disabled="controlLoading" @click="executeControl('pause', [vehicle.vid])">暂停</button>
+                  </template>
+                  <template v-if="getVehicleRuntimeState(vehicle) === 'PAUSED'">
+                    <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('resume', [vehicle.vid])">继续</button>
+                  </template>
+                  <template v-if="getVehicleRuntimeState(vehicle) === 'DONE'">
+                    <span class="as-state-badge done">已完成</span>
+                  </template>
+                  <template v-if="['ACTIVE', 'PAUSED'].includes(getVehicleRuntimeState(vehicle))">
+                    <button class="as-btn mini danger" type="button" :disabled="controlLoading" @click="executeControl('stop', [vehicle.vid])">停止</button>
+                  </template>
+                </div>
+                <span v-else class="as-vehicle-count">{{ vehicle.total_actions }} 个行动</span>
               </div>
               <div class="as-action-cards">
                 <template v-for="(action, idx) in flattenActions(vehicle)" :key="action.action_id || `${action.stage_id}-${idx}`">
@@ -246,6 +223,8 @@ import {
   dispatchOperatorPlan,
   batchAddMapObjects,
   deleteMapObject,
+  batchAddRouteDisplay,
+  batchDeleteRouteDisplay,
 } from '../../api/coordinationApi';
 
 const props = defineProps({
@@ -266,7 +245,8 @@ const isControlMode = computed(() => subviewId.value === 'action-sequence-contro
 const plans = ref([]);
 const selectedPlanId = ref('');
 const selectedPlan = ref(null);
-const runtimeState = ref('SCHEDULED');
+// 每辆车独立的运行时状态 { [vid]: 'SCHEDULED' | 'ACTIVE' | 'PAUSED' }
+const vehicleRuntimeStates = ref({});
 const loadingPlans = ref(false);
 const loadingDetail = ref(false);
 const controlLoading = ref(false);
@@ -281,17 +261,19 @@ const showDispatchVehicleDialog = ref(false);
 const selectedDispatchVid = ref('');
 
 /* ---------- 地图上图 ---------- */
-const currentMapObjectIds = ref([]);
+const currentMapObjectIds = ref([]);   // area / circle 对象 id
+const currentRouteIds = ref([]);        // 路线临时显示 id
 
+// 色轮均匀分布，确保相邻车辆颜色差异足够大
 const VEHICLE_COLORS = [
-  '#22c55e', // 绿
-  '#3b82f6', // 蓝
-  '#f59e0b', // 橙
-  '#ef4444', // 红
-  '#8b5cf6', // 紫
-  '#06b6d4', // 青
-  '#ec4899', // 粉
-  '#84cc16', // 黄绿
+  '#ff3333', // 红
+  '#00e5ff', // 青  ← 与红相隔180°，对比最强
+  '#ff8800', // 橙
+  '#2979ff', // 蓝
+  '#ffea00', // 黄
+  '#aa00ff', // 紫
+  '#00e676', // 绿
+  '#ff4081', // 粉
 ];
 
 const getVehicleColor = (vid, vehicleList) => {
@@ -365,6 +347,18 @@ const buildLineObject = (action, planId, vid, color) => {
   };
 };
 
+// 构建路线临时显示 item（用于 /map/route/display/batch/add）
+const buildRouteDisplayItem = (action, planId, vid, color) => {
+  const points = extractCoordinates(action.param);
+  if (points.length < 2) return null;
+  const uid = `as-${sanitizeId(planId)}-${sanitizeId(vid)}-${sanitizeId(action.action_id || action.action_seq)}-route`;
+  return {
+    unique_id: uid,
+    points: points.map((p) => ({ lat: p.lat, lng: p.lon, alt: p.alt })),
+    color,
+  };
+};
+
 const buildAreaObject = (action, planId, vid, color) => {
   const points = extractCoordinates(action.param);
   if (points.length < 3) return null;
@@ -390,14 +384,39 @@ const buildAreaObject = (action, planId, vid, color) => {
   };
 };
 
+const buildCircleObject = (action, planId, vid, color) => {
+  const points = extractCoordinates(action.param);
+  if (points.length !== 1) return null;
+  const p = points[0];
+  const uid = `as-${sanitizeId(planId)}-${sanitizeId(vid)}-${sanitizeId(action.action_id || action.action_seq)}-circle`;
+  // 从 param 中尝试读取半径，默认 100m
+  const radius = action.param?.radius_m || action.param?.radius || 100;
+  return {
+    unique_id: uid,
+    object_type: 'area',
+    object_subtype: 'circle_area',
+    name: `${vid} - ${action.name || ''}`,
+    color,
+    geometry: {
+      type: 'Point',
+      coordinates: [p.lon, p.lat, p.alt],
+    },
+    meta: {
+      radius_m: radius,
+    },
+  };
+};
+
 const drawPlanOnMap = async (plan) => {
   if (!plan) {
     console.log('[MapDraw] drawPlanOnMap skipped: plan is null');
     return;
   }
   const vehicleList = plan.vehicle_summary || [];
-  const items = [];
-  const ids = [];
+  const routeItems = [];
+  const routeIds = [];
+  const objectItems = [];
+  const objectIds = [];
 
   console.log(`[MapDraw] start drawPlanOnMap, plan_id=${plan.plan_id}, vehicles=${vehicleList.length}`);
 
@@ -408,68 +427,111 @@ const drawPlanOnMap = async (plan) => {
 
     for (const action of actions) {
       const atype = (action.action_type || '').toLowerCase();
-      const wps = action.param?.waypoints;
-      console.log(`[MapDraw]   action=${action.name}, action_type=${action.action_type}, waypoints=${wps?.length ?? 0}`);
+      const points = extractCoordinates(action.param);
+      console.log(`[MapDraw]   action=${action.name}, action_type=${action.action_type}, points=${points.length}`);
 
-      if (atype === 'auto-move') {
-        const obj = buildLineObject(action, plan.plan_id, vehicle.vid, color);
-        if (obj) {
-          items.push(obj);
-          ids.push(obj.unique_id);
-          console.log(`[MapDraw]   -> line built, uid=${obj.unique_id}, coords=${obj.geometry.coordinates.length}`);
+      if (points.length >= 2 && atype === 'auto-move') {
+        // 路线 → /map/route/display/batch/add
+        const routeItem = buildRouteDisplayItem(action, plan.plan_id, vehicle.vid, color);
+        if (routeItem) {
+          routeItems.push(routeItem);
+          routeIds.push(routeItem.unique_id);
+          console.log(`[MapDraw]   -> route built, uid=${routeItem.unique_id}, points=${routeItem.points.length}`);
         } else {
-          console.log(`[MapDraw]   -> line skipped (invalid waypoints)`);
+          console.log(`[MapDraw]   -> route skipped (invalid waypoints)`);
         }
-      } else if (atype === 'lens-recon') {
+      } else if (points.length >= 3) {
+        // 多边形区域 → /map/object/batch/add
         const obj = buildAreaObject(action, plan.plan_id, vehicle.vid, color);
         if (obj) {
-          items.push(obj);
-          ids.push(obj.unique_id);
-          console.log(`[MapDraw]   -> area built, uid=${obj.unique_id}, coords=${obj.geometry.coordinates[0].length}`);
+          objectItems.push(obj);
+          objectIds.push(obj.unique_id);
+          console.log(`[MapDraw]   -> polygon built, uid=${obj.unique_id}, coords=${obj.geometry.coordinates[0].length}`);
         } else {
-          console.log(`[MapDraw]   -> area skipped (invalid waypoints, need >=3)`);
+          console.log(`[MapDraw]   -> polygon skipped (invalid waypoints, need >=3)`);
+        }
+      } else if (points.length === 1) {
+        // 圆形区域 → /map/object/batch/add
+        const obj = buildCircleObject(action, plan.plan_id, vehicle.vid, color);
+        if (obj) {
+          objectItems.push(obj);
+          objectIds.push(obj.unique_id);
+          console.log(`[MapDraw]   -> circle built, uid=${obj.unique_id}, radius=${obj.meta.radius_m}m`);
         }
       } else {
-        console.log(`[MapDraw]   -> ignored action_type=${atype}`);
+        console.log(`[MapDraw]   -> ignored action_type=${atype}, points=${points.length}`);
       }
     }
   }
 
-  console.log(`[MapDraw] total items to draw: ${items.length}`, items);
+  let totalAdded = 0;
 
-  if (items.length === 0) {
-    console.log('[MapDraw] no drawable objects, skip batchAdd');
-    return;
+  // 1. 批量添加路线临时显示
+  if (routeItems.length > 0) {
+    console.log(`[MapDraw] calling batchAddRouteDisplay, routes=${routeItems.length}`);
+    const routeResult = await batchAddRouteDisplay(routeItems);
+    console.log('[MapDraw] batchAddRouteDisplay result:', routeResult);
+    if (routeResult.ok) {
+      currentRouteIds.value = routeIds;
+      totalAdded += routeItems.length;
+      console.log('[MapDraw] route success, stored ids:', routeIds);
+    } else {
+      appendSystemMessage('路线上图失败: ' + (routeResult.error || '未知错误'));
+      console.log('[MapDraw] route failed:', routeResult.error);
+    }
   }
 
-  console.log('[MapDraw] calling batchAddMapObjects...');
-  const result = await batchAddMapObjects(items);
-  console.log('[MapDraw] batchAddMapObjects result:', result);
+  // 2. 批量添加正式地图对象（area / circle）
+  if (objectItems.length > 0) {
+    console.log(`[MapDraw] calling batchAddMapObjects, objects=${objectItems.length}`);
+    const objResult = await batchAddMapObjects(objectItems);
+    console.log('[MapDraw] batchAddMapObjects result:', objResult);
+    if (objResult.ok) {
+      currentMapObjectIds.value = objectIds;
+      totalAdded += objectItems.length;
+      console.log('[MapDraw] object success, stored ids:', objectIds);
+    } else {
+      appendSystemMessage('区域上图失败: ' + (objResult.error || '未知错误'));
+      console.log('[MapDraw] object failed:', objResult.error);
+    }
+  }
 
-  if (result.ok) {
-    currentMapObjectIds.value = ids;
-    appendSystemMessage(`地图上图成功: ${items.length} 个对象`);
-    console.log('[MapDraw] success, stored uids:', ids);
-  } else {
-    appendSystemMessage('地图上图失败: ' + (result.error || '未知错误'));
-    console.log('[MapDraw] failed:', result.error);
+  if (totalAdded > 0) {
+    appendSystemMessage(`地图上图成功: ${totalAdded} 个对象`);
+  } else if (routeItems.length === 0 && objectItems.length === 0) {
+    console.log('[MapDraw] no drawable objects, skip batchAdd');
   }
 };
 
 const clearPlanOnMap = async () => {
-  const ids = currentMapObjectIds.value;
-  console.log(`[MapDraw] clearPlanOnMap, ids=${ids.length}`, ids);
-  if (ids.length === 0) return;
-  for (const uid of ids) {
+  // 1. 清除路线临时显示
+  const routeIds = currentRouteIds.value;
+  if (routeIds.length > 0) {
+    console.log(`[MapDraw] clear routes, count=${routeIds.length}`, routeIds);
     try {
-      console.log(`[MapDraw] deleting uid=${uid}`);
-      const r = await deleteMapObject(uid);
-      console.log(`[MapDraw] delete result for ${uid}:`, r);
+      const r = await batchDeleteRouteDisplay(routeIds);
+      console.log('[MapDraw] batchDeleteRouteDisplay result:', r);
     } catch (e) {
-      console.log(`[MapDraw] delete error for ${uid}:`, e);
+      console.log('[MapDraw] batchDeleteRouteDisplay error:', e);
     }
+    currentRouteIds.value = [];
   }
-  currentMapObjectIds.value = [];
+
+  // 2. 清除正式地图对象
+  const objIds = currentMapObjectIds.value;
+  if (objIds.length > 0) {
+    console.log(`[MapDraw] clear objects, count=${objIds.length}`, objIds);
+    for (const uid of objIds) {
+      try {
+        console.log(`[MapDraw] deleting object uid=${uid}`);
+        const r = await deleteMapObject(uid);
+        console.log(`[MapDraw] delete result for ${uid}:`, r);
+      } catch (e) {
+        console.log(`[MapDraw] delete error for ${uid}:`, e);
+      }
+    }
+    currentMapObjectIds.value = [];
+  }
 };
 
 /* ---------- 计算属性 ---------- */
@@ -481,7 +543,10 @@ const runtimeStateLabel = computed(() => {
     DONE: '已完成',
     DELETED: '已删除',
   };
-  return map[runtimeState.value] || runtimeState.value;
+  // 取第一辆车的实际状态作为整体显示
+  const vs = selectedPlan.value?.vehicle_summary || [];
+  const state = vs[0] ? getVehicleRuntimeState(vs[0]) : 'SCHEDULED';
+  return map[state] || state;
 });
 
 const vehicleActions = computed(() => {
@@ -531,6 +596,24 @@ const flattenActions = (vehicle) => {
     .sort((a, b) => (a.stage_seq - b.stage_seq) || ((a.action_seq || 0) - (b.action_seq || 0)));
 };
 
+// 根据车辆 actions 的实际状态计算控制按钮应显示的状态
+// 1. 所有 action 都 DONE → DONE（最高优先级）
+// 2. 优先使用后端返回的 runtime_state（plan 级别运行时状态）
+// 3. fallback 到 action 级别状态
+const getVehicleRuntimeState = (vehicle) => {
+  const actions = flattenActions(vehicle);
+  if (actions.length > 0 && actions.every((a) => a.state === 'DONE')) {
+    return 'DONE';
+  }
+  const runtimeState = selectedPlan.value?.runtime_state?.state;
+  if (runtimeState && runtimeState !== 'SCHEDULED') {
+    return runtimeState;
+  }
+  if (actions.some((a) => a.state === 'ACTIVE')) return 'ACTIVE';
+  if (actions.some((a) => a.state === 'PAUSED')) return 'PAUSED';
+  return 'SCHEDULED';
+};
+
 const loadPlans = async (silent = false) => {
   if (!silent) loadingPlans.value = true;
   // 协同席从协同席数据服务查，操控端从操控席数据服务查
@@ -566,7 +649,6 @@ const refreshDetail = async (planId) => {
   const result = await fetchActionSequencePlanDetail(planId);
   if (result.ok) {
     selectedPlan.value = result.data;
-    runtimeState.value = result.data.runtime_state?.state || 'SCHEDULED';
   }
 };
 
@@ -584,7 +666,6 @@ const selectPlan = async (planId) => {
   console.log(`[MapDraw] selectPlan result.ok=${result.ok}, error=${result.error || 'none'}`);
   if (result.ok) {
     selectedPlan.value = result.data;
-    runtimeState.value = result.data.runtime_state?.state || 'SCHEDULED';
     const vs = result.data.vehicle_summary || [];
     const firstAction = (vs[0]?.stages || [{}])[0]?.actions?.[0];
     console.log('[MapDraw] selectPlan firstAction keys:', firstAction ? Object.keys(firstAction) : 'no actions');
@@ -667,11 +748,12 @@ const executeControl = async (actionType, vids) => {
     const results = await Promise.all(vids.map((vid) => apiFn(planId, vid?.replace('equipment:', '') || vid)));
     const allOk = results.every((r) => r.ok);
     if (allOk) {
-      runtimeState.value = successState;
       const cleanVids = vids.map((v) => v?.replace('equipment:', '') || v);
       appendSystemMessage(
         `${successMsg} (${cleanVids.length > 1 ? cleanVids.length + '辆车' : cleanVids[0]})`
       );
+      // 操作成功后立即刷新 plan 详情，同步后端 runtime_state
+      await selectPlan(planId);
     } else {
       const errs = results
         .filter((r) => !r.ok)
@@ -810,14 +892,15 @@ watch(selectedPlanId, async (newId) => {
 watch(
   selectedPlan,
   (newPlan) => {
-    if (!newPlan || runtimeState.value !== 'ACTIVE') return;
-    const allActions = (newPlan.vehicle_summary || []).flatMap((v) =>
-      (v.stages || []).flatMap((s) => s.actions || [])
-    );
-    if (allActions.length > 0 && allActions.every((a) => a.state === 'DONE')) {
-      runtimeState.value = 'SCHEDULED';
-      appendSystemMessage('全部行动已完成，控制按钮已重置为开始执行');
-    }
+    if (!newPlan) return;
+    const vehicles = newPlan.vehicle_summary || [];
+    vehicles.forEach((v) => {
+      if (getVehicleRuntimeState(v) !== 'ACTIVE') return;
+      const actions = (v.stages || []).flatMap((s) => s.actions || []);
+      if (actions.length > 0 && actions.every((a) => a.state === 'DONE')) {
+        appendSystemMessage(`${v.vid?.replace('equipment:', '') || v.vid} 全部行动已完成`);
+      }
+    });
   },
   { deep: true }
 );
@@ -935,6 +1018,14 @@ onUnmounted(() => {
   background: linear-gradient(180deg, rgba(229, 168, 11, 0.5), rgba(140, 95, 0, 1));
 }
 
+.as-btn.mini {
+  min-height: 26px;
+  padding: 0 0.6rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .as-btn.danger {
   border-color: rgba(239, 68, 68, 0.4);
   background: linear-gradient(180deg, rgba(239, 68, 68, 0.35), rgba(120, 20, 20, 0.9));
@@ -942,6 +1033,22 @@ onUnmounted(() => {
 
 .as-btn.danger:hover:not(:disabled) {
   background: linear-gradient(180deg, rgba(239, 68, 68, 0.5), rgba(140, 30, 30, 1));
+}
+
+/* 状态标签（如已完成） */
+.as-state-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.08rem 0.5rem;
+  font-weight: 700;
+  font-size: 0.72rem;
+  min-height: 26px;
+}
+.as-state-badge.done {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
 /* 主内容布局 */
@@ -1129,6 +1236,12 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.6rem;
+}
+
+.as-vehicle-controls {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
 }
 
 .as-vehicle-name {
