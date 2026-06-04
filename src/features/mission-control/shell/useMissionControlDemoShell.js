@@ -17,7 +17,7 @@ const COORDINATION_SUBVIEWS = Object.freeze([
   { id: 'plan-design', title: '方案规划' },
   { id: 'resource-list', title: '资源清单' },
   { id: 'action-sequence', title: '行动序列' },
-  { id: 'action-sequence-control', title: '操控端行动序列' },
+  { id: 'action-sequence-control', title: '操控席行动序列' },
 ]);
 
 const ROUTE_ROLE_BY_PATH = {

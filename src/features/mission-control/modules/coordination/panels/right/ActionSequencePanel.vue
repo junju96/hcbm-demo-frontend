@@ -178,13 +178,21 @@
       </div>
     </div>
 
-    <!-- 下发车辆选择弹窗（单选：一次只能下发一辆车） -->
+    <!-- 下发车辆选择弹窗（复选：支持批量下发多辆车） -->
     <div v-if="showDispatchVehicleDialog" class="as-dialog-overlay" @click.self="cancelDispatchVehicleSelection">
       <div class="as-dialog">
         <div class="as-dialog-header">选择要下发的车辆</div>
         <div class="as-dialog-body">
+          <label class="as-dialog-item">
+            <input
+              type="checkbox"
+              :checked="selectedDispatchVids.length === getAllVehicles().length && getAllVehicles().length > 0"
+              @change="toggleDispatchSelectAll"
+            />
+            <span>全部车辆</span>
+          </label>
           <label v-for="v in getAllVehicles()" :key="v.vid" class="as-dialog-item">
-            <input type="radio" :value="v.vid" v-model="selectedDispatchVid" />
+            <input type="checkbox" :value="v.vid" v-model="selectedDispatchVids" />
             <span>{{ v.vid?.replace('equipment:', '') || v.vid }} {{ v.resource_type ? '(' + v.resource_type + ')' : '' }} — {{ v.total_actions || 0 }} 个行动</span>
           </label>
         </div>
@@ -193,7 +201,7 @@
           <button
             class="as-btn primary"
             type="button"
-            :disabled="!selectedDispatchVid"
+            :disabled="selectedDispatchVids.length === 0"
             @click="confirmDispatchVehicleSelection"
           >
             确认下发
@@ -225,6 +233,7 @@ import {
   deleteMapObject,
   batchAddRouteDisplay,
   batchDeleteRouteDisplay,
+  addPolygon,
 } from '../../api/coordinationApi';
 
 const props = defineProps({
@@ -256,9 +265,9 @@ const showVehicleDialog = ref(false);
 const pendingControlAction = ref('');
 const selectedVehicleVids = ref([]);
 
-/* ---------- 操控端下发弹窗（单选） ---------- */
+/* ---------- 操控端下发弹窗（复选） ---------- */
 const showDispatchVehicleDialog = ref(false);
-const selectedDispatchVid = ref('');
+const selectedDispatchVids = ref([]);
 
 /* ---------- 地图上图 ---------- */
 const currentMapObjectIds = ref([]);   // area / circle 对象 id
@@ -299,7 +308,8 @@ const isValidPoint = (pt) => {
 
 /**
  * 从 action.param 中提取坐标点列表
- * 兼容 waypoints(列表) / recon_position / fire_position / target_position / position(单点)
+ * 兼容 waypoints(列表) / target.location(列表, Lens-Recon 多边形) /
+ * recon_position / fire_position / target_position / position(单点)
  */
 const extractCoordinates = (param) => {
   if (!param || typeof param !== 'object') return [];
@@ -312,7 +322,16 @@ const extractCoordinates = (param) => {
       alt: Number(wp.altitude ?? wp.alt ?? 0),
     }));
   }
-  // 2) 尝试单点坐标字段
+  // 2) 尝试 target.location 列表（Lens-Recon 类型的多边形点）
+  const targetLocation = param.target?.location;
+  if (Array.isArray(targetLocation) && targetLocation.length > 0) {
+    return targetLocation.filter(isValidPoint).map((pt) => ({
+      lon: Number(pt.longitude ?? pt.lon),
+      lat: Number(pt.latitude ?? pt.lat),
+      alt: Number(pt.altitude ?? pt.alt ?? 0),
+    }));
+  }
+  // 3) 尝试单点坐标字段
   const keys = ['recon_position', 'fire_position', 'target_position', 'position'];
   for (const key of keys) {
     const pt = param[key];
@@ -384,6 +403,16 @@ const buildAreaObject = (action, planId, vid, color) => {
   };
 };
 
+// 构建 /map/add/polygon 接口需要的 payload
+const buildPolygonPayload = (action, vid) => {
+  const points = extractCoordinates(action.param);
+  if (points.length < 3) return null;
+  return {
+    label: `${vid} - ${action.name || ''}`,
+    points: points.map((p) => ({ lat: p.lat, lng: p.lon, alt: p.alt })),
+  };
+};
+
 const buildCircleObject = (action, planId, vid, color) => {
   const points = extractCoordinates(action.param);
   if (points.length !== 1) return null;
@@ -417,6 +446,7 @@ const drawPlanOnMap = async (plan) => {
   const routeIds = [];
   const objectItems = [];
   const objectIds = [];
+  const polygonPayloads = []; // Lens-Recon 多边形 → /map/add/polygon
 
   console.log(`[MapDraw] start drawPlanOnMap, plan_id=${plan.plan_id}, vehicles=${vehicleList.length}`);
 
@@ -440,8 +470,17 @@ const drawPlanOnMap = async (plan) => {
         } else {
           console.log(`[MapDraw]   -> route skipped (invalid waypoints)`);
         }
+      } else if (points.length >= 3 && atype === 'lens-recon') {
+        // Lens-Recon 多边形 → /map/add/polygon
+        const payload = buildPolygonPayload(action, vehicle.vid);
+        if (payload) {
+          polygonPayloads.push(payload);
+          console.log(`[MapDraw]   -> polygon payload built, label=${payload.label}, points=${payload.points.length}`);
+        } else {
+          console.log(`[MapDraw]   -> polygon payload skipped (invalid waypoints, need >=3)`);
+        }
       } else if (points.length >= 3) {
-        // 多边形区域 → /map/object/batch/add
+        // 其他多边形区域 → /map/object/batch/add
         const obj = buildAreaObject(action, plan.plan_id, vehicle.vid, color);
         if (obj) {
           objectItems.push(obj);
@@ -465,6 +504,7 @@ const drawPlanOnMap = async (plan) => {
   }
 
   let totalAdded = 0;
+  const mapObjectIds = []; // 统一收集所有成功上图的对象 id
 
   // 1. 批量添加路线临时显示
   if (routeItems.length > 0) {
@@ -481,13 +521,34 @@ const drawPlanOnMap = async (plan) => {
     }
   }
 
-  // 2. 批量添加正式地图对象（area / circle）
+  // 2. Lens-Recon 多边形逐个调用 /map/add/polygon
+  if (polygonPayloads.length > 0) {
+    console.log(`[MapDraw] calling addPolygon, count=${polygonPayloads.length}`);
+    for (const payload of polygonPayloads) {
+      const result = await addPolygon(payload);
+      if (result.ok) {
+        const uid = result.data?.data?.unique_id || result.data?.unique_id;
+        if (uid) {
+          mapObjectIds.push(uid);
+          totalAdded += 1;
+          console.log(`[MapDraw] polygon added, uid=${uid}`);
+        } else {
+          console.log('[MapDraw] polygon added but no unique_id returned');
+        }
+      } else {
+        appendSystemMessage('多边形上图失败: ' + (result.error || '未知错误'));
+        console.log('[MapDraw] addPolygon failed:', result.error);
+      }
+    }
+  }
+
+  // 3. 批量添加其他正式地图对象（area / circle）
   if (objectItems.length > 0) {
     console.log(`[MapDraw] calling batchAddMapObjects, objects=${objectItems.length}`);
     const objResult = await batchAddMapObjects(objectItems);
     console.log('[MapDraw] batchAddMapObjects result:', objResult);
     if (objResult.ok) {
-      currentMapObjectIds.value = objectIds;
+      mapObjectIds.push(...objectIds);
       totalAdded += objectItems.length;
       console.log('[MapDraw] object success, stored ids:', objectIds);
     } else {
@@ -496,9 +557,11 @@ const drawPlanOnMap = async (plan) => {
     }
   }
 
+  currentMapObjectIds.value = mapObjectIds;
+
   if (totalAdded > 0) {
     appendSystemMessage(`地图上图成功: ${totalAdded} 个对象`);
-  } else if (routeItems.length === 0 && objectItems.length === 0) {
+  } else if (routeItems.length === 0 && polygonPayloads.length === 0 && objectItems.length === 0) {
     console.log('[MapDraw] no drawable objects, skip batchAdd');
   }
 };
@@ -597,18 +660,14 @@ const flattenActions = (vehicle) => {
 };
 
 // 根据车辆 actions 的实际状态计算控制按钮应显示的状态
-// 1. 所有 action 都 DONE → DONE（最高优先级）
-// 2. 优先使用后端返回的 runtime_state（plan 级别运行时状态）
-// 3. fallback 到 action 级别状态
+// 每辆车独立判断，不受 plan 级别 runtime_state 影响
 const getVehicleRuntimeState = (vehicle) => {
   const actions = flattenActions(vehicle);
+  // 所有 action 都 DONE → DONE（最高优先级）
   if (actions.length > 0 && actions.every((a) => a.state === 'DONE')) {
     return 'DONE';
   }
-  const runtimeState = selectedPlan.value?.runtime_state?.state;
-  if (runtimeState && runtimeState !== 'SCHEDULED') {
-    return runtimeState;
-  }
+  // 根据该车自身的 action 状态推断
   if (actions.some((a) => a.state === 'ACTIVE')) return 'ACTIVE';
   if (actions.some((a) => a.state === 'PAUSED')) return 'PAUSED';
   return 'SCHEDULED';
@@ -795,8 +854,8 @@ const onDispatchActive = async () => {
   // 操控端行动序列模块：走 zenoh send_mission（操控端接口）
   const vehicles = getAllVehicles();
   if (vehicles.length > 1) {
-    // 多车时弹出单选框，一次只能下发一辆车
-    selectedDispatchVid.value = '';
+    // 多车时弹出复选框，支持批量下发
+    selectedDispatchVids.value = [];
     showDispatchVehicleDialog.value = true;
     return;
   }
@@ -805,46 +864,58 @@ const onDispatchActive = async () => {
   await doDispatchActive(vid);
 };
 
-const doDispatchActive = async (vehicleVid) => {
+// 核心下发逻辑（不管理 loading，供单发/批量复用）
+const _dispatchVehicle = async (vehicleVid) => {
   if (!vehicleVid) {
     appendSystemMessage('下发失败: 未指定车辆');
-    return;
+    return { ok: false };
   }
-  controlLoading.value = true;
-
-  // 在终端打印下发报文详细日志
-  console.log('[DISPATCH-FRONT] ====== 操控端下发请求 ======');
-  console.log(`[DISPATCH-FRONT] plan_id=${selectedPlanId.value}`);
-  console.log(`[DISPATCH-FRONT] vehicle_vid=${vehicleVid}`);
-
   // 去掉 equipment: 前缀（如 equipment:XL01 → XL01）
   const cleanVid = String(vehicleVid).replace('equipment:', '');
   const payload = { vehicle_vid: cleanVid };
-  console.log(`[DISPATCH-FRONT] payload=${JSON.stringify(payload, null, 2)}`);
-
   const result = await dispatchOperatorPlan(selectedPlanId.value, payload);
-
-  console.log(`[DISPATCH-FRONT] response.ok=${result.ok}`);
-  console.log(`[DISPATCH-FRONT] response.data=`, result.data);
-  console.log('[DISPATCH-FRONT] ====== 下发请求结束 ======');
-
-  controlLoading.value = false;
   if (result.ok) {
     const data = result.data?.data || {};
     appendSystemMessage(`行动序列已下发 | vehicle=${data.vehicle_vid || vehicleVid} | topic=${data.topic || ''} | tid=${data.mission_tid || ''}`);
   } else {
     appendSystemMessage('下发失败: ' + (result.data?.message || result.error || '未知错误'));
   }
+  return result;
 };
 
-const confirmDispatchVehicleSelection = () => {
+const doDispatchActive = async (vehicleVid) => {
+  controlLoading.value = true;
+  try {
+    await _dispatchVehicle(vehicleVid);
+  } finally {
+    controlLoading.value = false;
+  }
+};
+
+const confirmDispatchVehicleSelection = async () => {
   showDispatchVehicleDialog.value = false;
-  doDispatchActive(selectedDispatchVid.value);
+  const vids = selectedDispatchVids.value;
+  if (vids.length === 0) return;
+  controlLoading.value = true;
+  try {
+    await Promise.all(vids.map((vid) => _dispatchVehicle(vid)));
+  } finally {
+    controlLoading.value = false;
+    selectedDispatchVids.value = [];
+  }
 };
 
 const cancelDispatchVehicleSelection = () => {
   showDispatchVehicleDialog.value = false;
-  selectedDispatchVid.value = '';
+  selectedDispatchVids.value = [];
+};
+
+const toggleDispatchSelectAll = (e) => {
+  if (e.target.checked) {
+    selectedDispatchVids.value = getAllVehicles().map((v) => v.vid);
+  } else {
+    selectedDispatchVids.value = [];
+  }
 };
 
 /* ---------- 跑马灯溢出检测 ---------- */

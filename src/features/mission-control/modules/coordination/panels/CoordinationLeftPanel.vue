@@ -38,7 +38,7 @@
       </div>
 
       <div class="coord-card">
-        <div class="coord-title">操控端行动序列</div>
+        <div class="coord-title">操控行动序列</div>
         <div class="coord-panel-copy">
           查看已生成的行动方案列表，支持下发到无人车执行。
         </div>

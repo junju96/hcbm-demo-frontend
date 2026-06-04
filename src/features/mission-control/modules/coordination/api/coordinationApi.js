@@ -454,9 +454,13 @@ export const dispatchOperatorPlan = async (planId, payload = {}) => {
 
 /* ==================== 地图服务 API ==================== */
 
-const MAP_SERVICE_BASE_URL = 'http://25.11.1.180:28001';
+const MAP_SERVICE_BASE_URL = 'http://25.11.1.178:28001';
 
 const joinMapUrl = (path) => {
+  // 开发环境通过 Vite proxy 走相对路径，方便在终端查看代理日志
+  if (import.meta.env.DEV) {
+    return path;
+  }
   const base = MAP_SERVICE_BASE_URL.replace(/\/+$/, '');
   const normalizedPath = String(path || '').replace(/^\/+/, '');
   return `${base}/${normalizedPath}`;
@@ -480,6 +484,44 @@ export const batchAddMapObjects = async (items) => {
 /** 删除单个地图对象 */
 export const deleteMapObject = async (uniqueId) => {
   const result = await deleteJson(joinMapUrl(`/map/object/delete/${uniqueId}`));
+  return result;
+};
+
+/** 批量添加路线临时显示 */
+export const batchAddRouteDisplay = async (items) => {
+  const url = joinMapUrl('/map/route/display/batch/add');
+  console.log('[ROUTE-API] ====== 路线显示请求 ======');
+  console.log(`[ROUTE-API] URL=${url}`);
+  console.log(`[ROUTE-API] items_count=${items.length}`);
+  console.log(`[ROUTE-API] items=${JSON.stringify(items, null, 2)}`);
+  const result = await postJson(url, { items });
+  console.log(`[ROUTE-API] response.ok=${result.ok}`);
+  console.log(`[ROUTE-API] response.data=${JSON.stringify(result.data, null, 2)}`);
+  console.log(`[ROUTE-API] response.error=${result.error}`);
+  console.log('[ROUTE-API] ====== 路线显示结束 ======');
+  return result;
+};
+
+/** 添加多边形（单个） */
+export const addPolygon = async (payload) => {
+  const url = joinMapUrl('/map/add/polygon');
+  console.log('[MAP-API] ====== 添加多边形请求 ======');
+  console.log(`[MAP-API] URL=${url}`);
+  console.log(`[MAP-API] payload=${JSON.stringify(payload, null, 2)}`);
+  const result = await postJson(url, payload);
+  console.log(`[MAP-API] response.ok=${result.ok}`);
+  console.log(`[MAP-API] response.data=${JSON.stringify(result.data, null, 2)}`);
+  console.log(`[MAP-API] response.error=${result.error}`);
+  console.log('[MAP-API] ====== 添加多边形结束 ======');
+  return result;
+};
+
+/** 批量删除路线临时显示 */
+export const batchDeleteRouteDisplay = async (uniqueIds) => {
+  const url = joinMapUrl('/map/route/display/batch/delete');
+  console.log(`[ROUTE-API] delete routes, count=${uniqueIds.length}, ids=${JSON.stringify(uniqueIds)}`);
+  const result = await postJson(url, { unique_ids: uniqueIds });
+  console.log(`[ROUTE-API] delete response:`, result);
   return result;
 };
 
