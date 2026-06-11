@@ -67,7 +67,7 @@
                 :disabled="controlLoading"
                 @click="onDispatchActive"
               >
-                {{ controlLoading ? '处理中…' : '下发' }}
+                {{ controlLoading ? '处理中…' : '发布为正式行动方案' }}
               </button>
             </template>
           </div>
@@ -230,7 +230,7 @@ import {
   stopOperatorPlan,
   dispatchOperatorPlan,
   batchAddMapObjects,
-  deleteMapObject,
+  batchDeleteMapObjects,
   batchAddRouteDisplay,
   batchDeleteRouteDisplay,
   addPolygon,
@@ -344,6 +344,46 @@ const extractCoordinates = (param) => {
     }
   }
   return [];
+};
+
+/**
+ * 从整个 plan 中提取所有可绘制的坐标信息（用于比较是否变化）
+ */
+const extractPlanCoordinates = (plan) => {
+  if (!plan) return [];
+  const vehicleList = plan.vehicle_summary || [];
+  const list = [];
+  for (const vehicle of vehicleList) {
+    const actions = (vehicle.stages || []).flatMap((s) => s.actions || []);
+    for (const action of actions) {
+      const coords = extractCoordinates(action.param);
+      if (coords.length > 0) {
+        list.push({
+          vid: vehicle.vid,
+          action_id: action.action_id || action.action_seq,
+          action_type: action.action_type,
+          points: coords.map((p) => ({ lon: p.lon, lat: p.lat, alt: p.alt })),
+        });
+      }
+    }
+  }
+  return list;
+};
+
+const coordinatesEqual = (a, b) => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].vid !== b[i].vid) return false;
+    if (a[i].action_id !== b[i].action_id) return false;
+    if (a[i].action_type !== b[i].action_type) return false;
+    if (a[i].points.length !== b[i].points.length) return false;
+    for (let j = 0; j < a[i].points.length; j++) {
+      const pa = a[i].points[j];
+      const pb = b[i].points[j];
+      if (pa.lon !== pb.lon || pa.lat !== pb.lat || pa.alt !== pb.alt) return false;
+    }
+  }
+  return true;
 };
 
 const sanitizeId = (s) => String(s || '').replace(/[:\/\s#%&?]+/g, '-');
@@ -580,18 +620,15 @@ const clearPlanOnMap = async () => {
     currentRouteIds.value = [];
   }
 
-  // 2. 清除正式地图对象
+  // 2. 批量清除正式地图对象（polygon / circle / area）
   const objIds = currentMapObjectIds.value;
   if (objIds.length > 0) {
     console.log(`[MapDraw] clear objects, count=${objIds.length}`, objIds);
-    for (const uid of objIds) {
-      try {
-        console.log(`[MapDraw] deleting object uid=${uid}`);
-        const r = await deleteMapObject(uid);
-        console.log(`[MapDraw] delete result for ${uid}:`, r);
-      } catch (e) {
-        console.log(`[MapDraw] delete error for ${uid}:`, e);
-      }
+    try {
+      const r = await batchDeleteMapObjects(objIds);
+      console.log('[MapDraw] batchDeleteMapObjects result:', r);
+    } catch (e) {
+      console.log('[MapDraw] batchDeleteMapObjects error:', e);
     }
     currentMapObjectIds.value = [];
   }
@@ -705,9 +742,28 @@ const loadPlans = async (silent = false) => {
 
 const refreshDetail = async (planId) => {
   if (!planId) return;
-  const result = await fetchActionSequencePlanDetail(planId);
+  const oldCoords = extractPlanCoordinates(selectedPlan.value);
+  // 协同席 / 操控端区分数据源
+  const result = isControlMode.value
+    ? await fetchOperatorPlanDetail(planId)
+    : await fetchActionSequencePlanDetail(planId);
   if (result.ok) {
-    selectedPlan.value = result.data;
+    const newPlan = result.data;
+    const newCoords = extractPlanCoordinates(newPlan);
+    // 坐标未变化则跳过清空重绘，只更新数据
+    if (coordinatesEqual(oldCoords, newCoords)) {
+      selectedPlan.value = newPlan;
+      console.log('[MapDraw] coordinates unchanged, skip redraw');
+      return;
+    }
+    // 有变化时先清空，再根据新坐标决定是否重画
+    await clearPlanOnMap();
+    selectedPlan.value = newPlan;
+    if (newCoords.length > 0) {
+      await drawPlanOnMap(selectedPlan.value);
+    } else {
+      console.log('[MapDraw] no coordinates in refreshed data, cleared only');
+    }
   }
 };
 
@@ -939,18 +995,6 @@ const updateMarqueeStates = () => {
 watch(selectedPlan, () => {
   updateMarqueeStates();
 });
-
-// 当 selectedPlan 数据刷新（自动刷新导致）时，重绘地图
-watch(
-  () => selectedPlan.value?.plan_id,
-  async (newPlanId, oldPlanId) => {
-    if (newPlanId && newPlanId === oldPlanId) {
-      // plan 内容刷新（同一 plan），重绘地图
-      await clearPlanOnMap();
-      await drawPlanOnMap(selectedPlan.value);
-    }
-  }
-);
 
 // 当无选中方案时，清空地图对象
 watch(selectedPlanId, async (newId) => {

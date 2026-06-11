@@ -1,7 +1,7 @@
 <template>
   <div class="mission-page">
     <div class="top-bar">
-      <div class="top-title">任务管理系统 Demo</div>
+      <div class="top-title">协同任务智能调度与编排系统</div>
       <div class="top-meta">
         <span>天气: {{ weatherText }}</span>
         <span>时间: {{ currentTime }}</span>

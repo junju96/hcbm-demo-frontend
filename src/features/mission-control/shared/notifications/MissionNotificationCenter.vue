@@ -139,11 +139,11 @@ const getNotificationBaseURL = () => {
     return settings.notificationBaseURL;
   }
   try {
-    const url = new URL(settings.apiBaseURL || 'http://localhost:28600');
+    const url = new URL(settings.apiBaseURL || 'http://25.11.1.178:28600');
     url.port = '28004';
     return url.origin;
   } catch {
-    return 'http://localhost:28004';
+    return 'http://25.11.1.178:28004';
   }
 };
 
