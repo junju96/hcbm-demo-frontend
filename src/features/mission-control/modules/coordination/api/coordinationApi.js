@@ -1,9 +1,13 @@
 // coordinationApi.js — 协同指控模块后端 API 封装
 // 职责：统一 HTTP 请求 + 后端数据 → 前端数据模型适配
 
-const COORDINATION_BASE_URL = 'http://localhost:28600';
+const COORDINATION_BASE_URL = 'http://25.11.1.178:28600';
 
 const joinApiUrl = (path) => {
+  // 开发环境通过 Vite proxy 走相对路径，避免跨域
+  if (import.meta.env.DEV) {
+    return path;
+  }
   const base = COORDINATION_BASE_URL.replace(/\/+$/, '');
   const normalizedPath = String(path || '').replace(/^\/+/, '');
   return `${base}/${normalizedPath}`;
@@ -481,9 +485,12 @@ export const batchAddMapObjects = async (items) => {
   return result;
 };
 
-/** 删除单个地图对象 */
-export const deleteMapObject = async (uniqueId) => {
-  const result = await deleteJson(joinMapUrl(`/map/object/delete/${uniqueId}`));
+/** 批量删除地图对象 */
+export const batchDeleteMapObjects = async (uniqueIds) => {
+  const url = joinMapUrl('/map/object/batch/delete');
+  console.log(`[MAP-API] delete map objects, count=${uniqueIds.length}, ids=${JSON.stringify(uniqueIds)}`);
+  const result = await postJson(url, { unique_ids: uniqueIds });
+  console.log(`[MAP-API] delete response:`, result);
   return result;
 };
 

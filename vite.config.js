@@ -12,6 +12,11 @@ export default defineConfig({
         target: 'http://25.11.1.178:28001',
         changeOrigin: true,
       },
+      // API 请求代理，解决开发环境跨域问题
+      '/api': {
+        target: 'http://25.11.1.178:28600',
+        changeOrigin: true,
+      },
     },
   },
 });

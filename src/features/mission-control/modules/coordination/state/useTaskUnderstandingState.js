@@ -13,9 +13,13 @@ import {
   saveTaskUnderstandingDb,
 } from './taskUnderstandingLocalDb';
 
-const COORDINATION_BASE_URL = 'http://localhost:28600';
+const COORDINATION_BASE_URL = 'http://25.11.1.178:28600';
 
 const joinApiUrl = (path) => {
+  // 开发环境通过 Vite proxy 走相对路径，避免跨域
+  if (import.meta.env.DEV) {
+    return path;
+  }
   const base = COORDINATION_BASE_URL.replace(/\/+$/, '');
   const normalizedPath = String(path || '').replace(/^\/+/, '');
   return `${base}/${normalizedPath}`;
