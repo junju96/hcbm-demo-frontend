@@ -14,7 +14,7 @@ export default defineConfig({
       },
       // API 请求代理，解决开发环境跨域问题
       '/api': {
-        target: 'http://25.11.1.178:28600',
+        target: 'http://25.11.1.222:28600',
         changeOrigin: true,
       },
     },

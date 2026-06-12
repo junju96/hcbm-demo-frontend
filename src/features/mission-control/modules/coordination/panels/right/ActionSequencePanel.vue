@@ -113,6 +113,7 @@
                   <div
                     class="as-action-card"
                     :class="`state-${(action.state || 'SCHEDULED').toLowerCase()}`"
+                    @dblclick="openParamDialog(action, vehicle.vid)"
                   >
                     <div class="as-card-header" :title="action.name">
                       <span class="marquee-text">{{ action.name }}</span>
@@ -209,6 +210,17 @@
         </div>
       </div>
     </div>
+
+    <!-- 行动参数编辑弹窗：teleport 到 body，避免被右侧面板裁切 -->
+    <Teleport to="body">
+      <ActionParamDialog
+        v-if="showParamDialog"
+        :action="editingAction"
+        :vehicle-vid="editingVehicleVid"
+        @close="closeParamDialog"
+        @save="saveActionParam"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -217,6 +229,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import {
   fetchActionSequencePlans,
   fetchActionSequencePlanDetail,
+  updateActionParam,
   startActionSequence,
   pauseActionSequence,
   resumeActionSequence,
@@ -235,6 +248,7 @@ import {
   batchDeleteRouteDisplay,
   addPolygon,
 } from '../../api/coordinationApi';
+import ActionParamDialog from './ActionParamDialog.vue';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
@@ -268,6 +282,12 @@ const selectedVehicleVids = ref([]);
 /* ---------- 操控端下发弹窗（复选） ---------- */
 const showDispatchVehicleDialog = ref(false);
 const selectedDispatchVids = ref([]);
+
+/* ---------- 行动参数弹窗 ---------- */
+const showParamDialog = ref(false);
+const editingAction = ref(null);
+const editingVehicleVid = ref('');
+const savingParam = ref(false);
 
 /* ---------- 地图上图 ---------- */
 const currentMapObjectIds = ref([]);   // area / circle 对象 id
@@ -708,6 +728,59 @@ const getVehicleRuntimeState = (vehicle) => {
   if (actions.some((a) => a.state === 'ACTIVE')) return 'ACTIVE';
   if (actions.some((a) => a.state === 'PAUSED')) return 'PAUSED';
   return 'SCHEDULED';
+};
+
+/* ---------- 行动参数弹窗 ---------- */
+const openParamDialog = (action, vehicleVid) => {
+  if (!action || !action.action_id) return;
+  editingAction.value = action;
+  editingVehicleVid.value = vehicleVid || action.vid || '';
+  showParamDialog.value = true;
+};
+
+const closeParamDialog = () => {
+  showParamDialog.value = false;
+  editingAction.value = null;
+  editingVehicleVid.value = '';
+};
+
+const saveActionParam = async (newParam) => {
+  const action = editingAction.value;
+  if (!action || !selectedPlanId.value) return;
+
+  savingParam.value = true;
+  try {
+    const planId = selectedPlanId.value;
+    const actionId = action.action_id;
+
+    // 先调用后端保存
+    const result = await updateActionParam(planId, actionId, newParam);
+    if (!result.ok) {
+      appendSystemMessage('参数保存失败: ' + (result.error || '未知错误'));
+      return;
+    }
+
+    // 更新本地 selectedPlan 中对应 action 的 param
+    const vehicles = selectedPlan.value?.vehicle_summary || [];
+    for (const vehicle of vehicles) {
+      for (const stage of vehicle.stages || []) {
+        const target = (stage.actions || []).find((a) => a.action_id === actionId);
+        if (target) {
+          target.param = newParam;
+          break;
+        }
+      }
+    }
+
+    appendSystemMessage(`行动参数已保存 | ${action.name}`);
+    closeParamDialog();
+
+    // 参数变更可能影响地图显示，重新上图
+    await clearPlanOnMap();
+    await drawPlanOnMap(selectedPlan.value);
+  } finally {
+    savingParam.value = false;
+  }
 };
 
 const loadPlans = async (silent = false) => {

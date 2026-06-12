@@ -1,7 +1,7 @@
 // coordinationApi.js — 协同指控模块后端 API 封装
 // 职责：统一 HTTP 请求 + 后端数据 → 前端数据模型适配
 
-const COORDINATION_BASE_URL = 'http://25.11.1.178:28600';
+const COORDINATION_BASE_URL = 'http://25.11.1.222:28600';
 
 const joinApiUrl = (path) => {
   // 开发环境通过 Vite proxy 走相对路径，避免跨域
@@ -401,6 +401,14 @@ export const stopActionSequence = async (planId) => {
 /** 下发行动序列到无人车（通过 Zenoh MissionService/send_mission） */
 export const dispatchActionSequence = async (planId, payload = {}) => {
   const result = await postJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}/dispatch`), payload);
+  return result;
+};
+
+/** 更新行动中指定 action 的 param */
+export const updateActionParam = async (planId, actionId, param) => {
+  const result = await patchJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}/actions/${actionId}`), {
+    param,
+  });
   return result;
 };
 
