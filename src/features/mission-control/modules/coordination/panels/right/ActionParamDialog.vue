@@ -431,9 +431,11 @@ const loadingTargets = ref(false);
 const areaList = ref([]);
 const loadingAreas = ref(false);
 
-const normalizedActionType = computed(() =>
-  String(props.action?.action_type || '').toLowerCase()
-);
+const normalizedActionType = computed(() => {
+  const raw = String(props.action?.action_type || '').toLowerCase();
+  console.log('[ActionParamDialog] raw action_type:', props.action?.action_type, 'normalized:', raw);
+  return raw;
+});
 
 const actionTypeLabel = computed(() => {
   const map = {
