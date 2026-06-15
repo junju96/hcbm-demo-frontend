@@ -184,7 +184,138 @@
           </label>
         </template>
 
-        <!-- 打击类：40mm/7.62mm/AT导弹/火箭弹/巡飞弹 -->
+        <!-- 40mm机炮打击 -->
+        <template v-else-if="normalizedActionType === '40mm-gun-launch'">
+          <!-- 打击参数：目标点列表 -->
+          <div class="apd-section">
+            <div class="apd-section-title">
+              打击参数
+              <div class="apd-btn-group">
+                <button class="as-btn mini primary" type="button" @click="addTarget">+</button>
+                <button
+                  class="as-btn mini danger"
+                  type="button"
+                  :disabled="editedParam.targets.length <= 1"
+                  @click="removeTarget(editedParam.targets.length - 1)"
+                >
+                  -
+                </button>
+              </div>
+            </div>
+
+            <div class="apd-target-table-head">
+              <span>位置</span>
+              <span>高程</span>
+              <span>类型</span>
+              <span></span>
+            </div>
+            <div
+              v-for="(t, idx) in editedParam.targets"
+              :key="idx"
+              class="apd-target-table-row"
+            >
+              <select v-model="t.target_id" @change="onTargetChange(idx)">
+                <option value="">-- 选择目标点 --</option>
+                <option
+                  v-for="target in targetList"
+                  :key="target.resource_id"
+                  :value="target.resource_id"
+                >
+                  {{ target.resource_name || target.title || target.target_name || target.resource_id }}
+                </option>
+              </select>
+              <input v-model.number="t.altitude" type="number" step="0.1" placeholder="高程" />
+              <select v-model="t.target_type">
+                <option v-for="opt in TARGET_TYPE_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+              <button
+                class="as-btn mini danger"
+                type="button"
+                :disabled="editedParam.targets.length <= 1"
+                @click="removeTarget(idx)"
+              >
+                删除
+              </button>
+            </div>
+
+            <label class="apd-check" style="margin-top: 0.4rem;">
+              <input v-model="editedParam.sequential" type="checkbox" />
+              <span>按顺序打击</span>
+            </label>
+          </div>
+
+          <!-- 保留字段：发射时间、发射模式、毁伤模式、遮蔽顶、计划发射数量 -->
+          <label class="apd-field">
+            <span>发射时间 (s)</span>
+            <input v-model.number="editedParam.fire_duration_s" type="number" min="0" />
+          </label>
+          <label class="apd-field">
+            <span>发射模式</span>
+            <select v-model.number="editedParam.fire_mode">
+              <option :value="1">单发</option>
+              <option :value="2">多发</option>
+            </select>
+          </label>
+          <label class="apd-field">
+            <span>毁伤模式</span>
+            <select v-model.number="editedParam.damage_mode">
+              <option :value="0">未定义</option>
+              <option :value="1">饱和攻击</option>
+              <option :value="2">不饱和攻击</option>
+            </select>
+          </label>
+          <label class="apd-field">
+            <span>遮蔽顶</span>
+            <select v-model.number="editedParam.blank">
+              <option :value="0">未定义</option>
+              <option :value="1">有遮蔽顶</option>
+              <option :value="2">无遮蔽顶</option>
+            </select>
+          </label>
+          <label class="apd-field">
+            <span>计划发射数量</span>
+            <input v-model.number="editedParam.planned_ammo" type="number" min="0" />
+          </label>
+
+          <!-- 通用参数 -->
+          <div class="apd-section">
+            <div class="apd-section-title">通用参数</div>
+            <label class="apd-field">
+              <span>断连策略</span>
+              <div class="apd-radio-row">
+                <label class="apd-radio">
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="continue" />
+                  <span>继续</span>
+                </label>
+                <label class="apd-radio">
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="return" />
+                  <span>停车返航</span>
+                </label>
+                <label class="apd-radio">
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="forward_100m" />
+                  <span>前进100米</span>
+                </label>
+              </div>
+            </label>
+            <label class="apd-field">
+              <span>任务时长 (HH:MM:SS)</span>
+              <input v-model="editedParam.mission_duration" type="text" placeholder="00:00:00" />
+            </label>
+            <label class="apd-field">
+              <span class="apd-check">
+                <input v-model="editedParam.enable_start_time" type="checkbox" />
+                <span>设置开始时间</span>
+              </span>
+              <input
+                v-model="editedParam.start_time"
+                type="datetime-local"
+                :disabled="!editedParam.enable_start_time"
+              />
+            </label>
+          </div>
+        </template>
+
+        <!-- 打击类：7.62mm/AT导弹/火箭弹/巡飞弹 -->
         <template v-else-if="isStrikeAction">
           <label class="apd-field">
             <span>目标ID</span>
@@ -299,6 +430,8 @@ const emit = defineEmits(['close', 'save']);
 const editedParam = ref({});
 const routeList = ref([]);
 const loadingRoutes = ref(false);
+const targetList = ref([]);
+const loadingTargets = ref(false);
 
 const normalizedActionType = computed(() =>
   String(props.action?.action_type || '').toLowerCase()
@@ -326,7 +459,6 @@ const vehicleName = computed(() =>
 
 const isStrikeAction = computed(() =>
   [
-    '40mm-gun-launch',
     '7.62mm-gun-shot',
     'at-missile-launch',
     'rocket-launch',
@@ -340,6 +472,27 @@ const isRelayAction = computed(() =>
 
 function cloneParam(param) {
   return JSON.parse(JSON.stringify(param || {}));
+}
+
+const TARGET_TYPE_OPTIONS = [
+  '无定义',
+  '人员',
+  '汽车',
+  '装甲车',
+  '坦克',
+  '工事',
+  '建筑',
+  '地下空间',
+  '其他',
+];
+
+function buildEmptyTarget() {
+  return {
+    target_id: '',
+    target_name: '',
+    altitude: 0,
+    target_type: '无定义',
+  };
 }
 
 function ensureShape() {
@@ -388,6 +541,30 @@ function ensureShape() {
     p.fov_deg = p.fov_deg ?? 0;
     p.move_time_s = p.move_time_s ?? 0;
     p.scan_time_s = p.scan_time_s ?? 0;
+  } else if (type === '40mm-gun-launch') {
+    // 目标点列表
+    if (!Array.isArray(p.targets) || p.targets.length === 0) {
+      p.targets = [buildEmptyTarget()];
+    } else {
+      p.targets = p.targets.map((t) => ({
+        target_id: t?.target_id ?? '',
+        target_name: t?.target_name ?? '',
+        altitude: t?.altitude ?? 0,
+        target_type: t?.target_type ?? '无定义',
+      }));
+    }
+    p.sequential = p.sequential ?? false;
+    // 保留已有打击字段
+    p.fire_duration_s = p.fire_duration_s ?? 6;
+    p.fire_mode = p.fire_mode ?? 1;
+    p.damage_mode = p.damage_mode ?? 0;
+    p.blank = p.blank ?? 0;
+    p.planned_ammo = p.planned_ammo ?? 0;
+    // 通用参数
+    p.disconnect_strategy = p.disconnect_strategy ?? 'continue';
+    p.mission_duration = p.mission_duration ?? '00:00:00';
+    p.enable_start_time = p.enable_start_time ?? false;
+    p.start_time = p.start_time ?? '';
   } else if (isStrikeAction.value) {
     p.target_id = p.target_id ?? '';
     p.target_name = p.target_name ?? '';
@@ -421,6 +598,7 @@ watch(
 
 onMounted(() => {
   loadRoutes();
+  loadTargets();
 });
 
 async function loadRoutes() {
@@ -432,6 +610,18 @@ async function loadRoutes() {
     }
   } finally {
     loadingRoutes.value = false;
+  }
+}
+
+async function loadTargets() {
+  loadingTargets.value = true;
+  try {
+    const result = await fetchResourcePoolByType('TARGET', 50);
+    if (result.ok) {
+      targetList.value = result.data?.items || [];
+    }
+  } finally {
+    loadingTargets.value = false;
   }
 }
 
@@ -459,6 +649,26 @@ function formatCoord(val) {
   const num = Number(val);
   if (Number.isNaN(num)) return '—';
   return num.toFixed(7);
+}
+
+function onTargetChange(idx) {
+  const t = editedParam.value.targets[idx];
+  const target = targetList.value.find((item) => item.resource_id === t.target_id);
+  if (target) {
+    t.target_name = target.resource_name || target.title || target.target_name || '';
+    const loc = target.location || {};
+    t.altitude = loc.altitude ?? loc.alt ?? 0;
+  }
+}
+
+function addTarget() {
+  editedParam.value.targets.push(buildEmptyTarget());
+}
+
+function removeTarget(idx) {
+  if (editedParam.value.targets.length > 1) {
+    editedParam.value.targets.splice(idx, 1);
+  }
 }
 
 function addWaypoint() {
@@ -787,5 +997,56 @@ function onSave() {
 .apd-field input[type='datetime-local']:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* 40mm 目标点列表样式 */
+.apd-btn-group {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.apd-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.apd-target-table-head,
+.apd-target-table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.2fr 0.8fr;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.78rem;
+}
+
+.apd-target-table-head {
+  font-weight: 700;
+  color: rgba(226, 246, 248, 0.7);
+  background: rgba(0, 222, 200, 0.08);
+  padding: 0.35rem 0.45rem;
+  border-radius: 4px;
+}
+
+.apd-target-table-row {
+  padding: 0.3rem 0.2rem;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.06);
+}
+
+.apd-target-table-row:last-child {
+  border-bottom: none;
+}
+
+.apd-target-table-row select,
+.apd-target-table-row input {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(0, 222, 200, 0.2);
+  border-radius: 5px;
+  padding: 0.35rem 0.4rem;
+  color: #f1feff;
+  font-size: 0.8rem;
+  outline: none;
+  width: 100%;
 }
 </style>
