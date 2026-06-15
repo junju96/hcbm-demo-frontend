@@ -431,11 +431,9 @@ const loadingTargets = ref(false);
 const areaList = ref([]);
 const loadingAreas = ref(false);
 
-const normalizedActionType = computed(() => {
-  const raw = String(props.action?.action_type || '').toLowerCase();
-  console.log('[ActionParamDialog] raw action_type:', props.action?.action_type, 'normalized:', raw);
-  return raw;
-});
+const normalizedActionType = computed(() =>
+  String(props.action?.action_type || '').toLowerCase()
+);
 
 const actionTypeLabel = computed(() => {
   const map = {
@@ -624,18 +622,6 @@ function ensureShape() {
     p.mission_duration = p.mission_duration ?? '00:00:00';
     p.enable_start_time = p.enable_start_time ?? false;
     p.start_time = p.start_time ?? '';
-  } else if (isStrikeAction.value) {
-    p.target_id = p.target_id ?? '';
-    p.target_name = p.target_name ?? '';
-    p.fire_duration_s = p.fire_duration_s ?? 6;
-    p.fire_position = {
-      lon: p.fire_position?.lon ?? p.fire_position?.longitude ?? 0,
-      lat: p.fire_position?.lat ?? p.fire_position?.latitude ?? 0,
-    };
-    p.fire_mode = p.fire_mode ?? 1;
-    p.damage_mode = p.damage_mode ?? 0;
-    p.blank = p.blank ?? 0;
-    p.planned_ammo = p.planned_ammo ?? 0;
   } else if (type === 'search-and-shoot') {
     p.target_id = p.target_id ?? '';
     p.target_name = p.target_name ?? '';
