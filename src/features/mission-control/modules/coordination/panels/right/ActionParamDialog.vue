@@ -10,42 +10,125 @@
       <div class="apd-body">
         <!-- Auto-Move: 自主机动 -->
         <template v-if="normalizedActionType === 'auto-move'">
+          <!-- 路线参数 -->
           <div class="apd-section">
-            <div class="apd-section-title">航路点</div>
-            <div
-              v-for="(wp, idx) in editedParam.waypoints"
-              :key="idx"
-              class="apd-waypoint-row"
-            >
-              <label class="apd-field compact">
-                <span>经度</span>
-                <input v-model.number="wp.lon" type="number" step="0.0001" />
+            <div class="apd-section-title">路线参数</div>
+            <label class="apd-field">
+              <span>路线选择</span>
+              <select v-model="editedParam.route_id" @change="onRouteChange">
+                <option value="">-- 请选择路线 --</option>
+                <option v-for="route in routeList" :key="route.resource_id" :value="route.resource_id">
+                  {{ route.title || route.resource_id }}
+                </option>
+              </select>
+            </label>
+
+            <div class="apd-check-row">
+              <label class="apd-check">
+                <input v-model="editedParam.navigation" type="checkbox" />
+                <span>导航</span>
               </label>
-              <label class="apd-field compact">
-                <span>纬度</span>
-                <input v-model.number="wp.lat" type="number" step="0.0001" />
+              <label class="apd-check">
+                <input v-model="editedParam.circle" type="checkbox" />
+                <span>绕圈</span>
               </label>
-              <label class="apd-field compact">
-                <span>高度</span>
-                <input v-model.number="wp.alt" type="number" step="0.1" />
-              </label>
-              <button
-                class="as-btn mini danger"
-                type="button"
-                :disabled="editedParam.waypoints.length <= 1"
-                @click="removeWaypoint(idx)"
-              >
-                删除
-              </button>
             </div>
-            <button class="as-btn mini primary" type="button" @click="addWaypoint">
-              + 添加航路点
-            </button>
+
+            <div class="apd-section-title sub">路线参数列表</div>
+            <div class="apd-route-table-head">
+              <span>经度</span>
+              <span>纬度</span>
+              <span>高度</span>
+              <span>属性</span>
+            </div>
+            <div
+              v-for="(pt, idx) in editedParam.route_points"
+              :key="idx"
+              class="apd-route-table-row"
+            >
+              <span>{{ formatCoord(pt.lon) }}</span>
+              <span>{{ formatCoord(pt.lat) }}</span>
+              <span>{{ pt.alt ?? 0 }}</span>
+              <span>{{ pt.attribute || '—' }}</span>
+            </div>
+            <div v-if="!editedParam.route_points.length" class="apd-empty small">未选择路线</div>
           </div>
-          <label class="apd-field">
-            <span>速度 (km/h)</span>
-            <input v-model.number="editedParam.speed" type="number" min="0" />
-          </label>
+
+          <!-- 车辆参数 -->
+          <div class="apd-section">
+            <div class="apd-section-title">车辆参数</div>
+            <label class="apd-field">
+              <span>限速 (0 - 80 km/h)</span>
+              <div class="apd-slider-row">
+                <input
+                  v-model.number="editedParam.speed_limit"
+                  type="range"
+                  min="0"
+                  max="80"
+                  step="1"
+                />
+                <span class="apd-slider-value">{{ editedParam.speed_limit }} km/h</span>
+              </div>
+            </label>
+            <label class="apd-field">
+              <span>模式</span>
+              <div class="apd-radio-row">
+                <label class="apd-radio">
+                  <input v-model="editedParam.drive_mode" type="radio" value="avoid_obstacle" />
+                  <span>避障</span>
+                </label>
+                <label class="apd-radio">
+                  <input v-model="editedParam.drive_mode" type="radio" value="assault" />
+                  <span>突击</span>
+                </label>
+                <label class="apd-radio">
+                  <input v-model="editedParam.drive_mode" type="radio" value="stop_obstacle" />
+                  <span>停障</span>
+                </label>
+              </div>
+            </label>
+            <label class="apd-field">
+              <span>绕圈 (-1 表示一直绕圈，0-99 km)</span>
+              <input v-model.number="editedParam.circle_distance_km" type="number" min="-1" max="99" step="1" />
+            </label>
+          </div>
+
+          <!-- 通用参数 -->
+          <div class="apd-section">
+            <div class="apd-section-title">通用参数</div>
+            <label class="apd-field">
+              <span>断连策略</span>
+              <div class="apd-radio-row">
+                <label class="apd-radio">
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="continue" />
+                  <span>继续</span>
+                </label>
+                <label class="apd-radio">
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="return" />
+                  <span>停车返航</span>
+                </label>
+                <label class="apd-radio">
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="forward_100m" />
+                  <span>前进100米</span>
+                </label>
+              </div>
+            </label>
+            <label class="apd-field">
+              <span>任务时长 (HH:MM:SS)</span>
+              <input v-model="editedParam.mission_duration" type="text" placeholder="00:00:00" />
+            </label>
+            <label class="apd-field">
+              <span class="apd-check">
+                <input v-model="editedParam.enable_start_time" type="checkbox" />
+                <span>设置开始时间</span>
+              </span>
+              <input
+                v-model="editedParam.start_time"
+                type="datetime-local"
+                :disabled="!editedParam.enable_start_time"
+              />
+            </label>
+          </div>
         </template>
 
         <!-- Lens-Recon: 光电侦察 -->
@@ -203,7 +286,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
+import { fetchResourcePoolByType } from '../../api/coordinationApi';
 
 const props = defineProps({
   action: { type: Object, default: null },
@@ -213,6 +297,8 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save']);
 
 const editedParam = ref({});
+const routeList = ref([]);
+const loadingRoutes = ref(false);
 
 const normalizedActionType = computed(() =>
   String(props.action?.action_type || '').toLowerCase()
@@ -270,6 +356,25 @@ function ensureShape() {
       alt: wp?.alt ?? wp?.altitude ?? 0,
     }));
     p.speed = p.speed ?? 20;
+    // 路线/车辆/通用参数
+    p.route_id = p.route_id ?? '';
+    p.route_points = Array.isArray(p.route_points)
+      ? p.route_points.map((pt) => ({
+          lon: pt?.lon ?? pt?.longitude ?? 0,
+          lat: pt?.lat ?? pt?.latitude ?? 0,
+          alt: pt?.alt ?? pt?.altitude ?? 0,
+          attribute: pt?.attribute ?? '路网点',
+        }))
+      : [];
+    p.navigation = p.navigation ?? false;
+    p.circle = p.circle ?? false;
+    p.speed_limit = p.speed_limit ?? 40;
+    p.drive_mode = p.drive_mode ?? 'avoid_obstacle';
+    p.circle_distance_km = p.circle_distance_km ?? -1;
+    p.disconnect_strategy = p.disconnect_strategy ?? 'continue';
+    p.mission_duration = p.mission_duration ?? '00:00:00';
+    p.enable_start_time = p.enable_start_time ?? false;
+    p.start_time = p.start_time ?? '';
   } else if (type === 'lens-recon') {
     p.target_id = p.target_id ?? '';
     p.target_name = p.target_name ?? '';
@@ -313,6 +418,48 @@ watch(
   () => ensureShape(),
   { immediate: true }
 );
+
+onMounted(() => {
+  loadRoutes();
+});
+
+async function loadRoutes() {
+  loadingRoutes.value = true;
+  try {
+    const result = await fetchResourcePoolByType('ROUTE', 50);
+    if (result.ok) {
+      routeList.value = result.data?.items || [];
+    }
+  } finally {
+    loadingRoutes.value = false;
+  }
+}
+
+function onRouteChange() {
+  const route = routeList.value.find((r) => r.resource_id === editedParam.value.route_id);
+  if (route && Array.isArray(route.points)) {
+    editedParam.value.route_points = route.points.map((pt) => ({
+      lon: pt?.lon ?? pt?.longitude ?? 0,
+      lat: pt?.lat ?? pt?.latitude ?? 0,
+      alt: pt?.alt ?? pt?.altitude ?? 0,
+      attribute: pt?.attribute ?? '路网点',
+    }));
+    // 同步 waypoints，保证地图绘制使用最新路径
+    editedParam.value.waypoints = editedParam.value.route_points.map((pt) => ({
+      lon: pt.lon,
+      lat: pt.lat,
+      alt: pt.alt,
+    }));
+  } else {
+    editedParam.value.route_points = [];
+  }
+}
+
+function formatCoord(val) {
+  const num = Number(val);
+  if (Number.isNaN(num)) return '—';
+  return num.toFixed(7);
+}
 
 function addWaypoint() {
   editedParam.value.waypoints.push({ lon: 0, lat: 0, alt: 0 });
@@ -531,5 +678,114 @@ function onSave() {
   border-radius: 6px;
   font-size: 0.78rem;
   font-weight: 600;
+}
+
+/* Auto-Move 扩展样式 */
+.apd-section-title.sub {
+  font-size: 0.78rem;
+  color: rgba(226, 246, 248, 0.8);
+  margin-top: 0.4rem;
+}
+
+.apd-check-row {
+  display: flex;
+  gap: 1.2rem;
+  padding: 0.2rem 0;
+}
+
+.apd-check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #f1feff;
+  cursor: pointer;
+}
+
+.apd-check input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #00dec8;
+  cursor: pointer;
+}
+
+.apd-radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.apd-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #f1feff;
+  cursor: pointer;
+}
+
+.apd-radio input[type='radio'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #00dec8;
+  cursor: pointer;
+}
+
+.apd-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.apd-slider-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: #00dec8;
+}
+
+.apd-slider-value {
+  font-size: 0.85rem;
+  color: #00dec8;
+  min-width: 4.5rem;
+  text-align: right;
+}
+
+.apd-route-table-head,
+.apd-route-table-row {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr 1.2fr;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 4px;
+}
+
+.apd-route-table-head {
+  font-weight: 700;
+  color: rgba(226, 246, 248, 0.7);
+  background: rgba(0, 222, 200, 0.08);
+}
+
+.apd-route-table-row {
+  color: #f1feff;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.08);
+}
+
+.apd-route-table-row:last-child {
+  border-bottom: none;
+}
+
+.apd-empty.small {
+  padding: 0.8rem 0;
+  font-size: 0.82rem;
+}
+
+.apd-field .apd-check {
+  margin-bottom: 0.35rem;
+}
+
+.apd-field input[type='datetime-local']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

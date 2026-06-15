@@ -412,6 +412,14 @@ export const updateActionParam = async (planId, actionId, param) => {
   return result;
 };
 
+/** 查询本地资源池资源（ROUTE / AREA / TARGET 等） */
+export const fetchResourcePoolByType = async (taskType, limit = 50) => {
+  const result = await getJson(joinApiUrl(`/api/v1/resources/by_type/${taskType}?limit=${limit}`));
+  if (!result.ok) return result;
+  const items = result.data?.data?.items || [];
+  return { ok: true, data: { items, total: result.data?.data?.total || 0 } };
+};
+
 /* ==================== 操控端行动序列 API ==================== */
 
 /** 操控端 — 获取行动方案列表 */
