@@ -104,12 +104,12 @@
                   <span>继续</span>
                 </label>
                 <label class="apd-radio">
-                  <input v-model="editedParam.disconnect_strategy" type="radio" value="return" />
-                  <span>停车返航</span>
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="stop" />
+                  <span>停车</span>
                 </label>
                 <label class="apd-radio">
-                  <input v-model="editedParam.disconnect_strategy" type="radio" value="forward_100m" />
-                  <span>前进100米</span>
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="return" />
+                  <span>返航</span>
                 </label>
               </div>
             </label>
@@ -242,40 +242,41 @@
               <input v-model="editedParam.sequential" type="checkbox" />
               <span>按顺序打击</span>
             </label>
-          </div>
 
-          <!-- 保留字段：发射时间、发射模式、毁伤模式、遮蔽顶、计划发射数量 -->
-          <label class="apd-field">
-            <span>发射时间 (s)</span>
-            <input v-model.number="editedParam.fire_duration_s" type="number" min="0" />
-          </label>
-          <label class="apd-field">
-            <span>发射模式</span>
-            <select v-model.number="editedParam.fire_mode">
-              <option :value="1">单发</option>
-              <option :value="2">多发</option>
-            </select>
-          </label>
-          <label class="apd-field">
-            <span>毁伤模式</span>
-            <select v-model.number="editedParam.damage_mode">
-              <option :value="0">未定义</option>
-              <option :value="1">饱和攻击</option>
-              <option :value="2">不饱和攻击</option>
-            </select>
-          </label>
-          <label class="apd-field">
-            <span>遮蔽顶</span>
-            <select v-model.number="editedParam.blank">
-              <option :value="0">未定义</option>
-              <option :value="1">有遮蔽顶</option>
-              <option :value="2">无遮蔽顶</option>
-            </select>
-          </label>
-          <label class="apd-field">
-            <span>计划发射数量</span>
-            <input v-model.number="editedParam.planned_ammo" type="number" min="0" />
-          </label>
+            <div class="apd-strike-extra">
+              <label class="apd-field compact">
+                <span>发射时间 (s)</span>
+                <input v-model.number="editedParam.fire_duration_s" type="number" min="0" />
+              </label>
+              <label class="apd-field compact">
+                <span>发射模式</span>
+                <select v-model.number="editedParam.fire_mode">
+                  <option :value="1">单发</option>
+                  <option :value="2">多发</option>
+                </select>
+              </label>
+              <label class="apd-field compact">
+                <span>毁伤模式</span>
+                <select v-model.number="editedParam.damage_mode">
+                  <option :value="0">未定义</option>
+                  <option :value="1">饱和攻击</option>
+                  <option :value="2">不饱和攻击</option>
+                </select>
+              </label>
+              <label class="apd-field compact">
+                <span>遮蔽顶</span>
+                <select v-model.number="editedParam.blank">
+                  <option :value="0">未定义</option>
+                  <option :value="1">有遮蔽顶</option>
+                  <option :value="2">无遮蔽顶</option>
+                </select>
+              </label>
+              <label class="apd-field compact">
+                <span>计划发射数量</span>
+                <input v-model.number="editedParam.planned_ammo" type="number" min="0" />
+              </label>
+            </div>
+          </div>
 
           <!-- 通用参数 -->
           <div class="apd-section">
@@ -288,12 +289,12 @@
                   <span>继续</span>
                 </label>
                 <label class="apd-radio">
-                  <input v-model="editedParam.disconnect_strategy" type="radio" value="return" />
-                  <span>停车返航</span>
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="stop" />
+                  <span>停车</span>
                 </label>
                 <label class="apd-radio">
-                  <input v-model="editedParam.disconnect_strategy" type="radio" value="forward_100m" />
-                  <span>前进100米</span>
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="return" />
+                  <span>返航</span>
                 </label>
               </div>
             </label>
@@ -1048,5 +1049,23 @@ function onSave() {
   font-size: 0.8rem;
   outline: none;
   width: 100%;
+}
+
+.apd-strike-extra {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.55rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(0, 222, 200, 0.1);
+}
+
+.apd-strike-extra .apd-field.compact span {
+  font-size: 0.72rem;
+}
+
+.apd-strike-extra .apd-field.compact input,
+.apd-strike-extra .apd-field.compact select {
+  padding: 0.35rem 0.45rem;
+  font-size: 0.82rem;
 }
 </style>
