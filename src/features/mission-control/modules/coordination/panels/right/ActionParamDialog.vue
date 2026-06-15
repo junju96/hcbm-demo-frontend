@@ -184,8 +184,8 @@
           </label>
         </template>
 
-        <!-- 40mm机炮打击 -->
-        <template v-else-if="normalizedActionType === '40mm-gun-launch'">
+        <!-- 40mm机炮打击 / 机枪打击：共用目标点列表样式 -->
+        <template v-else-if="normalizedActionType === '40mm-gun-launch' || normalizedActionType === '7.62mm-gun-shot'">
           <!-- 打击参数：目标点列表 -->
           <div class="apd-section">
             <div class="apd-section-title">
@@ -226,7 +226,7 @@
               </select>
               <input v-model.number="t.altitude" type="number" step="0.1" placeholder="高程" />
               <select v-model="t.target_type">
-                <option v-for="opt in TARGET_TYPE_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+                <option v-for="opt in currentTargetTypeOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
               <button
                 class="as-btn mini danger"
@@ -460,12 +460,18 @@ const vehicleName = computed(() =>
 
 const isStrikeAction = computed(() =>
   [
-    '7.62mm-gun-shot',
     'at-missile-launch',
     'rocket-launch',
     'loitering-munition-launch',
   ].includes(normalizedActionType.value)
 );
+
+const currentTargetTypeOptions = computed(() => {
+  if (normalizedActionType.value === '7.62mm-gun-shot') {
+    return TARGET_TYPE_OPTIONS_GUN;
+  }
+  return TARGET_TYPE_OPTIONS_40MM;
+});
 
 const isRelayAction = computed(() =>
   ['land-communication-relay', 'air-communication-relay'].includes(normalizedActionType.value)
@@ -475,7 +481,8 @@ function cloneParam(param) {
   return JSON.parse(JSON.stringify(param || {}));
 }
 
-const TARGET_TYPE_OPTIONS = [
+// 40mm 机炮打击使用 21 项目标类型
+const TARGET_TYPE_OPTIONS_40MM = [
   '无定义',
   '人员',
   '汽车',
@@ -497,6 +504,25 @@ const TARGET_TYPE_OPTIONS = [
   '通信枢纽',
   '地下空间',
   '其他',
+];
+
+// 机枪打击使用 15 项目标类型
+const TARGET_TYPE_OPTIONS_GUN = [
+  '无定义',
+  '人员',
+  '汽车',
+  '卡车',
+  '装甲车',
+  '越野车',
+  '坦克',
+  '炮兵阵地',
+  '工事',
+  '电台基站',
+  '直升机',
+  '无人机',
+  '巡航导弹',
+  '火力阵地',
+  '导弹基地',
 ];
 
 function buildEmptyTarget() {
@@ -554,7 +580,7 @@ function ensureShape() {
     p.fov_deg = p.fov_deg ?? 0;
     p.move_time_s = p.move_time_s ?? 0;
     p.scan_time_s = p.scan_time_s ?? 0;
-  } else if (type === '40mm-gun-launch') {
+  } else if (type === '40mm-gun-launch' || type === '7.62mm-gun-shot') {
     // 目标点列表
     if (!Array.isArray(p.targets) || p.targets.length === 0) {
       p.targets = [buildEmptyTarget()];
