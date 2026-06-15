@@ -184,8 +184,8 @@
           </label>
         </template>
 
-        <!-- 40mm机炮打击 / 机枪打击：共用目标点列表样式 -->
-        <template v-else-if="normalizedActionType === '40mm-gun-launch' || normalizedActionType === '7.62mm-gun-shot'">
+        <!-- 打击类：40mm / 机枪 / 导弹 / 火箭弹 / 巡飞弹，共用目标点列表样式 -->
+        <template v-else-if="isTargetListStrike">
           <!-- 打击参数：目标点列表 -->
           <div class="apd-section">
             <div class="apd-section-title">
@@ -316,62 +316,6 @@
           </div>
         </template>
 
-        <!-- 打击类：7.62mm/AT导弹/火箭弹/巡飞弹 -->
-        <template v-else-if="isStrikeAction">
-          <label class="apd-field">
-            <span>目标ID</span>
-            <input v-model="editedParam.target_id" type="text" />
-          </label>
-          <label class="apd-field">
-            <span>目标名称</span>
-            <input v-model="editedParam.target_name" type="text" />
-          </label>
-          <label class="apd-field">
-            <span>发射时间 (s)</span>
-            <input v-model.number="editedParam.fire_duration_s" type="number" min="0" />
-          </label>
-          <div class="apd-section">
-            <div class="apd-section-title">打击位置</div>
-            <div class="apd-point-row">
-              <label class="apd-field compact">
-                <span>经度</span>
-                <input v-model.number="editedParam.fire_position.lon" type="number" step="0.0001" />
-              </label>
-              <label class="apd-field compact">
-                <span>纬度</span>
-                <input v-model.number="editedParam.fire_position.lat" type="number" step="0.0001" />
-              </label>
-            </div>
-          </div>
-          <label class="apd-field">
-            <span>发射模式</span>
-            <select v-model.number="editedParam.fire_mode">
-              <option :value="1">单发</option>
-              <option :value="2">多发</option>
-            </select>
-          </label>
-          <label class="apd-field">
-            <span>毁伤模式</span>
-            <select v-model.number="editedParam.damage_mode">
-              <option :value="0">未定义</option>
-              <option :value="1">饱和攻击</option>
-              <option :value="2">不饱和攻击</option>
-            </select>
-          </label>
-          <label class="apd-field">
-            <span>遮蔽顶</span>
-            <select v-model.number="editedParam.blank">
-              <option :value="0">未定义</option>
-              <option :value="1">有遮蔽顶</option>
-              <option :value="2">无遮蔽顶</option>
-            </select>
-          </label>
-          <label class="apd-field">
-            <span>计划发射数量</span>
-            <input v-model.number="editedParam.planned_ammo" type="number" min="0" />
-          </label>
-        </template>
-
         <!-- search-and-shoot: 侦察打击 -->
         <template v-else-if="normalizedActionType === 'search-and-shoot'">
           <label class="apd-field">
@@ -458,8 +402,10 @@ const vehicleName = computed(() =>
   String(props.vehicleVid || props.action?.vid || '').replace('equipment:', '')
 );
 
-const isStrikeAction = computed(() =>
+const isTargetListStrike = computed(() =>
   [
+    '40mm-gun-launch',
+    '7.62mm-gun-shot',
     'at-missile-launch',
     'rocket-launch',
     'loitering-munition-launch',
@@ -467,10 +413,10 @@ const isStrikeAction = computed(() =>
 );
 
 const currentTargetTypeOptions = computed(() => {
-  if (normalizedActionType.value === '7.62mm-gun-shot') {
-    return TARGET_TYPE_OPTIONS_GUN;
+  if (normalizedActionType.value === '40mm-gun-launch') {
+    return TARGET_TYPE_OPTIONS_40MM;
   }
-  return TARGET_TYPE_OPTIONS_40MM;
+  return TARGET_TYPE_OPTIONS_GUN;
 });
 
 const isRelayAction = computed(() =>
@@ -580,8 +526,8 @@ function ensureShape() {
     p.fov_deg = p.fov_deg ?? 0;
     p.move_time_s = p.move_time_s ?? 0;
     p.scan_time_s = p.scan_time_s ?? 0;
-  } else if (type === '40mm-gun-launch' || type === '7.62mm-gun-shot') {
-    // 目标点列表
+  } else if (isTargetListStrike.value) {
+    // 目标点列表（40mm / 机枪 / 导弹 / 火箭弹 / 巡飞弹 共用）
     if (!Array.isArray(p.targets) || p.targets.length === 0) {
       p.targets = [buildEmptyTarget()];
     } else {
