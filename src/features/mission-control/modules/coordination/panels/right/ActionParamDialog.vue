@@ -133,55 +133,106 @@
 
         <!-- Lens-Recon: 光电侦察 -->
         <template v-else-if="normalizedActionType === 'lens-recon'">
-          <label class="apd-field">
-            <span>目标ID</span>
-            <input v-model="editedParam.target_id" type="text" />
-          </label>
-          <label class="apd-field">
-            <span>目标名称</span>
-            <input v-model="editedParam.target_name" type="text" />
-          </label>
-          <label class="apd-field">
-            <span>侦察模式</span>
-            <select v-model.number="editedParam.type">
-              <option :value="1">只识别</option>
-              <option :value="2">识别+测距</option>
-              <option :value="3">识别+跟踪</option>
-            </select>
-          </label>
+          <!-- 侦察参数 -->
           <div class="apd-section">
-            <div class="apd-section-title">侦察点位</div>
-            <div class="apd-point-row">
-              <label class="apd-field compact">
-                <span>经度</span>
-                <input v-model.number="editedParam.recon_position.lon" type="number" step="0.0001" />
-              </label>
-              <label class="apd-field compact">
-                <span>纬度</span>
-                <input v-model.number="editedParam.recon_position.lat" type="number" step="0.0001" />
-              </label>
-              <label class="apd-field compact">
-                <span>高度</span>
-                <input v-model.number="editedParam.recon_position.alt" type="number" step="0.1" />
-              </label>
+            <div class="apd-section-title">侦察参数</div>
+            <label class="apd-field">
+              <span>目标ID</span>
+              <input v-model="editedParam.target_id" type="text" />
+            </label>
+            <label class="apd-field">
+              <span>目标名称</span>
+              <input v-model="editedParam.target_name" type="text" />
+            </label>
+            <label class="apd-field">
+              <span>侦察模式</span>
+              <select v-model.number="editedParam.type">
+                <option :value="1">只识别</option>
+                <option :value="2">识别+测距</option>
+                <option :value="3">识别+跟踪</option>
+              </select>
+            </label>
+            <label class="apd-field">
+              <span>区域选择</span>
+              <select v-model="editedParam.area_id" @change="onAreaChange">
+                <option value="">-- 请选择区域 --</option>
+                <option v-for="area in areaList" :key="area.resource_id" :value="area.resource_id">
+                  {{ area.title || area.resource_name || area.resource_id }}
+                </option>
+              </select>
+            </label>
+
+            <div class="apd-section-title sub">区域点列表</div>
+            <div class="apd-route-table-head">
+              <span>经度</span>
+              <span>纬度</span>
+              <span>高程</span>
             </div>
+            <div
+              v-for="(pt, idx) in editedParam.area_points"
+              :key="idx"
+              class="apd-route-table-row"
+            >
+              <span>{{ formatCoord(pt.lon) }}</span>
+              <span>{{ formatCoord(pt.lat) }}</span>
+              <span>{{ pt.alt ?? 0 }}</span>
+            </div>
+            <div v-if="!editedParam.area_points.length" class="apd-empty small">未选择区域</div>
+
+            <label class="apd-field compact">
+              <span>方位角 (°)</span>
+              <input v-model.number="editedParam.azimuth_deg" type="number" step="0.1" />
+            </label>
+            <label class="apd-field compact">
+              <span>视野角度 (°)</span>
+              <input v-model.number="editedParam.fov_deg" type="number" step="0.1" />
+            </label>
+            <label class="apd-field compact">
+              <span>移动时间 (s)</span>
+              <input v-model.number="editedParam.move_time_s" type="number" step="0.1" />
+            </label>
+            <label class="apd-field compact">
+              <span>扫描时间 (s)</span>
+              <input v-model.number="editedParam.scan_time_s" type="number" step="0.1" />
+            </label>
           </div>
-          <label class="apd-field">
-            <span>方位角 (°)</span>
-            <input v-model.number="editedParam.azimuth_deg" type="number" step="0.1" />
-          </label>
-          <label class="apd-field">
-            <span>视野角度 (°)</span>
-            <input v-model.number="editedParam.fov_deg" type="number" step="0.1" />
-          </label>
-          <label class="apd-field">
-            <span>移动时间 (s)</span>
-            <input v-model.number="editedParam.move_time_s" type="number" step="0.1" />
-          </label>
-          <label class="apd-field">
-            <span>扫描时间 (s)</span>
-            <input v-model.number="editedParam.scan_time_s" type="number" step="0.1" />
-          </label>
+
+          <!-- 通用参数 -->
+          <div class="apd-section">
+            <div class="apd-section-title">通用参数</div>
+            <label class="apd-field">
+              <span>断连策略</span>
+              <div class="apd-radio-row">
+                <label class="apd-radio">
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="continue" />
+                  <span>继续</span>
+                </label>
+                <label class="apd-radio">
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="stop" />
+                  <span>停车</span>
+                </label>
+                <label class="apd-radio">
+                  <input v-model="editedParam.disconnect_strategy" type="radio" value="return" />
+                  <span>返航</span>
+                </label>
+              </div>
+            </label>
+            <label class="apd-field">
+              <span>任务时长 (HH:MM:SS)</span>
+              <input v-model="editedParam.mission_duration" type="text" placeholder="00:00:00" />
+            </label>
+            <label class="apd-field">
+              <span class="apd-check">
+                <input v-model="editedParam.enable_start_time" type="checkbox" />
+                <span>设置开始时间</span>
+              </span>
+              <input
+                v-model="editedParam.start_time"
+                type="datetime-local"
+                :disabled="!editedParam.enable_start_time"
+              />
+            </label>
+          </div>
         </template>
 
         <!-- 打击类：40mm / 机枪 / 导弹 / 火箭弹 / 巡飞弹，共用目标点列表样式 -->
@@ -377,6 +428,8 @@ const routeList = ref([]);
 const loadingRoutes = ref(false);
 const targetList = ref([]);
 const loadingTargets = ref(false);
+const areaList = ref([]);
+const loadingAreas = ref(false);
 
 const normalizedActionType = computed(() =>
   String(props.action?.action_type || '').toLowerCase()
@@ -517,15 +570,34 @@ function ensureShape() {
     p.target_id = p.target_id ?? '';
     p.target_name = p.target_name ?? '';
     p.type = p.type ?? 2;
-    p.recon_position = {
-      lon: p.recon_position?.lon ?? p.recon_position?.longitude ?? 0,
-      lat: p.recon_position?.lat ?? p.recon_position?.latitude ?? 0,
-      alt: p.recon_position?.alt ?? p.recon_position?.altitude ?? 0,
-    };
+    // 区域选择 + 区域点列表
+    p.area_id = p.area_id ?? '';
+    p.area_points = Array.isArray(p.area_points)
+      ? p.area_points.map((pt) => ({
+          lon: pt?.lon ?? pt?.longitude ?? 0,
+          lat: pt?.lat ?? pt?.latitude ?? 0,
+          alt: pt?.alt ?? pt?.altitude ?? 0,
+        }))
+      : [];
+    // 兼容旧数据：如果存在 recon_position 但没有 area_points，则迁移过来
+    if (!p.area_points.length && p.recon_position) {
+      p.area_points = [
+        {
+          lon: p.recon_position?.lon ?? p.recon_position?.longitude ?? 0,
+          lat: p.recon_position?.lat ?? p.recon_position?.latitude ?? 0,
+          alt: p.recon_position?.alt ?? p.recon_position?.altitude ?? 0,
+        },
+      ];
+    }
     p.azimuth_deg = p.azimuth_deg ?? 0;
     p.fov_deg = p.fov_deg ?? 0;
     p.move_time_s = p.move_time_s ?? 0;
     p.scan_time_s = p.scan_time_s ?? 0;
+    // 通用参数
+    p.disconnect_strategy = p.disconnect_strategy ?? 'continue';
+    p.mission_duration = p.mission_duration ?? '00:00:00';
+    p.enable_start_time = p.enable_start_time ?? false;
+    p.start_time = p.start_time ?? '';
   } else if (isTargetListStrike.value) {
     // 目标点列表（40mm / 机枪 / 导弹 / 火箭弹 / 巡飞弹 共用）
     if (!Array.isArray(p.targets) || p.targets.length === 0) {
@@ -584,6 +656,7 @@ watch(
 onMounted(() => {
   loadRoutes();
   loadTargets();
+  loadAreas();
 });
 
 async function loadRoutes() {
@@ -598,6 +671,18 @@ async function loadRoutes() {
   }
 }
 
+async function loadAreas() {
+  loadingAreas.value = true;
+  try {
+    const result = await fetchResourcePoolByType('AREA', 50);
+    if (result.ok) {
+      areaList.value = result.data?.items || [];
+    }
+  } finally {
+    loadingAreas.value = false;
+  }
+}
+
 async function loadTargets() {
   loadingTargets.value = true;
   try {
@@ -607,6 +692,19 @@ async function loadTargets() {
     }
   } finally {
     loadingTargets.value = false;
+  }
+}
+
+function onAreaChange() {
+  const area = areaList.value.find((a) => a.resource_id === editedParam.value.area_id);
+  if (area && Array.isArray(area.polygon)) {
+    editedParam.value.area_points = area.polygon.map((pt) => ({
+      lon: pt?.lon ?? pt?.longitude ?? 0,
+      lat: pt?.lat ?? pt?.latitude ?? 0,
+      alt: pt?.alt ?? pt?.altitude ?? 0,
+    }));
+  } else {
+    editedParam.value.area_points = [];
   }
 }
 
