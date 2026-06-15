@@ -491,6 +491,12 @@ const TARGET_TYPE_OPTIONS = [
   '巡航导弹',
   '火力阵地',
   '导弹基地',
+  '武装人员',
+  '工事火力点',
+  '敌指挥所',
+  '通信枢纽',
+  '地下空间',
+  '其他',
 ];
 
 function buildEmptyTarget() {
