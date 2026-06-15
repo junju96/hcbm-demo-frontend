@@ -131,8 +131,8 @@
           </div>
         </template>
 
-        <!-- Lens-Recon: 光电侦察 -->
-        <template v-else-if="normalizedActionType === 'lens-recon'">
+        <!-- Lens-Recon / search-and-shoot: 光电侦察 / 侦察打击 共用侦察参数界面 -->
+        <template v-else-if="normalizedActionType === 'lens-recon' || normalizedActionType === 'search-and-shoot'">
           <!-- 侦察参数 -->
           <div class="apd-section">
             <div class="apd-section-title">侦察参数</div>
@@ -367,22 +367,6 @@
           </div>
         </template>
 
-        <!-- search-and-shoot: 侦察打击 -->
-        <template v-else-if="normalizedActionType === 'search-and-shoot'">
-          <label class="apd-field">
-            <span>目标ID</span>
-            <input v-model="editedParam.target_id" type="text" />
-          </label>
-          <label class="apd-field">
-            <span>目标名称</span>
-            <input v-model="editedParam.target_name" type="text" />
-          </label>
-          <label class="apd-field">
-            <span>行动时间 (s)</span>
-            <input v-model.number="editedParam.time" type="number" step="0.1" />
-          </label>
-        </template>
-
         <!-- 通信中继类 -->
         <template v-else-if="isRelayAction">
           <label class="apd-field">
@@ -566,7 +550,7 @@ function ensureShape() {
     p.mission_duration = p.mission_duration ?? '00:00:00';
     p.enable_start_time = p.enable_start_time ?? false;
     p.start_time = p.start_time ?? '';
-  } else if (type === 'lens-recon') {
+  } else if (type === 'lens-recon' || type === 'search-and-shoot') {
     p.target_id = p.target_id ?? '';
     p.target_name = p.target_name ?? '';
     p.type = p.type ?? 2;
@@ -622,10 +606,6 @@ function ensureShape() {
     p.mission_duration = p.mission_duration ?? '00:00:00';
     p.enable_start_time = p.enable_start_time ?? false;
     p.start_time = p.start_time ?? '';
-  } else if (type === 'search-and-shoot') {
-    p.target_id = p.target_id ?? '';
-    p.target_name = p.target_name ?? '';
-    p.time = p.time ?? 10;
   } else if (isRelayAction.value) {
     p.duration_s = p.duration_s ?? 900;
     p.ip = p.ip ?? '192.168.168.100';
