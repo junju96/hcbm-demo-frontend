@@ -16,11 +16,11 @@
       <span>高度</span>
       <span></span>
     </div>
-    <div v-for="(pt, idx) in modelValue" :key="idx" class="apd-route-table-row" style="grid-template-columns: 1fr 1fr 1fr 0.6fr;">
+    <div v-for="(pt, idx) in modelValue" :key="idx" class="apd-route-table-row" style="grid-template-columns: 1fr 1fr 1fr auto;">
       <input v-model.number="pt.lon" type="number" step="0.000001" placeholder="经度" />
       <input v-model.number="pt.lat" type="number" step="0.000001" placeholder="纬度" />
       <input v-model.number="pt.alt" type="number" step="0.1" placeholder="高度" />
-      <button class="as-btn mini danger" type="button" :disabled="modelValue.length <= 1" @click="removePoint(idx)">删</button>
+      <button class="as-btn mini danger" type="button" :disabled="modelValue.length <= 1" @click="removePoint(idx)">删除</button>
     </div>
     <button class="as-btn mini primary" type="button" @click="addPoint">+ 添加区域点</button>
   </div>
@@ -120,7 +120,7 @@ function removePoint(idx) {
 
 .apd-route-table-head {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 0.6fr;
+  grid-template-columns: 1fr 1fr 1fr auto;
   gap: 0.3rem;
   font-size: 0.72rem;
   color: rgba(226, 246, 248, 0.65);
@@ -130,7 +130,7 @@ function removePoint(idx) {
 
 .apd-route-table-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 0.6fr;
+  grid-template-columns: 1fr 1fr 1fr auto;
   gap: 0.3rem;
   align-items: center;
   padding: 0.2rem 0;

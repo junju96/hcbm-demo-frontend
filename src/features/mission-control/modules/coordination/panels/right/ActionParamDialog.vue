@@ -39,7 +39,7 @@
                 <option :value="2">非路网必经点</option>
                 <option :value="3">禁行点</option>
               </select>
-              <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removePoint('points', idx)">删</button>
+              <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removePoint('points', idx)">删除</button>
             </div>
             <button class="as-btn mini primary" type="button" @click="addPoint('points')">+ 添加路径点</button>
           </div>
@@ -125,7 +125,7 @@
               <input v-model.number="pt.alt" type="number" step="0.1" />
               <input v-model.number="pt.offsetX" type="number" />
               <input v-model.number="pt.offsetY" type="number" />
-              <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removePoint('points', idx)">删</button>
+              <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removePoint('points', idx)">删除</button>
             </div>
             <button class="as-btn mini primary" type="button" @click="addPoint('points')">+ 添加路径点</button>
           </div>
@@ -221,7 +221,7 @@
               <input v-model.number="pt.lon" type="number" step="0.000001" />
               <input v-model.number="pt.lat" type="number" step="0.000001" />
               <input v-model.number="pt.alt" type="number" step="0.1" />
-              <button class="as-btn mini danger" type="button" :disabled="editedParam.area.length <= 1" @click="removePoint('area', idx)">删</button>
+              <button class="as-btn mini danger" type="button" :disabled="editedParam.area.length <= 1" @click="removePoint('area', idx)">删除</button>
             </div>
             <button class="as-btn mini primary" type="button" @click="addPoint('area')">+ 添加区域点</button>
           </div>
@@ -441,7 +441,7 @@
             <div v-for="(f, idx) in editedParam.frequency" :key="idx" class="apd-freq-row">
               <input v-model.number="f.start" type="number" placeholder="起始频率 (Hz)" />
               <input v-model.number="f.end" type="number" placeholder="结束频率 (Hz)" />
-              <button class="as-btn mini danger" type="button" @click="removeFreq(idx)">删</button>
+              <button class="as-btn mini danger" type="button" @click="removeFreq(idx)">删除</button>
             </div>
             <button class="as-btn mini primary" type="button" @click="addFreq">+ 添加频段</button>
           </div>
@@ -1155,7 +1155,7 @@ function onSave() {
 .apd-route-table-head,
 .apd-target-table-head {
   display: grid;
-  grid-template-columns: 1.2fr 1.2fr 0.9fr 0.9fr 0.9fr 0.6fr;
+  grid-template-columns: 1.2fr 1.2fr 0.9fr 0.9fr 0.9fr auto;
   gap: 0.3rem;
   font-size: 0.72rem;
   color: rgba(226, 246, 248, 0.65);
@@ -1164,20 +1164,20 @@ function onSave() {
 }
 
 .apd-target-table-head {
-  grid-template-columns: 1.2fr 1fr 1fr 0.7fr 1fr 0.6fr;
+  grid-template-columns: 1.2fr 1fr 1fr 0.7fr 1fr auto;
 }
 
 .apd-route-table-row,
 .apd-target-table-row {
   display: grid;
-  grid-template-columns: 1.2fr 1.2fr 0.9fr 0.9fr 0.9fr 0.6fr;
+  grid-template-columns: 1.2fr 1.2fr 0.9fr 0.9fr 0.9fr auto;
   gap: 0.3rem;
   align-items: center;
   padding: 0.25rem 0;
 }
 
 .apd-target-table-row {
-  grid-template-columns: 1.2fr 1fr 1fr 0.7fr 1fr 0.6fr;
+  grid-template-columns: 1.2fr 1fr 1fr 0.7fr 1fr auto;
 }
 
 .apd-route-table-row input,
