@@ -113,7 +113,7 @@
                   <div
                     class="as-action-card"
                     :class="`state-${(action.state || 'SCHEDULED').toLowerCase()}`"
-                    @dblclick="openParamDialog(action, vehicle.vid)"
+                    @dblclick="openParamDialog(action, vehicle)"
                   >
                     <div class="as-card-header" :title="action.name">
                       <span class="marquee-text">{{ action.name }}</span>
@@ -217,6 +217,7 @@
         v-if="showParamDialog"
         :action="editingAction"
         :vehicle-vid="editingVehicleVid"
+        :vehicle-type="editingVehicleType"
         @close="closeParamDialog"
         @save="saveActionParam"
       />
@@ -287,6 +288,7 @@ const selectedDispatchVids = ref([]);
 const showParamDialog = ref(false);
 const editingAction = ref(null);
 const editingVehicleVid = ref('');
+const editingVehicleType = ref('');
 const savingParam = ref(false);
 
 /* ---------- 地图上图 ---------- */
@@ -731,10 +733,11 @@ const getVehicleRuntimeState = (vehicle) => {
 };
 
 /* ---------- 行动参数弹窗 ---------- */
-const openParamDialog = (action, vehicleVid) => {
+const openParamDialog = (action, vehicle) => {
   if (!action || !action.action_id) return;
   editingAction.value = action;
-  editingVehicleVid.value = vehicleVid || action.vid || '';
+  editingVehicleVid.value = vehicle?.vid || action.vid || '';
+  editingVehicleType.value = vehicle?.resource_type || '';
   showParamDialog.value = true;
 };
 
@@ -742,6 +745,7 @@ const closeParamDialog = () => {
   showParamDialog.value = false;
   editingAction.value = null;
   editingVehicleVid.value = '';
+  editingVehicleType.value = '';
 };
 
 const saveActionParam = async (newParam) => {
