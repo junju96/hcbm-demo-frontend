@@ -178,6 +178,75 @@
         </template>
 
         <!-- 9. 光电侦察（火力/侦打/巡逻） -->
+        <template v-else-if="normalizedActionType === 'air-recon'">
+          <div class="apd-section">
+            <div class="apd-section-title">侦察参数</div>
+            <label class="apd-field">
+              <span>侦察类型</span>
+              <select v-model.number="editedParam.type">
+                <option :value="1">区域</option>
+                <option :value="2">定点</option>
+              </select>
+            </label>
+            <label class="apd-field">
+              <span>侦察模式</span>
+              <select v-model.number="editedParam.mode">
+                <option :value="1">侦察</option>
+                <option :value="2">侦察跟踪</option>
+              </select>
+            </label>
+            <label class="apd-field"><span>任务时间 (s)</span><input v-model.number="editedParam.time" type="number" /></label>
+          </div>
+          <div class="apd-section">
+            <div class="apd-section-title">航路点列表</div>
+            <div class="apd-air-table-head">
+              <span>经度</span>
+              <span>纬度</span>
+              <span>高度</span>
+              <span>航点类型</span>
+              <span>速度</span>
+              <span>相机</span>
+              <span>俯仰</span>
+              <span>偏航</span>
+              <span>动作</span>
+              <span>朝向</span>
+              <span>倍率</span>
+              <span>悬停</span>
+            </div>
+            <div v-for="(pt, idx) in editedParam.points1" :key="idx" class="apd-air-table-row">
+              <input v-model.number="pt.lon" type="number" step="0.000001" />
+              <input v-model.number="pt.lat" type="number" step="0.000001" />
+              <input v-model.number="pt.alt" type="number" step="0.1" />
+              <select v-model.number="pt.type">
+                <option :value="0">普通</option>
+                <option :value="1">起飞</option>
+                <option :value="2">降落</option>
+                <option :value="5">返航</option>
+              </select>
+              <input v-model.number="pt.speed" type="number" />
+              <select v-model.number="pt.camera">
+                <option :value="1">无</option>
+                <option :value="2">拍照</option>
+                <option :value="4">开始录像</option>
+                <option :value="5">停止录像</option>
+                <option :value="6">识别上报</option>
+                <option :value="7">识别上报并追踪</option>
+              </select>
+              <input v-model.number="pt.gimpitch" type="number" />
+              <input v-model.number="pt.gimyaw" type="number" />
+              <select v-model.number="pt.action">
+                <option :value="0">短停</option>
+                <option :value="1">通过</option>
+              </select>
+              <input v-model.number="pt.playaw" type="number" />
+              <input v-model.number="pt.zoom" type="number" />
+              <input v-model.number="pt.loiter" type="number" />
+              <button class="as-btn mini danger" type="button" :disabled="editedParam.points1.length <= 1" @click="removePoint('points1', idx)">删除</button>
+            </div>
+            <button class="as-btn mini primary" type="button" @click="addPoint('points1')">+ 添加航路点</button>
+          </div>
+        </template>
+
         <template v-else-if="normalizedActionType === 'lens-recon'">
           <div class="apd-section">
             <div class="apd-section-title">侦察参数</div>
@@ -551,6 +620,8 @@ const normalizedVehicleType = computed(() => {
     'recon_strike_ugv': 'recon_strike',
     'patrol_ugv': 'patrol',
     'electronic_ugv': 'electronic',
+    'air_ground_uav': 'air_ground',
+    'air_ground_ugv': 'air_ground',
   };
   return map[rt] || '';
 });
@@ -580,6 +651,7 @@ const actionTypeLabel = computed(() => {
     'electronic-recon': '电磁侦察',
     'electronic-jamming': '电磁突击 / 电磁干扰',
     'payload-silent': '载荷静默',
+    'air-recon': '空中侦察',
   };
   return map[normalizedActionType.value] || props.action?.action_type || '未知类型';
 });
@@ -605,7 +677,8 @@ const showCommonParams = computed(() =>
   ['auto-move', 'follow-move', 'silent-guard', 'formation-move', 'manual-task', 'pose-adjust',
    'lens-recon', 'recon-strike', '40mm-gun-launch', 'gun-shot', 'at-missile-launch',
    'rocket-launch', 'loitering-munition-launch', 'laser-illumination',
-   'acoustic-deterrence', 'light-deterrence', 'electronic-recon', 'electronic-jamming', 'payload-silent']
+   'acoustic-deterrence', 'light-deterrence', 'electronic-recon', 'electronic-jamming',
+   'payload-silent', 'air-recon']
     .includes(normalizedActionType.value)
 );
 
@@ -651,6 +724,23 @@ function defaultStrikePoint() {
 
 function defaultDirect() {
   return { type: 1, cent: 9000, sear: 6000, up: 3000, down: -1000, dist: 2000, sens: 0 };
+}
+
+function defaultAirReconPoint() {
+  return {
+    lon: 116.13,
+    lat: 39.766,
+    alt: 100,
+    type: 0,
+    speed: 150,
+    camera: 2,
+    gimpitch: 36100,
+    gimyaw: 36100,
+    action: 1,
+    playaw: 36100,
+    zoom: 10,
+    loiter: 0,
+  };
 }
 
 function ensureShape() {
@@ -708,6 +798,17 @@ function ensureShape() {
     p.pose_deviation = Array.isArray(p.pose_deviation) ? p.pose_deviation : [36100, 9100, 9100];
     p.limited_speed = p.limited_speed ?? 10;
     p.safe_mode = p.safe_mode ?? 0;
+    p.disconnect_strategy = p.disconnect_strategy ?? 'continue';
+    p.mission_duration = p.mission_duration ?? '00:00:00';
+    p.enable_start_time = p.enable_start_time ?? false;
+    p.start_time = p.start_time ?? '';
+  } else if (type === 'air-recon') {
+    p.type = p.type ?? 2;
+    p.mode = p.mode ?? 1;
+    p.time = p.time ?? 120;
+    p.points1 = Array.isArray(p.points1) && p.points1.length ? p.points1 : [defaultAirReconPoint()];
+    p.points2 = Array.isArray(p.points2) ? p.points2 : [];
+    p.points3 = Array.isArray(p.points3) ? p.points3 : [];
     p.disconnect_strategy = p.disconnect_strategy ?? 'continue';
     p.mission_duration = p.mission_duration ?? '00:00:00';
     p.enable_start_time = p.enable_start_time ?? false;
@@ -944,7 +1045,7 @@ function initFromTargetSelection() {
 }
 
 function addPoint(field) {
-  const defaults = { points: defaultPoint, area: defaultAreaPoint };
+  const defaults = { points: defaultPoint, area: defaultAreaPoint, points1: defaultAirReconPoint };
   editedParam.value[field].push(defaults[field] ? defaults[field]() : defaultPoint());
 }
 
@@ -1191,6 +1292,35 @@ function onSave() {
   padding: 0.25rem 0.3rem;
   color: #f1feff;
   font-size: 0.75rem;
+}
+
+.apd-air-table-head {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 0.7fr 0.9fr 0.6fr 0.9fr 0.7fr 0.7fr 0.7fr 0.7fr 0.5fr 0.5fr auto;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  color: rgba(226, 246, 248, 0.65);
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(0, 222, 200, 0.12);
+}
+
+.apd-air-table-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 0.7fr 0.9fr 0.6fr 0.9fr 0.7fr 0.7fr 0.7fr 0.7fr 0.5fr 0.5fr auto;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0.2rem 0;
+}
+
+.apd-air-table-row input,
+.apd-air-table-row select {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(0, 222, 200, 0.2);
+  border-radius: 4px;
+  padding: 0.2rem 0.25rem;
+  color: #f1feff;
+  font-size: 0.72rem;
 }
 
 .apd-freq-row {

@@ -129,6 +129,9 @@
                       <span v-if="action.param?.waypoints" class="as-card-waypoints" :title="`${action.param.waypoints.length} 个航路点`">
                         <span class="marquee-text">{{ action.param.waypoints.length }} 个航路点</span>
                       </span>
+                      <span v-else-if="action.param?.points1?.length" class="as-card-waypoints" :title="`${action.param.points1.length} 个航路点`">
+                        <span class="marquee-text">{{ action.param.points1.length }} 个航路点</span>
+                      </span>
                       <span v-else-if="action.description" class="as-card-desc" :title="action.description">
                         <span class="marquee-text">{{ action.description }}</span>
                       </span>
