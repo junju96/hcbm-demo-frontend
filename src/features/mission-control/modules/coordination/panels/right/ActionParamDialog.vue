@@ -199,49 +199,45 @@
           </div>
           <div class="apd-section">
             <div class="apd-section-title">航路点列表</div>
-            <div class="apd-air-table-head">
-              <span>经度</span>
-              <span>纬度</span>
-              <span>高度</span>
-              <span>航点类型</span>
-              <span>速度</span>
-              <span>相机</span>
-              <span>俯仰</span>
-              <span>偏航</span>
-              <span>动作</span>
-              <span>朝向</span>
-              <span>倍率</span>
-              <span>悬停</span>
-            </div>
-            <div v-for="(pt, idx) in editedParam.points1" :key="idx" class="apd-air-table-row">
-              <input v-model.number="pt.lon" type="number" step="0.000001" />
-              <input v-model.number="pt.lat" type="number" step="0.000001" />
-              <input v-model.number="pt.alt" type="number" step="0.1" />
-              <select v-model.number="pt.type">
-                <option :value="0">普通</option>
-                <option :value="1">起飞</option>
-                <option :value="2">降落</option>
-                <option :value="5">返航</option>
-              </select>
-              <input v-model.number="pt.speed" type="number" />
-              <select v-model.number="pt.camera">
-                <option :value="1">无</option>
-                <option :value="2">拍照</option>
-                <option :value="4">开始录像</option>
-                <option :value="5">停止录像</option>
-                <option :value="6">识别上报</option>
-                <option :value="7">识别上报并追踪</option>
-              </select>
-              <input v-model.number="pt.gimpitch" type="number" />
-              <input v-model.number="pt.gimyaw" type="number" />
-              <select v-model.number="pt.action">
-                <option :value="0">短停</option>
-                <option :value="1">通过</option>
-              </select>
-              <input v-model.number="pt.playaw" type="number" />
-              <input v-model.number="pt.zoom" type="number" />
-              <input v-model.number="pt.loiter" type="number" />
-              <button class="as-btn mini danger" type="button" :disabled="editedParam.points1.length <= 1" @click="removePoint('points1', idx)">删除</button>
+            <div v-for="(pt, idx) in editedParam.points1" :key="idx" class="apd-air-point">
+              <div class="apd-air-row">
+                <label class="apd-air-cell"><span>经度</span><input v-model.number="pt.lon" type="number" step="0.000001" /></label>
+                <label class="apd-air-cell"><span>纬度</span><input v-model.number="pt.lat" type="number" step="0.000001" /></label>
+                <label class="apd-air-cell"><span>高度</span><input v-model.number="pt.alt" type="number" step="0.1" /></label>
+                <label class="apd-air-cell"><span>航点类型</span>
+                  <select v-model.number="pt.type">
+                    <option :value="0">普通</option>
+                    <option :value="1">起飞</option>
+                    <option :value="2">降落</option>
+                    <option :value="5">返航</option>
+                  </select>
+                </label>
+                <label class="apd-air-cell"><span>速度</span><input v-model.number="pt.speed" type="number" /></label>
+                <label class="apd-air-cell"><span>相机</span>
+                  <select v-model.number="pt.camera">
+                    <option :value="1">无</option>
+                    <option :value="2">拍照</option>
+                    <option :value="4">开始录像</option>
+                    <option :value="5">停止录像</option>
+                    <option :value="6">识别上报</option>
+                    <option :value="7">识别上报并追踪</option>
+                  </select>
+                </label>
+              </div>
+              <div class="apd-air-row">
+                <label class="apd-air-cell"><span>俯仰</span><input v-model.number="pt.gimpitch" type="number" /></label>
+                <label class="apd-air-cell"><span>偏航</span><input v-model.number="pt.gimyaw" type="number" /></label>
+                <label class="apd-air-cell"><span>动作</span>
+                  <select v-model.number="pt.action">
+                    <option :value="0">短停</option>
+                    <option :value="1">通过</option>
+                  </select>
+                </label>
+                <label class="apd-air-cell"><span>朝向</span><input v-model.number="pt.playaw" type="number" /></label>
+                <label class="apd-air-cell"><span>倍率</span><input v-model.number="pt.zoom" type="number" /></label>
+                <label class="apd-air-cell"><span>悬停</span><input v-model.number="pt.loiter" type="number" /></label>
+                <button class="as-btn mini danger" type="button" :disabled="editedParam.points1.length <= 1" @click="removePoint('points1', idx)">删除</button>
+              </div>
             </div>
             <button class="as-btn mini primary" type="button" @click="addPoint('points1')">+ 添加航路点</button>
           </div>
@@ -1294,33 +1290,55 @@ function onSave() {
   font-size: 0.75rem;
 }
 
-.apd-air-table-head {
+.apd-air-point {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 222, 200, 0.12);
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.apd-air-row {
   display: grid;
-  grid-template-columns: 1.2fr 1.2fr 0.7fr 0.9fr 0.6fr 0.9fr 0.7fr 0.7fr 0.7fr 0.7fr 0.5fr 0.5fr auto;
-  gap: 0.25rem;
+  grid-template-columns: repeat(6, 1fr) auto;
+  gap: 0.4rem;
+  align-items: end;
+}
+
+.apd-air-row + .apd-air-row {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed rgba(0, 222, 200, 0.1);
+}
+
+.apd-air-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.apd-air-cell span {
   font-size: 0.68rem;
   color: rgba(226, 246, 248, 0.65);
-  padding: 0.25rem 0;
-  border-bottom: 1px solid rgba(0, 222, 200, 0.12);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.apd-air-table-row {
-  display: grid;
-  grid-template-columns: 1.2fr 1.2fr 0.7fr 0.9fr 0.6fr 0.9fr 0.7fr 0.7fr 0.7fr 0.7fr 0.5fr 0.5fr auto;
-  gap: 0.25rem;
-  align-items: center;
-  padding: 0.2rem 0;
-}
-
-.apd-air-table-row input,
-.apd-air-table-row select {
+.apd-air-cell input,
+.apd-air-cell select {
   width: 100%;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(0, 222, 200, 0.2);
   border-radius: 4px;
-  padding: 0.2rem 0.25rem;
+  padding: 0.25rem 0.3rem;
   color: #f1feff;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
+}
+
+.apd-air-row > .as-btn.mini.danger {
+  margin-bottom: 0.05rem;
 }
 
 .apd-freq-row {
