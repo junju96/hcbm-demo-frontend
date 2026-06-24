@@ -29,6 +29,7 @@
         <div class="asc-header">
           <span>新建方案 - {{ selectedVehicleName }}</span>
           <div class="asc-header-actions">
+            <button class="as-btn mini ghost" type="button" title="按串/并行关系自动等距排列" @click="autoLayout">⊹ 自动对齐</button>
             <button class="as-btn mini primary" type="button" @click="savePlan">保存</button>
             <button class="as-btn mini" type="button" @click="$emit('close')">取消</button>
           </div>
@@ -379,6 +380,133 @@ function updateLines() {
 
 function removeLine(line) {
   lines.value = lines.value.filter((l) => l !== line);
+}
+
+/**
+ * 传递性约简：删除冗余的“直连”边
+ * 若 from→to 之间已存在经过其它节点的更长路径（长度≥2），
+ * 则这条直连边是多余的（视觉上表现为穿过中间的空线），予以删除。
+ */
+function reduceTransitiveEdges() {
+  const ids = nodes.value.map((n) => n.id);
+  const idSet = new Set(ids);
+  const valid = lines.value.filter((l) => idSet.has(l.from) && idSet.has(l.to) && l.from !== l.to);
+
+  // 去重（同 from/to 只保留一条）
+  const seen = new Set();
+  const unique = [];
+  valid.forEach((l) => {
+    const key = `${l.from}->${l.to}`;
+    if (!seen.has(key)) { seen.add(key); unique.push(l); }
+  });
+
+  const adj = {};
+  ids.forEach((id) => { adj[id] = []; });
+  unique.forEach((l) => adj[l.from].push(l.to));
+
+  // 排除某条直连边后，from 是否仍能到达 to
+  const reachableWithout = (from, to, skip) => {
+    const stack = [from];
+    const visited = new Set([from]);
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const next of adj[cur]) {
+        if (cur === skip.from && next === skip.to) continue; // 跳过被检查的直连边
+        if (next === to) return true;
+        if (!visited.has(next)) { visited.add(next); stack.push(next); }
+      }
+    }
+    return false;
+  };
+
+  const kept = unique.filter((l) => !reachableWithout(l.from, l.to, l));
+  const removed = unique.length - kept.length;
+  lines.value = kept;
+  return removed;
+}
+
+/**
+ * 自动对齐：按串/并行关系做分层布局
+ * - 串行（有连线先后）→ 按最长路径深度分到不同列，水平等距
+ * - 并行（同一深度）→ 同列垂直堆叠，等距且整体居中
+ */
+function autoLayout() {
+  if (nodes.value.length === 0) return;
+
+  // 先做传递性约简，去掉穿过中间的冗余直连边
+  reduceTransitiveEdges();
+
+  const NODE_W = 140;
+  const NODE_H = 56;
+  const COL_GAP = 90;   // 列间距（不含节点宽）
+  const ROW_GAP = 30;   // 行间距（不含节点高）
+  const PAD_X = 40;     // 画布左侧留白
+  const COL_STEP = NODE_W + COL_GAP;
+  const ROW_STEP = NODE_H + ROW_GAP;
+
+  const ids = nodes.value.map((n) => n.id);
+  const idSet = new Set(ids);
+  const adj = {};       // from -> [to]
+  const inDeg = {};
+  ids.forEach((id) => { adj[id] = []; inDeg[id] = 0; });
+  lines.value.forEach((l) => {
+    if (idSet.has(l.from) && idSet.has(l.to)) {
+      adj[l.from].push(l.to);
+      inDeg[l.to] = (inDeg[l.to] || 0) + 1;
+    }
+  });
+
+  // Kahn 拓扑排序 + 最长路径分层（含环保护）
+  const depth = {};
+  ids.forEach((id) => { depth[id] = 0; });
+  const remaining = { ...inDeg };
+  const queue = ids.filter((id) => remaining[id] === 0);
+  const visited = new Set();
+  while (queue.length) {
+    const id = queue.shift();
+    if (visited.has(id)) continue;
+    visited.add(id);
+    adj[id].forEach((to) => {
+      if (depth[to] < depth[id] + 1) depth[to] = depth[id] + 1;
+      remaining[to]--;
+      if (remaining[to] <= 0) queue.push(to);
+    });
+  }
+  // 环中节点未访问：按已访问前驱推一层，保证有列归属
+  ids.forEach((id) => {
+    if (!visited.has(id)) {
+      const preds = lines.value.filter((l) => l.to === id && idSet.has(l.from));
+      depth[id] = preds.reduce((m, l) => Math.max(m, (depth[l.from] || 0) + 1), depth[id]);
+    }
+  });
+
+  // 按列分组，保留节点原始顺序以稳定排列
+  const columns = {};
+  ids.forEach((id) => {
+    const d = depth[id];
+    (columns[d] = columns[d] || []).push(id);
+  });
+  const colKeys = Object.keys(columns).map(Number).sort((a, b) => a - b);
+
+  // 整体垂直居中：以最高的一列为基准
+  const maxRows = Math.max(...colKeys.map((k) => columns[k].length));
+  const blockHeight = maxRows * NODE_H + (maxRows - 1) * ROW_GAP;
+  const canvasH = canvasRef.value?.clientHeight || 600;
+  const baseTop = Math.max(20, (canvasH - blockHeight) / 2);
+
+  const nodeMap = Object.fromEntries(nodes.value.map((n) => [n.id, n]));
+  colKeys.forEach((d, colIdx) => {
+    const colNodes = columns[d];
+    const colH = colNodes.length * NODE_H + (colNodes.length - 1) * ROW_GAP;
+    const colTop = baseTop + (blockHeight - colH) / 2; // 每列在整体块内再次居中
+    colNodes.forEach((id, rowIdx) => {
+      const node = nodeMap[id];
+      node.x = PAD_X + colIdx * COL_STEP;
+      node.y = colTop + rowIdx * ROW_STEP;
+    });
+  });
+
+  updateLines();
 }
 
 function buildPlan() {
@@ -911,6 +1039,17 @@ async function savePlan() {
 .as-btn.primary {
   background: rgba(0, 222, 200, 0.25);
   border-color: rgba(0, 222, 200, 0.45);
+}
+
+.as-btn.ghost {
+  background: transparent;
+  border-color: rgba(0, 222, 200, 0.4);
+  color: #9ff5ec;
+}
+
+.as-btn.ghost:hover {
+  background: rgba(0, 222, 200, 0.14);
+  border-color: rgba(0, 222, 200, 0.6);
 }
 
 .as-btn.mini {
