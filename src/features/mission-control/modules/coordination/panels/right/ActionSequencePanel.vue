@@ -6,6 +6,9 @@
         <button class="as-btn primary" type="button" @click="onRefresh">
           刷新
         </button>
+        <button class="as-btn" type="button" @click="openCreator">
+          新建
+        </button>
       </div>
     </div>
 
@@ -224,6 +227,11 @@
         @close="closeParamDialog"
         @save="saveActionParam"
       />
+      <ActionSequenceCreator
+        v-if="showCreator"
+        @close="closeCreator"
+        @saved="onCreatorSaved"
+      />
     </Teleport>
   </div>
 </template>
@@ -253,6 +261,7 @@ import {
   addPolygon,
 } from '../../api/coordinationApi';
 import ActionParamDialog from './ActionParamDialog.vue';
+import ActionSequenceCreator from './ActionSequenceCreator.vue';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
@@ -293,6 +302,9 @@ const editingAction = ref(null);
 const editingVehicleVid = ref('');
 const editingVehicleType = ref('');
 const savingParam = ref(false);
+
+/* ---------- 新建方案弹窗 ---------- */
+const showCreator = ref(false);
 
 /* ---------- 地图上图 ---------- */
 const currentMapObjectIds = ref([]);   // area / circle 对象 id
@@ -788,6 +800,34 @@ const saveActionParam = async (newParam) => {
   } finally {
     savingParam.value = false;
   }
+};
+
+/* ---------- 新建方案弹窗 ---------- */
+const openCreator = () => {
+  showCreator.value = true;
+};
+
+const closeCreator = () => {
+  showCreator.value = false;
+};
+
+const onCreatorSaved = (plan) => {
+  // 当前后端暂无 create plan 接口，新建方案仅本地展示
+  // 将其插入方案列表并选中，便于用户查看效果
+  const item = {
+    plan_id: plan.plan_id,
+    resource_id: plan.resource_id,
+    title: plan.title,
+    description: plan.description,
+    state: plan.state,
+    stages_count: plan.stages?.length || 0,
+    teams_count: plan.teams?.length || 0,
+  };
+  plans.value.unshift(item);
+  selectedPlan.value = plan;
+  selectedPlanId.value = plan.plan_id;
+  closeCreator();
+  appendSystemMessage('已新建本地预览方案，可继续编辑参数');
 };
 
 const loadPlans = async (silent = false) => {
