@@ -16,7 +16,9 @@
               class="asc-vehicle-card"
               @click="selectVehicle(v.type)"
             >
-              <div class="asc-vehicle-icon">{{ v.icon }}</div>
+              <div class="asc-vehicle-icon">
+                <VehicleIcon :vehicle-type="v.type" />
+              </div>
               <div class="asc-vehicle-name">{{ v.name }}</div>
               <div class="asc-vehicle-type">{{ v.type }}</div>
             </div>
@@ -158,6 +160,7 @@
 
 <script setup>
 import { ref, computed, nextTick } from 'vue';
+import VehicleIcon from './VehicleIcon.vue';
 
 const emit = defineEmits(['close', 'saved']);
 
@@ -173,12 +176,11 @@ const draggingNode = ref(null);
 const dragOffset = ref({ x: 0, y: 0 });
 
 const vehicleOptions = [
-  { type: 'Chassis-UGV', name: '底盘车', icon: '🚗' },
-  { type: 'Fire-Support-UGV', name: '火力车', icon: '🔥' },
-  { type: 'Recon-Strike-UGV', name: '侦打车', icon: '👁' },
-  { type: 'Patrol-UGV', name: '巡逻车', icon: '🛡' },
-  { type: 'Electronic-UGV', name: '电磁车', icon: '📡' },
-  { type: 'Air-Ground-UAV', name: '空地车', icon: '🚁' },
+  { type: 'Fire-Support-UGV', name: '火力车' },
+  { type: 'Recon-Strike-UGV', name: '侦打车' },
+  { type: 'Patrol-UGV', name: '巡逻车' },
+  { type: 'Electronic-UGV', name: '电磁车' },
+  { type: 'Air-Ground-UAV', name: '空地车' },
 ];
 
 const selectedVehicleName = computed(() => {
@@ -671,22 +673,49 @@ async function savePlan() {
 .asc-vehicle-card {
   width: 150px;
   padding: 1.2rem;
-  background: rgba(0, 222, 200, 0.08);
-  border: 1px solid rgba(0, 222, 200, 0.2);
-  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(0, 222, 200, 0.08), rgba(0, 222, 200, 0.03));
+  border: 2px solid rgba(0, 222, 200, 0.25);
+  border-radius: 12px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.asc-vehicle-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 222, 200, 0.2), transparent);
+  transition: left 0.5s ease;
 }
 
 .asc-vehicle-card:hover {
-  background: rgba(0, 222, 200, 0.15);
-  border-color: rgba(0, 222, 200, 0.4);
+  background: linear-gradient(135deg, rgba(0, 222, 200, 0.18), rgba(0, 222, 200, 0.08));
+  border-color: rgba(0, 222, 200, 0.55);
+  box-shadow: 0 0 20px rgba(0, 222, 200, 0.3), inset 0 0 20px rgba(0, 222, 200, 0.05);
+  transform: translateY(-4px);
+}
+
+.asc-vehicle-card:hover::before {
+  left: 100%;
 }
 
 .asc-vehicle-icon {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 30% 30%, rgba(0, 222, 200, 0.15), rgba(0, 222, 200, 0.02));
+  border: 1.5px solid rgba(0, 222, 200, 0.3);
+  border-radius: 10px;
+  transition: all 0.3s ease;
 }
 
 .asc-vehicle-name {
