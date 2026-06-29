@@ -106,41 +106,70 @@
                 </div>
                 <span v-else class="as-vehicle-count">{{ vehicle.total_actions }} 个行动</span>
               </div>
-              <div class="as-action-cards">
-                <template v-for="(action, idx) in flattenActions(vehicle)" :key="action.action_id || `${action.stage_id}-${idx}`">
-                  <!-- 连接线 -->
-                  <div v-if="idx > 0" class="as-card-connector">
-                    <div class="as-connector-line"></div>
-                  </div>
-                  <!-- 行动卡片 -->
-                  <div
-                    class="as-action-card"
-                    :class="`state-${(action.state || 'SCHEDULED').toLowerCase()}`"
-                    @dblclick="openParamDialog(action, vehicle)"
-                  >
-                    <div class="as-card-header" :title="action.name">
-                      <span class="marquee-text">{{ action.name }}</span>
+              <div class="as-action-cards" :data-vid="vehicle.vid">
+                <!-- 跨层依赖连线（按真实卡片位置绘制平滑曲线） -->
+                <svg class="as-action-lines" v-if="getActionLines(vehicle).length">
+                  <defs>
+                    <marker
+                      :id="`action-arrow-${sanitizeId(vehicle.vid)}`"
+                      viewBox="0 0 14 14"
+                      refX="11"
+                      refY="7"
+                      markerWidth="11"
+                      markerHeight="11"
+                      markerUnits="userSpaceOnUse"
+                      orient="auto"
+                    >
+                      <path d="M2 2 L11 7 L2 12 L4.5 7 Z" fill="#16e6cf" />
+                    </marker>
+                  </defs>
+                  <path
+                    v-for="line in getActionLines(vehicle)"
+                    :key="`${line.from}-${line.to}`"
+                    :d="getLinePath(line, vehicle)"
+                    class="as-action-line"
+                    :marker-end="`url(#action-arrow-${sanitizeId(vehicle.vid)})`"
+                  />
+                </svg>
+
+                <!-- 按 dependencies 分列后的行动卡片 -->
+                <div
+                  v-for="(column, colIdx) in getActionColumns(vehicle)"
+                  :key="colIdx"
+                  class="as-action-column"
+                >
+                  <template v-for="(action, rowIdx) in column" :key="action.action_id || `${action.stage_id}-${rowIdx}`">
+                    <!-- 行动卡片 -->
+                    <div
+                      class="as-action-card"
+                      :class="`state-${(action.state || 'SCHEDULED').toLowerCase()}`"
+                      :data-action-id="action.action_id"
+                      @dblclick="openParamDialog(action, vehicle)"
+                    >
+                      <div class="as-card-header" :title="action.name">
+                        <span class="marquee-text">{{ action.name }}</span>
+                      </div>
+                      <div class="as-card-meta">
+                        <span class="as-card-stage" :title="action.stage_title">
+                          <span class="marquee-text">{{ action.stage_title }}</span>
+                        </span>
+                        <span class="as-card-state">{{ actionStateLabel(action.state) }}</span>
+                      </div>
+                      <div class="as-card-body">
+                        <span class="as-card-seq">{{ action.action_seq }}</span>
+                        <span v-if="action.param?.waypoints" class="as-card-waypoints" :title="`${action.param.waypoints.length} 个航路点`">
+                          <span class="marquee-text">{{ action.param.waypoints.length }} 个航路点</span>
+                        </span>
+                        <span v-else-if="action.param?.points1?.length" class="as-card-waypoints" :title="`${action.param.points1.length} 个航路点`">
+                          <span class="marquee-text">{{ action.param.points1.length }} 个航路点</span>
+                        </span>
+                        <span v-else-if="action.description" class="as-card-desc" :title="action.description">
+                          <span class="marquee-text">{{ action.description }}</span>
+                        </span>
+                      </div>
                     </div>
-                    <div class="as-card-meta">
-                      <span class="as-card-stage" :title="action.stage_title">
-                        <span class="marquee-text">{{ action.stage_title }}</span>
-                      </span>
-                      <span class="as-card-state">{{ actionStateLabel(action.state) }}</span>
-                    </div>
-                    <div class="as-card-body">
-                      <span class="as-card-seq">{{ idx + 1 }}</span>
-                      <span v-if="action.param?.waypoints" class="as-card-waypoints" :title="`${action.param.waypoints.length} 个航路点`">
-                        <span class="marquee-text">{{ action.param.waypoints.length }} 个航路点</span>
-                      </span>
-                      <span v-else-if="action.param?.points1?.length" class="as-card-waypoints" :title="`${action.param.points1.length} 个航路点`">
-                        <span class="marquee-text">{{ action.param.points1.length }} 个航路点</span>
-                      </span>
-                      <span v-else-if="action.description" class="as-card-desc" :title="action.description">
-                        <span class="marquee-text">{{ action.description }}</span>
-                      </span>
-                    </div>
-                  </div>
-                </template>
+                  </template>
+                </div>
               </div>
             </div>
           </div>
@@ -733,6 +762,138 @@ const flattenActions = (vehicle) => {
     .sort((a, b) => (a.stage_seq - b.stage_seq) || ((a.action_seq || 0) - (b.action_seq || 0)));
 };
 
+// 根据 action.dependencies 将 actions 按列排列，无 dependencies 的放在第 0 列
+const getActionColumns = (vehicle) => {
+  const actions = flattenActions(vehicle);
+  if (actions.length === 0) return [];
+
+  const actionMapById = Object.fromEntries(actions.map((a) => [a.action_id, a]));
+  const actionMapBySeq = Object.fromEntries(actions.map((a) => [String(a.action_seq || ''), a]));
+
+  // 解析依赖：dependencies 中的元素可能是 action_id 或 action_seq，统一解析为 action 对象
+  actions.forEach((a) => {
+    const rawDeps = a.dependencies;
+    let deps = [];
+    if (Array.isArray(rawDeps)) {
+      deps = rawDeps
+        .map((d) => {
+          if (typeof d !== 'string') return null;
+          return actionMapById[d] || actionMapBySeq[d] || null;
+        })
+        .filter(Boolean);
+    }
+    a._deps = deps.map((depAction) => depAction.action_id);
+  });
+
+  // 计算每个 action 所在的列号：无依赖 = 0，有依赖 = max(依赖列号) + 1
+  const computing = new Set();
+  const colMap = {};
+  const getCol = (id) => {
+    if (colMap[id] !== undefined) return colMap[id];
+    if (computing.has(id)) {
+      // 出现环，按无依赖处理
+      colMap[id] = 0;
+      return 0;
+    }
+    computing.add(id);
+    const a = actionMapById[id];
+    let col = 0;
+    if (a && a._deps.length > 0) {
+      col = Math.max(...a._deps.map(getCol)) + 1;
+    }
+    computing.delete(id);
+    colMap[id] = col;
+    return col;
+  };
+
+  actions.forEach((a) => getCol(a.action_id));
+
+  const maxCol = Math.max(...Object.values(colMap), 0);
+  const columns = [];
+  for (let c = 0; c <= maxCol; c++) {
+    const col = actions
+      .filter((a) => colMap[a.action_id] === c)
+      .sort((a, b) => (a.action_seq || 0) - (b.action_seq || 0));
+    columns.push(col);
+  }
+
+  // 把剩余未分配的（有环或异常）全部放到最后一列
+  const assignedIds = new Set(columns.flat().map((a) => a.action_id));
+  const remaining = actions
+    .filter((a) => !assignedIds.has(a.action_id))
+    .sort((a, b) => (a.action_seq || 0) - (b.action_seq || 0));
+  if (remaining.length) {
+    columns.push(remaining);
+  }
+
+  return columns;
+};
+
+// 计算跨列依赖连线：从 dependency action 到当前 action
+const getActionLines = (vehicle) => {
+  const columns = getActionColumns(vehicle);
+  const actions = columns.flat();
+  const lines = [];
+  actions.forEach((a) => {
+    const deps = a._deps || [];
+    deps.forEach((depId) => {
+      lines.push({ from: depId, to: a.action_id });
+    });
+  });
+  return lines;
+};
+
+// 根据真实渲染的卡片位置计算依赖连线
+// 采用「圆角折线」路由：水平段沿 from 行，竖直段走在 to 列左侧的列间空隙里，
+// 从而避免连线斜穿中间列的卡片造成覆盖。
+const getLinePath = (line, vehicle) => {
+  // 依赖 layoutTick 触发重算（数据变化 / 滚动 / 尺寸变化后 bump）
+  void layoutTick.value;
+
+  const container = document.querySelector(`.as-action-cards[data-vid="${cssEscape(vehicle.vid)}"]`);
+  if (!container) return '';
+  const fromEl = container.querySelector(`.as-action-card[data-action-id="${cssEscape(line.from)}"]`);
+  const toEl = container.querySelector(`.as-action-card[data-action-id="${cssEscape(line.to)}"]`);
+  if (!fromEl || !toEl) return '';
+
+  const base = container.getBoundingClientRect();
+  const fr = fromEl.getBoundingClientRect();
+  const tr = toEl.getBoundingClientRect();
+
+  // 起点离开卡片右边缘留一点空隙，避免与方框重合
+  const START_GAP = 4;
+  // 终点（箭头尖）距离目标卡片左边缘留出空隙，避免箭头贴住方框
+  const END_GAP = 6;
+  const fromX = fr.right - base.left + START_GAP;
+  const fromY = fr.top - base.top + fr.height / 2;
+  const toX = tr.left - base.left - END_GAP;
+  const toY = tr.top - base.top + tr.height / 2;
+
+  // 竖直拐弯点落在 to 卡片左侧的列间空隙里（默认列间距 44px，取一半作为缓冲）
+  const GUTTER = 22;
+  let turnX = toX - GUTTER;
+  // 保证拐点在 from 出口右侧，避免折回
+  turnX = Math.max(fromX + 16, Math.min(turnX, toX - 6));
+
+  // 同一水平线（同行）直接连直线
+  if (Math.abs(toY - fromY) < 1.5) {
+    return `M ${fromX} ${fromY} L ${toX} ${toY}`;
+  }
+
+  const dirY = toY > fromY ? 1 : -1;
+  // 圆角半径，受可用水平/垂直距离限制
+  const r = Math.max(2, Math.min(9, Math.abs(toY - fromY) / 2, turnX - fromX, toX - turnX));
+
+  return [
+    `M ${fromX} ${fromY}`,
+    `L ${turnX - r} ${fromY}`,
+    `Q ${turnX} ${fromY} ${turnX} ${fromY + r * dirY}`,
+    `L ${turnX} ${toY - r * dirY}`,
+    `Q ${turnX} ${toY} ${turnX + r} ${toY}`,
+    `L ${toX} ${toY}`,
+  ].join(' ');
+};
+
 // 根据车辆 actions 的实际状态计算控制按钮应显示的状态
 // 每辆车独立判断，不受 plan 级别 runtime_state 影响
 const getVehicleRuntimeState = (vehicle) => {
@@ -1094,6 +1255,21 @@ const toggleDispatchSelectAll = (e) => {
   }
 };
 
+/* ---------- 依赖连线重算 ---------- */
+// bump 此值即触发所有 getLinePath 重新读取真实 DOM 位置
+const layoutTick = ref(0);
+// CSS 选择器转义（vid / action_id 可能含特殊字符）
+const cssEscape = (s) => {
+  const str = String(s ?? '');
+  return window.CSS && CSS.escape ? CSS.escape(str) : str.replace(/["\\\]\[#.:]/g, '\\$&');
+};
+const recomputeLines = () => {
+  nextTick(() => {
+    // 双 rAF：确保卡片布局、字体、跑马灯测量都已落定再读位置
+    requestAnimationFrame(() => requestAnimationFrame(() => { layoutTick.value++; }));
+  });
+};
+
 /* ---------- 跑马灯溢出检测 ---------- */
 const updateMarqueeStates = () => {
   nextTick(() => {
@@ -1109,6 +1285,8 @@ const updateMarqueeStates = () => {
         track.style.removeProperty('--track-width');
       }
     });
+    // 跑马灯测量会影响卡片宽度，测完后重算连线
+    recomputeLines();
   });
 };
 
@@ -1155,15 +1333,19 @@ const stopAutoRefresh = () => {
 };
 
 /* ---------- 生命周期 ---------- */
+const onWindowResize = () => recomputeLines();
+
 onMounted(() => {
   loadPlans();
   updateMarqueeStates();
   startAutoRefresh();
+  window.addEventListener('resize', onWindowResize);
 });
 
 onUnmounted(() => {
   stopAutoRefresh();
   clearPlanOnMap();
+  window.removeEventListener('resize', onWindowResize);
 });
 </script>
 
@@ -1440,10 +1622,25 @@ onUnmounted(() => {
 .as-vehicle-sequences {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+}
+
+.as-vehicle-sequences::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.as-vehicle-sequences::-webkit-scrollbar-track {
+  background: rgba(0, 222, 200, 0.05);
+  border-radius: 3px;
+}
+
+.as-vehicle-sequences::-webkit-scrollbar-thumb {
+  background: rgba(0, 222, 200, 0.25);
+  border-radius: 3px;
 }
 
 .as-vehicle-seq-title {
@@ -1495,15 +1692,74 @@ onUnmounted(() => {
 
 /* 卡片容器 — 水平排列 */
 .as-action-cards {
+  position: relative;
   display: flex;
-  align-items: stretch;
-  gap: 0;
-  overflow-x: auto;
-  padding: 0.4rem 0.8rem;
+  flex-direction: row;
+  gap: 44px;
+  padding: 0.8rem;
   min-height: 120px;
+  width: max-content;
 }
 
-/* 连接线 */
+.as-action-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: visible;
+}
+
+.as-action-line {
+  fill: none;
+  stroke: #16e6cf;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+.as-action-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+/* 同列内垂直连接线 */
+.as-card-connector-vertical {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.as-connector-line-vertical {
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(180deg, rgba(0, 222, 200, 0.4), rgba(0, 222, 200, 0.7), rgba(0, 222, 200, 0.4));
+  position: relative;
+}
+
+.as-connector-line-vertical::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-top: 6px solid rgba(0, 222, 200, 0.7);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+
+/* 跨列水平连接线（依赖线已用 SVG，此处保留旧类名避免误删影响其它地方） */
 .as-card-connector {
   display: flex;
   align-items: center;
@@ -1544,14 +1800,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition: box-shadow 180ms ease, border-color 180ms ease;
   cursor: default;
 }
 
 .as-action-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0, 222, 200, 0.12);
-  border-color: rgba(0, 222, 200, 0.4);
+  box-shadow: 0 0 0 1px rgba(0, 222, 200, 0.25), 0 6px 18px rgba(0, 222, 200, 0.15);
+  border-color: rgba(0, 222, 200, 0.5);
 }
 
 /* 执行中 — 呼吸灯效果（box-shadow 限制在卡片 margin 内，避免被父容器 overflow 裁切） */
