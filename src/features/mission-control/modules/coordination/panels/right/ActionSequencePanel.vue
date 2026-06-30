@@ -103,6 +103,7 @@
                   <template v-if="['ACTIVE', 'PAUSED'].includes(getVehicleRuntimeState(vehicle))">
                     <button class="as-btn mini danger" type="button" :disabled="controlLoading" @click="executeControl('stop', [vehicle.vid])">停止</button>
                   </template>
+                  <button class="as-btn mini" type="button" @click="openCreatorForEdit(vehicle)">编辑</button>
                 </div>
                 <span v-else class="as-vehicle-count">{{ vehicle.total_actions }} 个行动</span>
               </div>
@@ -258,6 +259,9 @@
       />
       <ActionSequenceCreator
         v-if="showCreator"
+        :edit-mode="creatorEditMode"
+        :edit-plan="creatorEditPlan"
+        :edit-vehicle-vid="creatorEditVehicleVid"
         @close="closeCreator"
         @saved="onCreatorSaved"
       />
@@ -332,8 +336,11 @@ const editingVehicleVid = ref('');
 const editingVehicleType = ref('');
 const savingParam = ref(false);
 
-/* ---------- 新建方案弹窗 ---------- */
+/* ---------- 新建/编辑方案弹窗 ---------- */
 const showCreator = ref(false);
+const creatorEditMode = ref(false);
+const creatorEditPlan = ref(null);
+const creatorEditVehicleVid = ref('');
 
 /* ---------- 地图上图 ---------- */
 const currentMapObjectIds = ref([]);   // area / circle 对象 id
@@ -984,18 +991,40 @@ const saveActionParam = async (newParam) => {
   }
 };
 
-/* ---------- 新建方案弹窗 ---------- */
+/* ---------- 新建/编辑方案弹窗 ---------- */
 const openCreator = () => {
+  creatorEditMode.value = false;
+  creatorEditPlan.value = null;
+  creatorEditVehicleVid.value = '';
+  showCreator.value = true;
+};
+
+const openCreatorForEdit = (vehicle) => {
+  if (!selectedPlan.value) return;
+  creatorEditMode.value = true;
+  creatorEditPlan.value = selectedPlan.value;
+  creatorEditVehicleVid.value = vehicle.vid;
   showCreator.value = true;
 };
 
 const closeCreator = () => {
   showCreator.value = false;
+  creatorEditMode.value = false;
+  creatorEditPlan.value = null;
+  creatorEditVehicleVid.value = '';
 };
 
 const onCreatorSaved = (plan) => {
-  // 当前后端暂无 create plan 接口，新建方案仅本地展示
-  // 将其插入方案列表并选中，便于用户查看效果
+  if (creatorEditMode.value) {
+    // 编辑模式：刷新当前选中方案详情
+    selectedPlan.value = plan;
+    refreshDetail(plan.plan_id);
+    closeCreator();
+    appendSystemMessage('已本地更新行动序列，点击“发布为正式行动方案”后同步到数据服务器');
+    return;
+  }
+
+  // 新建模式：将其插入方案列表并选中，便于用户查看效果
   const item = {
     plan_id: plan.plan_id,
     resource_id: plan.resource_id,

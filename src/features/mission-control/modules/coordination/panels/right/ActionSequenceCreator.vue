@@ -29,7 +29,7 @@
       <!-- 步骤 2：编辑方案 -->
       <template v-else-if="step === 'edit'">
         <div class="asc-header">
-          <span>新建方案 - {{ selectedVehicleName }}</span>
+          <span>{{ headerTitle }}</span>
           <div class="asc-header-actions">
             <button class="as-btn mini ghost" type="button" title="按串/并行关系自动等距排列" @click="autoLayout">⊹ 自动对齐</button>
             <button class="as-btn mini primary" type="button" @click="savePlan">保存</button>
@@ -159,9 +159,15 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue';
+import { ref, computed, nextTick, onMounted } from 'vue';
 import VehicleIcon from './VehicleIcon.vue';
-import { createOperatorPlan } from '../../api/coordinationApi.js';
+import { createOperatorPlan, patchOperatorPlan } from '../../api/coordinationApi.js';
+
+const props = defineProps({
+  editMode: { type: Boolean, default: false },
+  editPlan: { type: Object, default: null },
+  editVehicleVid: { type: String, default: '' },
+});
 
 const emit = defineEmits(['close', 'saved']);
 
@@ -187,6 +193,11 @@ const vehicleOptions = [
 const selectedVehicleName = computed(() => {
   const v = vehicleOptions.find((item) => item.type === selectedVehicleType.value);
   return v ? v.name : selectedVehicleType.value;
+});
+
+const headerTitle = computed(() => {
+  if (props.editMode) return `编辑方案 - ${selectedVehicleName.value}`;
+  return `新建方案 - ${selectedVehicleName.value}`;
 });
 
 const chassisTasks = [
@@ -239,6 +250,93 @@ function selectVehicle(type) {
   selectedVehicleType.value = type;
   step.value = 'edit';
 }
+
+function inferVehicleTypeFromResourceType(rt) {
+  const map = {
+    'Chassis-UGV': 'Chassis-UGV',
+    'Fire-Support-UGV': 'Fire-Support-UGV',
+    'Recon-Strike-UGV': 'Recon-Strike-UGV',
+    'Patrol-UGV': 'Patrol-UGV',
+    'Electronic-UGV': 'Electronic-UGV',
+    'Communication-UGV': 'Communication-UGV',
+    'Air-Ground-UAV': 'Air-Ground-UAV',
+  };
+  return map[rt] || '';
+}
+
+function initEditMode() {
+  if (!props.editMode || !props.editPlan || !props.editVehicleVid) return;
+  const plan = props.editPlan;
+  const vid = props.editVehicleVid;
+
+  // 从 plan.teams 找 resource_type
+  let resourceType = '';
+  for (const team of plan.teams || []) {
+    for (const v of team.vehicles || []) {
+      if (v.vid === vid) resourceType = v.resource_type || resourceType;
+    }
+  }
+  // 从 vehicle_summary 兜底
+  if (!resourceType) {
+    const vs = (plan.vehicle_summary || []).find((v) => v.vid === vid);
+    resourceType = vs?.resource_type || '';
+  }
+
+  selectedVehicleType.value = inferVehicleTypeFromResourceType(resourceType);
+  if (!selectedVehicleType.value) {
+    selectedVehicleType.value = 'Chassis-UGV';
+  }
+
+  // 收集该车辆所有 stages 中的 actions
+  const allActions = [];
+  for (const stage of plan.stages || []) {
+    const ta = stage.team_actions || {};
+    const vehicles = Array.isArray(ta) ? ta : Object.values(ta).flat();
+    for (const v of vehicles) {
+      if (v.vid !== vid) continue;
+      for (const a of v.actions || []) {
+        allActions.push({ ...a, _stage_id: stage.stage_id });
+      }
+    }
+  }
+  allActions.sort((a, b) => (a.action_seq || 0) - (b.action_seq || 0));
+
+  // 建立 action_seq -> nodeId 映射，用于生成连线
+  const seqToNodeId = {};
+  const colWidth = 180;
+  const rowHeight = 90;
+  nodes.value = allActions.map((a, idx) => {
+    const id = `node_${a.action_id || a.action_seq || idx}_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+    seqToNodeId[String(a.action_seq)] = id;
+    return {
+      id,
+      actionType: a.action_type || '',
+      name: a.name || '',
+      category: a.action_type && chassisTasks.some((t) => t.actionType === a.action_type) ? 'chassis' : 'payload',
+      param: JSON.parse(JSON.stringify(a.param || {})),
+      x: PAD_X + (idx % 4) * colWidth,
+      y: PAD_Y + Math.floor(idx / 4) * rowHeight,
+    };
+  });
+
+  // 根据 dependencies 生成连线
+  const depsLines = [];
+  allActions.forEach((a) => {
+    const toId = seqToNodeId[String(a.action_seq)];
+    if (!toId) return;
+    for (const dep of a.dependencies || []) {
+      const fromId = seqToNodeId[String(dep)];
+      if (fromId) depsLines.push({ from: fromId, to: toId });
+    }
+  });
+  lines.value = depsLines;
+  nextTick(() => updateLines());
+
+  step.value = 'edit';
+}
+
+const PAD_X = 40;
+const PAD_Y = 40;
 
 function onDragStart(event, task, category = 'chassis') {
   event.dataTransfer.setData('application/json', JSON.stringify({ ...task, category }));
@@ -512,12 +610,7 @@ function autoLayout() {
   updateLines();
 }
 
-function buildPlan() {
-  const planId = `PLAN_${Date.now()}`;
-  const stageId = `STAGE_${Date.now()}`;
-  const teamId = 'TEAM_NEW';
-  const vid = `equipment:new-${Date.now()}`;
-
+function buildActionsForVid(vid) {
   // 按连线拓扑排序：从入度为 0 的节点开始
   const inDegree = {};
   nodes.value.forEach((n) => { inDegree[n.id] = 0; });
@@ -553,7 +646,7 @@ function buildPlan() {
     incoming[l.to].push(l.from);
   });
 
-  const actions = sorted.map((id, idx) => {
+  return sorted.map((id, idx) => {
     const n = nodeMap[id];
     const deps = (incoming[id] || [])
       .filter((fromId) => idToSeq[fromId] !== undefined)
@@ -570,11 +663,19 @@ function buildPlan() {
       dependencies: deps.length ? deps : undefined,
       state: 'SCHEDULED',
       task_type: 'ACTION',
-      plan_id: planId,
-      stage_id: stageId,
-      team_id: teamId,
+      plan_id: props.editMode ? props.editPlan.plan_id : `PLAN_${Date.now()}`,
+      stage_id: props.editMode ? (props.editPlan.stages?.[0]?.stage_id || `STAGE_${Date.now()}`) : `STAGE_${Date.now()}`,
+      team_id: props.editMode ? (props.editPlan.teams?.[0]?.team_id || 'TEAM_NEW') : 'TEAM_NEW',
     };
   });
+}
+
+function buildPlan() {
+  const planId = `PLAN_${Date.now()}`;
+  const stageId = `STAGE_${Date.now()}`;
+  const teamId = 'TEAM_NEW';
+  const vid = `equipment:new-${Date.now()}`;
+  const actions = buildActionsForVid(vid);
 
   return {
     resource_id: `plan:${planId}`,
@@ -609,11 +710,76 @@ function buildPlan() {
   };
 }
 
+function buildUpdatedPlan() {
+  const plan = JSON.parse(JSON.stringify(props.editPlan));
+  const vid = props.editVehicleVid;
+  const actions = buildActionsForVid(vid);
+
+  // 更新 stages 中对应车辆的 actions
+  for (const stage of plan.stages || []) {
+    const ta = stage.team_actions || {};
+    if (Array.isArray(ta)) {
+      for (const v of ta) {
+        if (v.vid === vid) v.actions = actions;
+      }
+    } else {
+      for (const key of Object.keys(ta)) {
+        for (const v of ta[key]) {
+          if (v.vid === vid) v.actions = actions;
+        }
+      }
+    }
+  }
+
+  // 更新 car_actions（如果存在）
+  if (plan.car_actions) {
+    for (const ca of plan.car_actions) {
+      if (ca.vid === vid) ca.actions = actions;
+    }
+  }
+
+  // 更新 vehicle_summary
+  if (plan.vehicle_summary) {
+    for (const vs of plan.vehicle_summary) {
+      if (vs.vid === vid && vs.stages?.[0]) {
+        vs.stages[0].actions = actions;
+        vs.total_actions = actions.length;
+      }
+    }
+  }
+
+  plan.updated_at = new Date().toISOString();
+  return plan;
+}
+
+onMounted(() => {
+  if (props.editMode) {
+    initEditMode();
+  }
+});
+
 async function savePlan() {
   if (nodes.value.length === 0) {
     alert('请至少添加一个元任务');
     return;
   }
+
+  if (props.editMode && props.editPlan && props.editVehicleVid) {
+    // 编辑模式：只更新本地 task_pool，不同步数据服务器
+    const updatedPlan = buildUpdatedPlan();
+    try {
+      const result = await patchOperatorPlan(props.editPlan.plan_id, updatedPlan);
+      if (!result.ok) {
+        alert(`保存失败：${result.data?.message || result.error || result.statusText || '未知错误'}`);
+        return;
+      }
+      emit('saved', result.data?.data || updatedPlan);
+    } catch (err) {
+      alert(`保存失败：${err.message || err}`);
+    }
+    return;
+  }
+
   const plan = buildPlan();
   try {
     const result = await createOperatorPlan(plan);
