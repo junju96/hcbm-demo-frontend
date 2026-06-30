@@ -347,6 +347,7 @@ import {
   resumeOperatorPlan,
   stopOperatorPlan,
   dispatchOperatorPlan,
+  syncOperatorPlanToDataServer,
   batchAddMapObjects,
   batchDeleteMapObjects,
   batchAddRouteDisplay,
@@ -1180,7 +1181,13 @@ const executeDeleteVehicleActions = async () => {
     if (updatedPlan.vehicle_summary !== undefined && Array.isArray(savedPlan.vehicle_summary)) {
       selectedPlan.value = { ...savedPlan, vehicle_summary: updatedPlan.vehicle_summary };
     }
-    appendSystemMessage('已本地删除该车辆行动序列');
+    // 同步到数据服务器，避免轮询时旧数据覆盖本地删除结果
+    const syncResult = await syncOperatorPlanToDataServer(planId);
+    if (!syncResult.ok) {
+      appendSystemMessage(`删除已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
+    } else {
+      appendSystemMessage('已删除该车辆行动序列并同步到数据服务器');
+    }
   } catch (err) {
     appendSystemMessage(`删除车辆行动序列失败：${err.message || err}`);
   } finally {
@@ -1213,8 +1220,15 @@ const onCreatorSaved = (plan) => {
     // 追加模式：刷新当前方案详情，不新增方案条目
     selectedPlan.value = plan;
     refreshDetail(plan.plan_id);
+    // 同步到数据服务器，避免轮询时旧数据覆盖本地追加结果
+    syncOperatorPlanToDataServer(plan.plan_id).then((syncResult) => {
+      if (!syncResult.ok) {
+        appendSystemMessage(`追加已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
+      } else {
+        appendSystemMessage('已追加车辆行动序列到当前方案并同步到数据服务器');
+      }
+    });
     closeCreator();
-    appendSystemMessage('已追加车辆行动序列到当前方案');
     return;
   }
 

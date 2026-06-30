@@ -484,6 +484,12 @@ export const patchOperatorPlan = async (planId, payload = {}) => {
   return result;
 };
 
+/** 操控端 — 把本地 plan 同步到数据服务器 */
+export const syncOperatorPlanToDataServer = async (planId) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/sync`), {});
+  return result;
+};
+
 /* ==================== 地图服务 API ==================== */
 
 const MAP_SERVICE_BASE_URL = 'http://25.11.1.178:28001';
