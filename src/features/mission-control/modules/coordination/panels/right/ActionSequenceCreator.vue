@@ -161,6 +161,7 @@
 <script setup>
 import { ref, computed, nextTick } from 'vue';
 import VehicleIcon from './VehicleIcon.vue';
+import { createOperatorPlan } from '../../api/coordinationApi.js';
 
 const emit = defineEmits(['close', 'saved']);
 
@@ -545,8 +546,18 @@ function buildPlan() {
   });
 
   const nodeMap = Object.fromEntries(nodes.value.map((n) => [n.id, n]));
+  const idToSeq = Object.fromEntries(sorted.map((id, idx) => [id, idx + 1]));
+  const incoming = {};
+  lines.value.forEach((l) => {
+    incoming[l.to] = incoming[l.to] || [];
+    incoming[l.to].push(l.from);
+  });
+
   const actions = sorted.map((id, idx) => {
     const n = nodeMap[id];
+    const deps = (incoming[id] || [])
+      .filter((fromId) => idToSeq[fromId] !== undefined)
+      .map((fromId) => String(idToSeq[fromId]));
     return {
       resource_id: `action:${n.id}`,
       action_id: n.actionType.toUpperCase().replace(/-/g, '_'),
@@ -556,6 +567,7 @@ function buildPlan() {
       action_type: n.actionType,
       description: n.name,
       param: n.param,
+      dependencies: deps.length ? deps : undefined,
       state: 'SCHEDULED',
       task_type: 'ACTION',
       plan_id: planId,
@@ -603,9 +615,16 @@ async function savePlan() {
     return;
   }
   const plan = buildPlan();
-  // 本地模拟保存：存入 task_pool 由后端接口返回
-  // 由于后端暂无 create plan 接口，先通过 event 抛出，由父组件处理展示或调用接口
-  emit('saved', plan);
+  try {
+    const result = await createOperatorPlan(plan);
+    if (!result.ok) {
+      alert(`保存失败：${result.data?.message || result.statusText || '未知错误'}`);
+      return;
+    }
+    emit('saved', result.data?.data || plan);
+  } catch (err) {
+    alert(`保存失败：${err.message || err}`);
+  }
 }
 </script>
 

@@ -472,6 +472,12 @@ export const dispatchOperatorPlan = async (planId, payload = {}) => {
   return result;
 };
 
+/** 操控端 — 新建行动序列方案 */
+export const createOperatorPlan = async (payload = {}) => {
+  const result = await postJson(joinApiUrl('/api/v1/action-sequences/operator/plans'), payload);
+  return result;
+};
+
 /* ==================== 地图服务 API ==================== */
 
 const MAP_SERVICE_BASE_URL = 'http://25.11.1.178:28001';
