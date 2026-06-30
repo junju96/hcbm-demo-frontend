@@ -1173,8 +1173,13 @@ const executeDeleteVehicleActions = async () => {
       appendSystemMessage(`删除车辆行动序列失败：${result.data?.message || result.error || '未知错误'}`);
       return;
     }
-    selectedPlan.value = result.data?.data || updatedPlan;
-    await refreshDetail(planId);
+    const savedPlan = result.data?.data || updatedPlan;
+    // 后端返回的 savedPlan 可能没有最新 vehicle_summary，直接用本地构造的数据刷新视图
+    selectedPlan.value = savedPlan;
+    // 强制让 vehicle_summary 与本地构造一致
+    if (updatedPlan.vehicle_summary !== undefined && Array.isArray(savedPlan.vehicle_summary)) {
+      selectedPlan.value = { ...savedPlan, vehicle_summary: updatedPlan.vehicle_summary };
+    }
     appendSystemMessage('已本地删除该车辆行动序列');
   } catch (err) {
     appendSystemMessage(`删除车辆行动序列失败：${err.message || err}`);
