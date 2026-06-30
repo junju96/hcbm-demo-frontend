@@ -78,7 +78,17 @@
 
         <!-- 按车辆组织的行动序列 — 卡片串联式 -->
         <div v-if="vehicleActions.length > 0" class="as-vehicle-sequences">
-          <div class="as-vehicle-seq-title">各车行动序列</div>
+          <div class="as-vehicle-seq-title">
+            <span>各车行动序列</span>
+            <button
+              v-if="isControlMode && missingVehicleTypes.length > 0"
+              class="as-btn mini primary"
+              type="button"
+              @click="openMissingVehicleSelector"
+            >
+              + 新建
+            </button>
+          </div>
           <div class="as-vehicle-list">
             <div
               v-for="vehicle in vehicleActions"
@@ -104,7 +114,7 @@
                     <button class="as-btn mini danger" type="button" :disabled="controlLoading" @click="executeControl('stop', [vehicle.vid])">停止</button>
                   </template>
                   <button class="as-btn mini" type="button" @click="openCreatorForEdit(vehicle)">编辑</button>
-                  <button class="as-btn mini primary" type="button" @click="openCreatorForVehicle(vehicle)">新建</button>
+                  <button class="as-btn mini danger" type="button" @click="confirmDeleteVehicleActions(vehicle)">删除</button>
                 </div>
                 <span v-else class="as-vehicle-count">{{ vehicle.total_actions }} 个行动</span>
               </div>
@@ -248,6 +258,44 @@
       </div>
     </div>
 
+    <!-- 缺失车型选择弹窗 -->
+    <div v-if="showMissingVehicleDialog" class="as-dialog-overlay" @click.self="showMissingVehicleDialog = false">
+      <div class="as-dialog">
+        <div class="as-dialog-header">选择要新建行动序列的车型</div>
+        <div class="as-dialog-body">
+          <label v-for="v in missingVehicleTypes" :key="v.type" class="as-dialog-item">
+            <input type="radio" :value="v.type" v-model="selectedMissingVehicleType" />
+            <span>{{ v.name }} {{ v.type ? '(' + v.type + ')' : '' }}</span>
+          </label>
+        </div>
+        <div class="as-dialog-footer">
+          <button class="as-btn" type="button" @click="showMissingVehicleDialog = false">取消</button>
+          <button
+            class="as-btn primary"
+            type="button"
+            :disabled="!selectedMissingVehicleType"
+            @click="confirmMissingVehicleSelection"
+          >
+            确认
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 删除确认弹窗 -->
+    <div v-if="showDeleteConfirmDialog" class="as-dialog-overlay" @click.self="showDeleteConfirmDialog = false">
+      <div class="as-dialog">
+        <div class="as-dialog-header">确认删除</div>
+        <div class="as-dialog-body">
+          确定要删除 <strong>{{ vehicleToDelete ? getVehicleDisplayName(vehicleToDelete) : '' }}</strong> 的行动序列吗？此操作仅本地生效，删除后可在下发前重新编辑。
+        </div>
+        <div class="as-dialog-footer">
+          <button class="as-btn" type="button" @click="showDeleteConfirmDialog = false">取消</button>
+          <button class="as-btn danger" type="button" @click="executeDeleteVehicleActions">删除</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 行动参数编辑弹窗：teleport 到 body，避免被右侧面板裁切 -->
     <Teleport to="body">
       <ActionParamDialog
@@ -344,6 +392,14 @@ const creatorEditMode = ref(false);
 const creatorEditPlan = ref(null);
 const creatorEditVehicleVid = ref('');
 const creatorPresetVehicleType = ref('');
+
+/* ---------- 缺失车型选择弹窗 ---------- */
+const showMissingVehicleDialog = ref(false);
+const selectedMissingVehicleType = ref('');
+
+/* ---------- 删除车型行动序列确认弹窗 ---------- */
+const showDeleteConfirmDialog = ref(false);
+const vehicleToDelete = ref(null);
 
 /* ---------- 地图上图 ---------- */
 const currentMapObjectIds = ref([]);   // area / circle 对象 id
@@ -730,6 +786,19 @@ const vehicleActions = computed(() => {
   return selectedPlan.value.vehicle_summary || [];
 });
 
+const supportedVehicleTypes = [
+  { type: 'Recon-Strike-UGV', name: '侦打车' },
+  { type: 'Air-Ground-UAV', name: '空地车' },
+  { type: 'Fire-Support-UGV', name: '火力车' },
+  { type: 'Electronic-UGV', name: '电磁车' },
+  { type: 'Patrol-UGV', name: '巡逻车' },
+];
+
+const missingVehicleTypes = computed(() => {
+  const existingTypes = new Set((vehicleActions.value || []).map((v) => v.resource_type).filter(Boolean));
+  return supportedVehicleTypes.filter((v) => !existingTypes.has(v.type));
+});
+
 const vehicleTypeNameMap = {
   'Chassis-UGV': '底盘车',
   'Fire-Support-UGV': '火力车',
@@ -1012,12 +1081,78 @@ const openCreatorForEdit = (vehicle) => {
   showCreator.value = true;
 };
 
-const openCreatorForVehicle = (vehicle) => {
+const openCreatorForVehicle = (vehicleType) => {
   creatorEditMode.value = false;
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
-  creatorPresetVehicleType.value = vehicle.resource_type || '';
+  creatorPresetVehicleType.value = vehicleType || '';
   showCreator.value = true;
+};
+
+const openMissingVehicleSelector = () => {
+  selectedMissingVehicleType.value = missingVehicleTypes.value[0]?.type || '';
+  showMissingVehicleDialog.value = true;
+};
+
+const confirmMissingVehicleSelection = () => {
+  if (!selectedMissingVehicleType.value) return;
+  showMissingVehicleDialog.value = false;
+  openCreatorForVehicle(selectedMissingVehicleType.value);
+  selectedMissingVehicleType.value = '';
+};
+
+const confirmDeleteVehicleActions = (vehicle) => {
+  vehicleToDelete.value = vehicle;
+  showDeleteConfirmDialog.value = true;
+};
+
+const executeDeleteVehicleActions = async () => {
+  if (!vehicleToDelete.value || !selectedPlan.value) return;
+  const vid = vehicleToDelete.value.vid;
+  const planId = selectedPlan.value.plan_id;
+
+  // 构造更新后的 plan：移除该车辆相关的 stages.team_actions、car_actions、vehicle_summary
+  const updatedPlan = JSON.parse(JSON.stringify(selectedPlan.value));
+
+  // 移除 stages 中该车辆的 actions
+  for (const stage of updatedPlan.stages || []) {
+    const ta = stage.team_actions || {};
+    if (Array.isArray(ta)) {
+      for (const v of ta) {
+        if (v.vid === vid) v.actions = [];
+      }
+    } else {
+      for (const key of Object.keys(ta)) {
+        ta[key] = (ta[key] || []).filter((v) => v.vid !== vid);
+      }
+    }
+  }
+
+  // 移除 car_actions 中该车辆
+  if (updatedPlan.car_actions) {
+    updatedPlan.car_actions = updatedPlan.car_actions.filter((v) => v.vid !== vid);
+  }
+
+  // 移除 vehicle_summary 中该车辆
+  updatedPlan.vehicle_summary = (updatedPlan.vehicle_summary || []).filter((v) => v.vid !== vid);
+
+  updatedPlan.updated_at = new Date().toISOString();
+
+  try {
+    const result = await patchOperatorPlan(planId, updatedPlan);
+    if (!result.ok) {
+      appendSystemMessage(`删除车辆行动序列失败：${result.data?.message || result.error || '未知错误'}`);
+      return;
+    }
+    selectedPlan.value = result.data?.data || updatedPlan;
+    refreshDetail(planId);
+    appendSystemMessage('已本地删除该车辆行动序列');
+  } catch (err) {
+    appendSystemMessage(`删除车辆行动序列失败：${err.message || err}`);
+  } finally {
+    showDeleteConfirmDialog.value = false;
+    vehicleToDelete.value = null;
+  }
 };
 
 const closeCreator = () => {
