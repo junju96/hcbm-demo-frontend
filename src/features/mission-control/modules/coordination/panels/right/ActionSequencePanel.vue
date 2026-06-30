@@ -1144,12 +1144,15 @@ const executeDeleteVehicleActions = async () => {
   // 构造更新后的 plan：移除该车辆相关的 stages.team_actions、car_actions、vehicle_summary
   const updatedPlan = JSON.parse(JSON.stringify(selectedPlan.value));
 
-  // 移除 stages 中该车辆的 actions
+  // 移除 stages 中该车辆（直接过滤车辆对象，而不是仅清空 actions）
   for (const stage of updatedPlan.stages || []) {
     const ta = stage.team_actions || {};
     if (Array.isArray(ta)) {
       for (const v of ta) {
-        if (v.vid === vid) v.actions = [];
+        const cars = v.car_actions || v.team_actions || [];
+        const filtered = cars.filter((c) => c.vid !== vid);
+        if (v.car_actions) v.car_actions = filtered;
+        else v.team_actions = filtered;
       }
     } else {
       for (const key of Object.keys(ta)) {
