@@ -618,7 +618,7 @@ async function savePlan() {
   try {
     const result = await createOperatorPlan(plan);
     if (!result.ok) {
-      alert(`保存失败：${result.data?.message || result.statusText || '未知错误'}`);
+      alert(`保存失败：${result.data?.message || result.error || result.statusText || '未知错误'}`);
       return;
     }
     emit('saved', result.data?.data || plan);
