@@ -188,7 +188,15 @@
         </div>
 
         <div v-else-if="selectedPlanId && !loadingDetail" class="as-empty-detail">
-          暂无行动序列数据
+          <div>暂无行动序列数据</div>
+          <button
+            v-if="isControlMode && missingVehicleTypes.length > 0"
+            class="as-btn mini primary as-empty-new-btn"
+            type="button"
+            @click="openMissingVehicleSelector"
+          >
+            + 新建行动序列
+          </button>
         </div>
         <div v-if="loadingDetail" class="as-loading-detail">加载详情中…</div>
       </div>
@@ -1847,6 +1855,10 @@ onUnmounted(() => {
   font-weight: 800;
   color: #eefcff;
   padding: 0.1rem 0.1rem 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .as-vehicle-list {
@@ -2153,6 +2165,17 @@ onUnmounted(() => {
   text-align: center;
   color: rgba(226, 246, 248, 0.6);
   font-size: 0.9rem;
+}
+
+.as-empty-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.as-empty-new-btn {
+  margin-top: 0.2rem;
 }
 
 /* 车辆选择弹窗 */
