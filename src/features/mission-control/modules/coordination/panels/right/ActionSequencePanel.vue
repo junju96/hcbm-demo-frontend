@@ -1174,7 +1174,7 @@ const executeDeleteVehicleActions = async () => {
       return;
     }
     selectedPlan.value = result.data?.data || updatedPlan;
-    refreshDetail(planId);
+    await refreshDetail(planId);
     appendSystemMessage('已本地删除该车辆行动序列');
   } catch (err) {
     appendSystemMessage(`删除车辆行动序列失败：${err.message || err}`);
