@@ -86,7 +86,7 @@
               class="as-vehicle-card"
             >
               <div class="as-vehicle-header">
-                <span class="as-vehicle-name">{{ vehicle.vid?.replace('equipment:', '') || vehicle.vid }}</span>
+                <span class="as-vehicle-name">{{ getVehicleDisplayName(vehicle) }}</span>
                 <div class="as-vehicle-controls" v-if="isControlMode">
                   <template v-if="getVehicleRuntimeState(vehicle) === 'SCHEDULED'">
                     <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('start', [vehicle.vid])">开始</button>
@@ -197,7 +197,7 @@
           </label>
           <label v-for="v in getUgvVehicles()" :key="v.vid" class="as-dialog-item">
             <input type="checkbox" :value="v.vid" v-model="selectedVehicleVids" />
-            <span>{{ v.vid?.replace('equipment:', '') || v.vid }} {{ v.resource_type ? '(' + v.resource_type + ')' : '' }}</span>
+            <span>{{ getVehicleDisplayName(v) }} {{ v.resource_type ? '(' + v.resource_type + ')' : '' }}</span>
           </label>
         </div>
         <div class="as-dialog-footer">
@@ -229,7 +229,7 @@
           </label>
           <label v-for="v in getAllVehicles()" :key="v.vid" class="as-dialog-item">
             <input type="checkbox" :value="v.vid" v-model="selectedDispatchVids" />
-            <span>{{ v.vid?.replace('equipment:', '') || v.vid }} {{ v.resource_type ? '(' + v.resource_type + ')' : '' }} — {{ v.total_actions || 0 }} 个行动</span>
+            <span>{{ getVehicleDisplayName(v) }} {{ v.resource_type ? '(' + v.resource_type + ')' : '' }} — {{ v.total_actions || 0 }} 个行动</span>
           </label>
         </div>
         <div class="as-dialog-footer">
@@ -719,6 +719,27 @@ const vehicleActions = computed(() => {
   if (!selectedPlan.value) return [];
   return selectedPlan.value.vehicle_summary || [];
 });
+
+const vehicleTypeNameMap = {
+  'Chassis-UGV': '底盘车',
+  'Fire-Support-UGV': '火力车',
+  'Recon-Strike-UGV': '侦打车',
+  'Patrol-UGV': '巡逻车',
+  'Electronic-UGV': '电磁车',
+  'Communication-UGV': '通信车',
+  'Air-Ground-UAV': '空地车',
+  'UGV': '无人车',
+};
+
+const getVehicleDisplayName = (vehicle) => {
+  if (!vehicle) return '';
+  const rawVid = (vehicle.vid || '').replace('equipment:', '');
+  const resourceType = vehicle.resource_type || '';
+  const cnType = vehicleTypeNameMap[resourceType] || resourceType || '无人车';
+  const suffixMatch = rawVid.match(/(\d+)$/);
+  const suffix = suffixMatch ? suffixMatch[1] : rawVid;
+  return `${cnType}-${suffix}`;
+};
 
 /* ---------- 方法 ---------- */
 const stateLabel = (state) => {
