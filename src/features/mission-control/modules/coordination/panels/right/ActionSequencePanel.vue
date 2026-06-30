@@ -320,6 +320,8 @@
         :edit-plan="creatorEditPlan"
         :edit-vehicle-vid="creatorEditVehicleVid"
         :preset-vehicle-type="creatorPresetVehicleType"
+        :append-mode="creatorAppendMode"
+        :append-plan="creatorAppendPlan"
         @close="closeCreator"
         @saved="onCreatorSaved"
       />
@@ -400,6 +402,8 @@ const creatorEditMode = ref(false);
 const creatorEditPlan = ref(null);
 const creatorEditVehicleVid = ref('');
 const creatorPresetVehicleType = ref('');
+const creatorAppendMode = ref(false);
+const creatorAppendPlan = ref(null);
 
 /* ---------- 缺失车型选择弹窗 ---------- */
 const showMissingVehicleDialog = ref(false);
@@ -1077,6 +1081,8 @@ const openCreator = () => {
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
   creatorPresetVehicleType.value = '';
+  creatorAppendMode.value = false;
+  creatorAppendPlan.value = null;
   showCreator.value = true;
 };
 
@@ -1086,6 +1092,8 @@ const openCreatorForEdit = (vehicle) => {
   creatorEditPlan.value = selectedPlan.value;
   creatorEditVehicleVid.value = vehicle.vid;
   creatorPresetVehicleType.value = '';
+  creatorAppendMode.value = false;
+  creatorAppendPlan.value = null;
   showCreator.value = true;
 };
 
@@ -1094,6 +1102,19 @@ const openCreatorForVehicle = (vehicleType) => {
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
   creatorPresetVehicleType.value = vehicleType || '';
+  creatorAppendMode.value = false;
+  creatorAppendPlan.value = null;
+  showCreator.value = true;
+};
+
+const openCreatorAppendToPlan = (vehicleType) => {
+  if (!selectedPlan.value) return;
+  creatorEditMode.value = false;
+  creatorEditPlan.value = null;
+  creatorEditVehicleVid.value = '';
+  creatorPresetVehicleType.value = vehicleType || '';
+  creatorAppendMode.value = true;
+  creatorAppendPlan.value = selectedPlan.value;
   showCreator.value = true;
 };
 
@@ -1105,7 +1126,7 @@ const openMissingVehicleSelector = () => {
 const confirmMissingVehicleSelection = () => {
   if (!selectedMissingVehicleType.value) return;
   showMissingVehicleDialog.value = false;
-  openCreatorForVehicle(selectedMissingVehicleType.value);
+  openCreatorAppendToPlan(selectedMissingVehicleType.value);
   selectedMissingVehicleType.value = '';
 };
 
@@ -1169,6 +1190,8 @@ const closeCreator = () => {
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
   creatorPresetVehicleType.value = '';
+  creatorAppendMode.value = false;
+  creatorAppendPlan.value = null;
 };
 
 const onCreatorSaved = (plan) => {
@@ -1178,6 +1201,15 @@ const onCreatorSaved = (plan) => {
     refreshDetail(plan.plan_id);
     closeCreator();
     appendSystemMessage('已本地更新行动序列，点击“发布为正式行动方案”后同步到数据服务器');
+    return;
+  }
+
+  if (creatorAppendMode.value) {
+    // 追加模式：刷新当前方案详情，不新增方案条目
+    selectedPlan.value = plan;
+    refreshDetail(plan.plan_id);
+    closeCreator();
+    appendSystemMessage('已追加车辆行动序列到当前方案');
     return;
   }
 

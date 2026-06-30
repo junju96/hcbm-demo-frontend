@@ -168,6 +168,9 @@ const props = defineProps({
   editPlan: { type: Object, default: null },
   editVehicleVid: { type: String, default: '' },
   presetVehicleType: { type: String, default: '' },
+  // 追加模式：将新车辆行动序列追加到已有方案中，而不是创建新方案
+  appendMode: { type: Boolean, default: false },
+  appendPlan: { type: Object, default: null },
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -198,6 +201,7 @@ const selectedVehicleName = computed(() => {
 
 const headerTitle = computed(() => {
   if (props.editMode) return `编辑方案 - ${selectedVehicleName.value}`;
+  if (props.appendMode) return `追加方案 - ${selectedVehicleName.value}`;
   return `新建方案 - ${selectedVehicleName.value}`;
 });
 
@@ -611,7 +615,7 @@ function autoLayout() {
   updateLines();
 }
 
-function buildActionsForVid(vid) {
+function buildActionsForVid(vid, planBase = null) {
   // 按连线拓扑排序：从入度为 0 的节点开始
   const inDegree = {};
   nodes.value.forEach((n) => { inDegree[n.id] = 0; });
@@ -647,6 +651,10 @@ function buildActionsForVid(vid) {
     incoming[l.to].push(l.from);
   });
 
+  const basePlanId = planBase?.plan_id || (props.editMode ? props.editPlan?.plan_id : `PLAN_${Date.now()}`);
+  const baseStageId = planBase?.stages?.[0]?.stage_id || (props.editMode ? (props.editPlan?.stages?.[0]?.stage_id || `STAGE_${Date.now()}`) : `STAGE_${Date.now()}`);
+  const baseTeamId = planBase?.teams?.[0]?.team_id || (props.editMode ? (props.editPlan?.teams?.[0]?.team_id || 'TEAM_NEW') : 'TEAM_NEW');
+
   return sorted.map((id, idx) => {
     const n = nodeMap[id];
     const deps = (incoming[id] || [])
@@ -664,9 +672,9 @@ function buildActionsForVid(vid) {
       dependencies: deps.length ? deps : undefined,
       state: 'SCHEDULED',
       task_type: 'ACTION',
-      plan_id: props.editMode ? props.editPlan.plan_id : `PLAN_${Date.now()}`,
-      stage_id: props.editMode ? (props.editPlan.stages?.[0]?.stage_id || `STAGE_${Date.now()}`) : `STAGE_${Date.now()}`,
-      team_id: props.editMode ? (props.editPlan.teams?.[0]?.team_id || 'TEAM_NEW') : 'TEAM_NEW',
+      plan_id: basePlanId,
+      stage_id: baseStageId,
+      team_id: baseTeamId,
     };
   });
 }
@@ -709,6 +717,67 @@ function buildPlan() {
       },
     ],
   };
+}
+
+function buildAppendedPlan() {
+  const plan = JSON.parse(JSON.stringify(props.appendPlan));
+  const now = Date.now();
+  const vid = `equipment:${selectedVehicleType.value.toLowerCase().replace(/_/g, '-').replace(/[^a-z0-9-]/g, '')}-${now}`;
+  const actions = buildActionsForVid(vid, plan);
+
+  const teamId = plan.teams?.[0]?.team_id || 'TEAM_APPEND';
+  const stageId = plan.stages?.[0]?.stage_id || `STAGE_${now}`;
+
+  // 确保 teams 中包含该车辆
+  let team = (plan.teams || []).find((t) => t.team_id === teamId);
+  if (!team) {
+    team = { team_id: teamId, name: '追加编组', description: '', state: 'READY', vehicles: [] };
+    plan.teams = plan.teams || [];
+    plan.teams.push(team);
+  }
+  if (!team.vehicles.some((v) => v.vid === vid)) {
+    team.vehicles.push({ vid, resource_type: selectedVehicleType.value });
+  }
+
+  // 在 stages 中追加该车辆 actions
+  let stage = (plan.stages || []).find((s) => s.stage_id === stageId);
+  if (!stage) {
+    stage = {
+      stage_id: stageId,
+      title: '追加阶段',
+      stage_seq: 1,
+      team_ids: [teamId],
+      target_ids: [],
+      state: 'SCHEDULED',
+      team_actions: {},
+    };
+    plan.stages = plan.stages || [];
+    plan.stages.push(stage);
+  }
+  const ta = stage.team_actions || {};
+  if (Array.isArray(ta)) {
+    ta.push({ vid, state: 'SCHEDULED', action_type: '', actions });
+  } else {
+    ta[teamId] = ta[teamId] || [];
+    ta[teamId].push({ vid, state: 'SCHEDULED', action_type: '', actions });
+  }
+  stage.team_actions = ta;
+
+  // 追加 car_actions
+  plan.car_actions = plan.car_actions || [];
+  plan.car_actions.push({ vid, state: 'SCHEDULED', action_type: '', actions });
+
+  // 追加 vehicle_summary
+  plan.vehicle_summary = plan.vehicle_summary || [];
+  plan.vehicle_summary.push({
+    vid,
+    resource_type: selectedVehicleType.value,
+    total_actions: actions.length,
+    stages: [{ stage_id: stageId, stage_title: stage.title, actions }],
+  });
+
+  plan.updated_at = new Date().toISOString();
+  return plan;
 }
 
 function buildUpdatedPlan() {
@@ -774,6 +843,22 @@ async function savePlan() {
     const updatedPlan = buildUpdatedPlan();
     try {
       const result = await patchOperatorPlan(props.editPlan.plan_id, updatedPlan);
+      if (!result.ok) {
+        alert(`保存失败：${result.data?.message || result.error || result.statusText || '未知错误'}`);
+        return;
+      }
+      emit('saved', result.data?.data || updatedPlan);
+    } catch (err) {
+      alert(`保存失败：${err.message || err}`);
+    }
+    return;
+  }
+
+  if (props.appendMode && props.appendPlan) {
+    // 追加模式：把新车辆行动序列追加到已有方案
+    const updatedPlan = buildAppendedPlan();
+    try {
+      const result = await patchOperatorPlan(props.appendPlan.plan_id, updatedPlan);
       if (!result.ok) {
         alert(`保存失败：${result.data?.message || result.error || result.statusText || '未知错误'}`);
         return;
