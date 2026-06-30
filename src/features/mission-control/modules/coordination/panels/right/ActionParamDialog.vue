@@ -1008,8 +1008,12 @@ function onRouteChange() {
 }
 
 function initFromRouteSelection() {
-  if (!editedParam.value.route_id || !routeList.value.length) return;
-  onRouteChange();
+  if (!routeList.value.length) return;
+  // 新建/未设置路线时，默认选中第一条路线
+  if (!editedParam.value.route_id) {
+    editedParam.value.route_id = routeList.value[0]?.resource_id || '';
+  }
+  if (editedParam.value.route_id) onRouteChange();
 }
 
 function applyAreaFromList() {
@@ -1028,13 +1032,21 @@ function onAreaChange() {
 }
 
 function initFromAreaSelection() {
-  if (!editedParam.value.area_id || !areaList.value.length) return;
-  applyAreaFromList();
+  if (!areaList.value.length) return;
+  // 新建/未设置区域时，默认选中第一个区域
+  if (!editedParam.value.area_id) {
+    editedParam.value.area_id = areaList.value[0]?.resource_id || '';
+  }
+  if (editedParam.value.area_id) applyAreaFromList();
 }
 
 function initFromTargetSelection() {
   if (!Array.isArray(editedParam.value.points) || !targetList.value.length) return;
   editedParam.value.points.forEach((pt) => {
+    // 新建/未设置目标时，默认选中第一个目标
+    if (!pt.target_ref) {
+      pt.target_ref = targetList.value[0]?.resource_id || '';
+    }
     if (!pt.target_ref) return;
     const target = targetList.value.find((item) => item.resource_id === pt.target_ref);
     if (target) {

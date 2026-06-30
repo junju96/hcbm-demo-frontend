@@ -63,8 +63,18 @@ function onAreaChange(event) {
 
 watch(
   () => [props.areaId, props.areaList.length],
-  ([selectedId, listLength]) => {
-    if (selectedId && listLength) {
+  ([selectedId, listLength], [prevSelectedId]) => {
+    if (!listLength) return;
+    // 新建/未设置区域时，默认选中第一个区域
+    if (!selectedId) {
+      const first = props.areaList[0]?.resource_id;
+      if (first) {
+        emit('update:areaId', first);
+        applyAreaFromList(first);
+      }
+      return;
+    }
+    if (selectedId && selectedId !== prevSelectedId) {
       applyAreaFromList(selectedId);
     }
   },
