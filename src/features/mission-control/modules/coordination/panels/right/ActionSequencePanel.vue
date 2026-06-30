@@ -104,6 +104,7 @@
                     <button class="as-btn mini danger" type="button" :disabled="controlLoading" @click="executeControl('stop', [vehicle.vid])">停止</button>
                   </template>
                   <button class="as-btn mini" type="button" @click="openCreatorForEdit(vehicle)">编辑</button>
+                  <button class="as-btn mini primary" type="button" @click="openCreatorForVehicle(vehicle)">新建</button>
                 </div>
                 <span v-else class="as-vehicle-count">{{ vehicle.total_actions }} 个行动</span>
               </div>
@@ -262,6 +263,7 @@
         :edit-mode="creatorEditMode"
         :edit-plan="creatorEditPlan"
         :edit-vehicle-vid="creatorEditVehicleVid"
+        :preset-vehicle-type="creatorPresetVehicleType"
         @close="closeCreator"
         @saved="onCreatorSaved"
       />
@@ -341,6 +343,7 @@ const showCreator = ref(false);
 const creatorEditMode = ref(false);
 const creatorEditPlan = ref(null);
 const creatorEditVehicleVid = ref('');
+const creatorPresetVehicleType = ref('');
 
 /* ---------- 地图上图 ---------- */
 const currentMapObjectIds = ref([]);   // area / circle 对象 id
@@ -996,6 +999,7 @@ const openCreator = () => {
   creatorEditMode.value = false;
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
+  creatorPresetVehicleType.value = '';
   showCreator.value = true;
 };
 
@@ -1004,6 +1008,15 @@ const openCreatorForEdit = (vehicle) => {
   creatorEditMode.value = true;
   creatorEditPlan.value = selectedPlan.value;
   creatorEditVehicleVid.value = vehicle.vid;
+  creatorPresetVehicleType.value = '';
+  showCreator.value = true;
+};
+
+const openCreatorForVehicle = (vehicle) => {
+  creatorEditMode.value = false;
+  creatorEditPlan.value = null;
+  creatorEditVehicleVid.value = '';
+  creatorPresetVehicleType.value = vehicle.resource_type || '';
   showCreator.value = true;
 };
 
@@ -1012,6 +1025,7 @@ const closeCreator = () => {
   creatorEditMode.value = false;
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
+  creatorPresetVehicleType.value = '';
 };
 
 const onCreatorSaved = (plan) => {

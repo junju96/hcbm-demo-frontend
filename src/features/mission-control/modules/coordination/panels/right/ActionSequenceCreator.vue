@@ -167,6 +167,7 @@ const props = defineProps({
   editMode: { type: Boolean, default: false },
   editPlan: { type: Object, default: null },
   editVehicleVid: { type: String, default: '' },
+  presetVehicleType: { type: String, default: '' },
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -755,6 +756,10 @@ function buildUpdatedPlan() {
 onMounted(() => {
   if (props.editMode) {
     initEditMode();
+  } else if (props.presetVehicleType) {
+    // 从某车“新建”进入时，跳过车辆选择，直接进编辑界面
+    selectedVehicleType.value = props.presetVehicleType;
+    step.value = 'edit';
   }
 });
 
