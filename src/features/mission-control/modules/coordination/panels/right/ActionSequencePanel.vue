@@ -321,6 +321,7 @@
         :edit-mode="creatorEditMode"
         :edit-plan="creatorEditPlan"
         :edit-vehicle-vid="creatorEditVehicleVid"
+        :edit-vehicle-type="creatorEditVehicleType"
         :preset-vehicle-type="creatorPresetVehicleType"
         :preset-vehicle="creatorPresetVehicle"
         :append-mode="creatorAppendMode"
@@ -412,6 +413,7 @@ const creatorEditPlan = ref(null);
 const creatorEditVehicleVid = ref('');
 const creatorPresetVehicleType = ref('');
 const creatorPresetVehicle = ref(null);
+const creatorEditVehicleType = ref('');
 const creatorAppendMode = ref(false);
 const creatorAppendPlan = ref(null);
 
@@ -1206,6 +1208,7 @@ const openCreatorForEdit = (vehicle) => {
   creatorEditMode.value = true;
   creatorEditPlan.value = selectedPlan.value;
   creatorEditVehicleVid.value = vehicle.vid;
+  creatorEditVehicleType.value = vehicle.resource_type || '';
   creatorPresetVehicleType.value = '';
   creatorPresetVehicle.value = null;
   creatorAppendMode.value = false;
@@ -1323,6 +1326,7 @@ const closeCreator = () => {
   creatorEditMode.value = false;
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
+  creatorEditVehicleType.value = '';
   creatorPresetVehicleType.value = '';
   creatorPresetVehicle.value = null;
   creatorAppendMode.value = false;

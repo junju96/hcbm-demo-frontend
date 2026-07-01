@@ -167,6 +167,7 @@ const props = defineProps({
   editMode: { type: Boolean, default: false },
   editPlan: { type: Object, default: null },
   editVehicleVid: { type: String, default: '' },
+  editVehicleType: { type: String, default: '' },
   presetVehicleType: { type: String, default: '' },
   // 追加模式：将新车辆行动序列追加到已有方案中，而不是创建新方案
   appendMode: { type: Boolean, default: false },
@@ -308,7 +309,7 @@ function initEditMode() {
     resourceType = vs?.resource_type || '';
   }
 
-  selectedVehicleType.value = inferVehicleTypeFromResourceType(resourceType);
+  selectedVehicleType.value = inferVehicleTypeFromResourceType(props.editVehicleType || resourceType);
   if (!selectedVehicleType.value) {
     selectedVehicleType.value = 'Chassis-UGV';
   }
