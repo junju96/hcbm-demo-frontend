@@ -322,7 +322,17 @@ function initEditMode() {
   const allActions = [];
   for (const stage of plan.stages || []) {
     const ta = stage.team_actions || {};
-    const vehicles = Array.isArray(ta) ? ta : Object.values(ta).flat();
+    let vehicles = [];
+    if (Array.isArray(ta)) {
+      // 数据服务器标准格式：team_actions = [{ team_id, car_actions: [...] }]
+      for (const entry of ta) {
+        vehicles.push(...(entry.car_actions || []));
+        vehicles.push(...(entry.team_actions || []));
+      }
+    } else {
+      // 旧 mock 格式：team_actions = { [teamId]: [...] }
+      vehicles = Object.values(ta).flat();
+    }
     for (const v of vehicles) {
       if (v.vid !== vid) continue;
       for (const a of v.actions || []) {
