@@ -314,7 +314,7 @@
         </template>
 
         <!-- 10. 侦察打击 -->
-        <template v-else-if="normalizedActionType === 'recon-strike'">
+        <template v-else-if="['recon-strike', 'search-and-shoot'].includes(normalizedActionType)">
           <template v-if="isPatrolVehicle">
             <div class="apd-section">
               <div class="apd-section-title">打击参数</div>
@@ -555,7 +555,9 @@
         </template>
 
         <template v-else>
-          <div class="apd-empty">暂无该行动类型（{{ action?.action_type || '未知' }}）的参数定义</div>
+          <div class="apd-empty">
+            暂无该行动类型（{{ action?.action_type || '未知' }} / {{ normalizedActionType }}）的参数定义
+          </div>
         </template>
 
         <!-- 通用参数：仅对需要通用参数的底盘/载荷类显示 -->
@@ -606,7 +608,11 @@ const loadingTargets = ref(false);
 const areaList = ref([]);
 const loadingAreas = ref(false);
 
-const normalizedActionType = computed(() => String(props.action?.action_type || '').toLowerCase());
+const normalizedActionType = computed(() => {
+  const raw = String(props.action?.action_type || '').toLowerCase();
+  console.log('[ActionParamDialog] raw action_type:', props.action?.action_type, 'normalized:', raw);
+  return raw;
+});
 
 const normalizedVehicleType = computed(() => {
   const rt = String(props.vehicleType || '').toLowerCase().replace(/-/g, '_');
@@ -663,23 +669,24 @@ const vehicleName = computed(() =>
 );
 
 const isTargetListStrike = computed(() =>
-  ['40mm-gun-launch', 'gun-shot', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch']
+  ['40mm-gun-launch', 'gun-shot', '7.62mm-gun-shot', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch']
     .includes(normalizedActionType.value)
 );
 
 const isPatrolDeterrence = computed(() =>
-  ['acoustic-deterrence', 'light-deterrence'].includes(normalizedActionType.value)
+  ['sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'].includes(normalizedActionType.value)
 );
 
 const isElectronic = computed(() =>
-  ['electronic-recon', 'electronic-jamming'].includes(normalizedActionType.value)
+  ['em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)
 );
 
 const showCommonParams = computed(() =>
   ['auto-move', 'follow-move', 'silent-guard', 'formation-move', 'manual-task', 'pose-adjust',
-   'lens-recon', 'recon-strike', '40mm-gun-launch', 'gun-shot', 'at-missile-launch',
-   'rocket-launch', 'loitering-munition-launch', 'laser-illumination',
-   'acoustic-deterrence', 'light-deterrence', 'electronic-recon', 'electronic-jamming',
+   'lens-recon', 'recon-strike', 'search-and-shoot', '40mm-gun-launch', 'gun-shot', '7.62mm-gun-shot',
+   'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'laser-illumination',
+   'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence',
+   'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming',
    'payload-silent', 'air-recon']
     .includes(normalizedActionType.value)
 );
@@ -826,7 +833,7 @@ function ensureShape() {
     p.mission_duration = p.mission_duration ?? '00:00:00';
     p.enable_start_time = p.enable_start_time ?? false;
     p.start_time = p.start_time ?? '';
-  } else if (type === 'recon-strike') {
+  } else if (type === 'recon-strike' || type === 'search-and-shoot') {
     p.time = p.time ?? 180;
     p.area = Array.isArray(p.area) ? p.area : [defaultAreaPoint(), defaultAreaPoint()];
     p.area_id = p.area_id ?? '';

@@ -149,6 +149,7 @@
                   v-for="(column, colIdx) in getActionColumns(vehicle)"
                   :key="colIdx"
                   class="as-action-column"
+                  :style="columnStyle(vehicle, column)"
                 >
                   <template v-for="(action, rowIdx) in column" :key="action.action_id || `${action.stage_id}-${rowIdx}`">
                     <!-- 行动卡片 -->
@@ -156,6 +157,7 @@
                       class="as-action-card"
                       :class="`state-${(action.state || 'SCHEDULED').toLowerCase()}`"
                       :data-action-id="action.action_id"
+                      :style="cardStyle(vehicle, action)"
                       @dblclick="openParamDialog(action, vehicle)"
                     >
                       <div class="as-card-header" :title="action.name">
@@ -954,6 +956,108 @@ const getActionLines = (vehicle) => {
     });
   });
   return lines;
+};
+
+// 卡片按上游连线的重心定位（与编辑界面一致）：
+// - 首列（无前驱）按 action_seq 自上而下排列
+// - 其余每列每个卡片的目标中心 = 其所有前驱卡片中心的平均值
+//   使串行链保持同一水平，汇聚节点落在多个前驱之间
+// - 同列内若重心导致重叠，则自上而下按最小行距顺次下推
+// - 整张图顶部对齐画布上方
+// 卡片高度从真实 DOM 读取（依赖 layoutTick 触发重算），无法读取时用估算值兜底
+const ROW_GAP = 16; // 同列卡片最小间距，与 .as-action-column gap 保持一致
+const CARD_FALLBACK_H = 96; // 卡片高度兜底估算值
+const getCardOffsets = (vehicle) => {
+  void layoutTick.value; // 数据/尺寸变化后触发重算
+  const columns = getActionColumns(vehicle);
+  if (!columns.length) return {};
+
+  const container = document.querySelector(`.as-action-cards[data-vid="${cssEscape(vehicle.vid)}"]`);
+  const heightOf = (action) => {
+    if (container) {
+      const el = container.querySelector(`.as-action-card[data-action-id="${cssEscape(action.action_id)}"]`);
+      if (el) return el.offsetHeight;
+    }
+    return CARD_FALLBACK_H;
+  };
+
+  // center[action_id] = 卡片中心的 Y 坐标（相对列内 0 基准）
+  const center = {};
+
+  columns.forEach((column, colIdx) => {
+    if (colIdx === 0) {
+      // 首列：自上而下顺次堆叠
+      let cursor = 0;
+      column.forEach((action) => {
+        const h = heightOf(action);
+        center[action.action_id] = cursor + h / 2;
+        cursor += h + ROW_GAP;
+      });
+      return;
+    }
+
+    // 其余列：先按前驱重心算理想中心，再消除重叠
+    const items = column.map((action) => {
+      const deps = (action._deps || []).filter((id) => center[id] !== undefined);
+      const ideal = deps.length
+        ? deps.reduce((sum, id) => sum + center[id], 0) / deps.length
+        : null;
+      return { action, h: heightOf(action), ideal };
+    });
+
+    // 没有可用前驱重心的（异常/根节点混入）保持原顺序，给一个递增基准
+    let fallbackCursor = 0;
+    items.forEach((it) => {
+      if (it.ideal === null) {
+        it.ideal = fallbackCursor + it.h / 2;
+      }
+      fallbackCursor = Math.max(fallbackCursor, it.ideal + it.h / 2) + ROW_GAP;
+    });
+
+    // 按理想中心排序后，自上而下顺次下推消除重叠
+    items.sort((a, b) => a.ideal - b.ideal);
+    let minTop = 0;
+    items.forEach((it) => {
+      let top = it.ideal - it.h / 2;
+      if (top < minTop) top = minTop;
+      center[it.action.action_id] = top + it.h / 2;
+      minTop = top + it.h + ROW_GAP;
+    });
+  });
+
+  // 整体顶部对齐：把所有卡片的最小 top 归零
+  const offsets = {};
+  let minTop = Infinity;
+  columns.flat().forEach((action) => {
+    const h = heightOf(action);
+    const top = center[action.action_id] - h / 2;
+    offsets[action.action_id] = { top, h };
+    if (top < minTop) minTop = top;
+  });
+  if (!isFinite(minTop)) minTop = 0;
+  Object.keys(offsets).forEach((id) => {
+    offsets[id].top -= minTop;
+  });
+  return offsets;
+};
+
+// 单个卡片的定位样式
+const cardStyle = (vehicle, action) => {
+  const offsets = getCardOffsets(vehicle);
+  const o = offsets[action.action_id];
+  if (!o) return {};
+  return { position: 'absolute', top: `${o.top}px`, left: '0' };
+};
+
+// 每列容器高度（取列内最靠下卡片的底部）
+const columnStyle = (vehicle, column) => {
+  const offsets = getCardOffsets(vehicle);
+  let maxBottom = 0;
+  column.forEach((action) => {
+    const o = offsets[action.action_id];
+    if (o) maxBottom = Math.max(maxBottom, o.top + o.h);
+  });
+  return { position: 'relative', height: maxBottom ? `${maxBottom}px` : undefined };
 };
 
 // 根据真实渲染的卡片位置计算依赖连线
@@ -1960,6 +2064,7 @@ onUnmounted(() => {
   position: relative;
   display: flex;
   flex-direction: row;
+  align-items: flex-start;
   gap: 44px;
   padding: 0.8rem;
   min-height: 120px;
@@ -1986,11 +2091,9 @@ onUnmounted(() => {
 }
 
 .as-action-column {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
   position: relative;
+  width: 166px; /* 卡片 160 + margin 3*2 */
+  flex-shrink: 0;
   z-index: 1;
 }
 

@@ -63,7 +63,7 @@ function onAreaChange(event) {
 
 watch(
   () => [props.areaId, props.areaList.length],
-  ([selectedId, listLength], [prevSelectedId]) => {
+  ([selectedId, listLength], [prevSelectedId] = []) => {
     if (!listLength) return;
     // 新建/未设置区域时，默认选中第一个区域
     if (!selectedId) {

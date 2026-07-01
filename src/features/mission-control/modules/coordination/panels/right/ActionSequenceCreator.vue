@@ -81,10 +81,10 @@
           <div
             ref="canvasRef"
             class="asc-canvas"
+            :class="{ 'is-connecting': drawingLine }"
             @drop="onDrop"
             @dragover.prevent
             @click="onCanvasClick"
-            @mouseup="onCanvasMouseUp"
           >
             <svg class="asc-lines">
               <defs>
@@ -138,12 +138,12 @@
               @mousedown.stop="startDragNode($event, node)"
               @click.stop="onNodeClick(node)"
             >
-              <div class="asc-node-port in" title="连接入口" @mouseup.stop="finishConnect($event, node, 'in')" />
+              <div class="asc-node-port in" title="连接到此" @click.stop="finishConnect($event, node, 'in')" />
               <div class="asc-node-body">
                 <div class="asc-node-name">{{ node.name }}</div>
                 <div class="asc-node-type">{{ node.actionType }}</div>
               </div>
-              <div class="asc-node-port out" title="连接出口" @mousedown.stop="startConnect($event, node, 'out')" />
+              <div class="asc-node-port out" :title="drawingLine ? '连接到此' : '点击开始连线'" @click.stop="onPortClick($event, node, 'out')" />
               <button class="asc-node-remove" type="button" title="删除节点" @click.stop="removeNode(node)">×</button>
             </div>
 
@@ -159,7 +159,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import VehicleIcon from './VehicleIcon.vue';
 import { createOperatorPlan, patchOperatorPlan } from '../../api/coordinationApi.js';
 
@@ -308,8 +308,6 @@ function initEditMode() {
 
   // 建立 action_seq -> nodeId 映射，用于生成连线
   const seqToNodeId = {};
-  const colWidth = 180;
-  const rowHeight = 90;
   nodes.value = allActions.map((a, idx) => {
     const id = `node_${a.action_id || a.action_seq || idx}_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
     seqToNodeId[String(a.action_seq)] = id;
@@ -319,8 +317,9 @@ function initEditMode() {
       name: a.name || '',
       category: a.action_type && chassisTasks.some((t) => t.actionType === a.action_type) ? 'chassis' : 'payload',
       param: JSON.parse(JSON.stringify(a.param || {})),
-      x: PAD_X + (idx % 4) * colWidth,
-      y: PAD_Y + Math.floor(idx / 4) * rowHeight,
+      // 先给个占位坐标，稍后交给 autoLayout 按依赖图重新排布
+      x: PAD_X,
+      y: PAD_Y,
     };
   });
 
@@ -335,9 +334,12 @@ function initEditMode() {
     }
   });
   lines.value = depsLines;
-  nextTick(() => updateLines());
 
   step.value = 'edit';
+  // 进入编辑视图后，按串/并行关系自动等距排列，避免连线斜穿、错行
+  nextTick(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => autoLayout()));
+  });
 }
 
 const PAD_X = 40;
@@ -370,24 +372,21 @@ function onDrop(event) {
 }
 
 function onNodeClick(node) {
+  // 正在连线时，点击目标节点主体即可连上（无需精确点到入口小圆点）
+  if (drawingLine.value) {
+    finishConnect(null, node, 'in');
+    return;
+  }
   selectedNodeId.value = node.id;
 }
 
 function onCanvasClick() {
+  // 点击画布空白处：取消当前连线，或清除选中
+  if (drawingLine.value) {
+    cancelConnect();
+    return;
+  }
   selectedNodeId.value = null;
-  if (drawingLine.value) {
-    drawingLine.value = null;
-    tempLine.value = null;
-    window.removeEventListener('mousemove', onDrawingMove);
-  }
-}
-
-function onCanvasMouseUp() {
-  if (drawingLine.value) {
-    drawingLine.value = null;
-    tempLine.value = null;
-    window.removeEventListener('mousemove', onDrawingMove);
-  }
 }
 
 function removeNode(node) {
@@ -397,6 +396,8 @@ function removeNode(node) {
 
 function startDragNode(event, node) {
   if (event.target.classList.contains('asc-node-port') || event.target.classList.contains('asc-node-remove')) return;
+  // 连线进行中，不启动拖拽（让 click 去完成连线）
+  if (drawingLine.value) return;
   draggingNode.value = node;
   const rect = canvasRef.value.getBoundingClientRect();
   dragOffset.value = { x: event.clientX - rect.left - node.x, y: event.clientY - rect.top - node.y };
@@ -433,31 +434,47 @@ function buildCurvePath(fromPos, toPos) {
   return `M ${fromPos.x} ${fromPos.y} C ${fromPos.x + offset} ${fromPos.y}, ${toPos.x - offset} ${toPos.y}, ${toPos.x} ${toPos.y}`;
 }
 
+function onPortClick(event, node, portType) {
+  if (event) event.stopPropagation();
+  // 已在连线中：把出口/入口都当作“落点”，连到该节点
+  if (drawingLine.value) {
+    finishConnect(event, node, 'in');
+    return;
+  }
+  // 未连线：从出口开始一次点击式连线
+  if (portType === 'out') startConnect(event, node, 'out');
+}
+
 function startConnect(event, node, portType) {
-  event.stopPropagation();
+  if (event) event.stopPropagation();
   if (portType !== 'out') return;
   // 如果已经在画线，先取消上一次的
-  if (drawingLine.value) {
-    drawingLine.value = null;
-    tempLine.value = null;
-    window.removeEventListener('mousemove', onDrawingMove);
-  }
+  if (drawingLine.value) cancelConnect();
   drawingLine.value = { from: node.id };
+  selectedNodeId.value = node.id;
   const pos = getPortPosition(node, 'out');
   tempLine.value = { path: buildCurvePath(pos, pos) };
+  // 松开鼠标也不结束连线；改由移动跟随光标、点击落点结束
   window.addEventListener('mousemove', onDrawingMove);
 }
 
 function finishConnect(event, node, portType) {
-  event.stopPropagation();
-  if (portType !== 'in') return;
+  if (event) event.stopPropagation();
   if (!drawingLine.value) return;
-  if (drawingLine.value.from === node.id) return;
+  // 落点是起点自身则取消
+  if (drawingLine.value.from === node.id) {
+    cancelConnect();
+    return;
+  }
   const exists = lines.value.some((l) => l.from === drawingLine.value.from && l.to === node.id);
   if (!exists) {
     lines.value.push({ from: drawingLine.value.from, to: node.id });
     updateLines();
   }
+  cancelConnect();
+}
+
+function cancelConnect() {
   drawingLine.value = null;
   tempLine.value = null;
   window.removeEventListener('mousemove', onDrawingMove);
@@ -594,21 +611,49 @@ function autoLayout() {
   });
   const colKeys = Object.keys(columns).map(Number).sort((a, b) => a - b);
 
-  // 整体垂直居中：以最高的一列为基准
-  const maxRows = Math.max(...colKeys.map((k) => columns[k].length));
-  const blockHeight = maxRows * NODE_H + (maxRows - 1) * ROW_GAP;
-  const canvasH = canvasRef.value?.clientHeight || 600;
-  const baseTop = Math.max(20, (canvasH - blockHeight) / 2);
+  // 前驱表：用于把节点对齐到其上游的“重心”高度
+  const preds = {};
+  ids.forEach((id) => { preds[id] = []; });
+  lines.value.forEach((l) => {
+    if (idSet.has(l.from) && idSet.has(l.to)) preds[l.to].push(l.from);
+  });
 
   const nodeMap = Object.fromEntries(nodes.value.map((n) => [n.id, n]));
-  colKeys.forEach((d, colIdx) => {
+  const yPos = {}; // id -> 顶部 y（临时，未归一化）
+  const PAD_Y = 24; // 画布顶部留白
+
+  // 从左到右逐列布局：
+  // - 首列（无前驱的根）按原始顺序自上而下堆叠
+  // - 其余列：每个节点的目标高度 = 其前驱的平均高度（串行链因此保持同一行），
+  //   再自上而下消解重叠，保证同列节点间距不小于 ROW_STEP
+  colKeys.forEach((d) => {
     const colNodes = columns[d];
-    const colH = colNodes.length * NODE_H + (colNodes.length - 1) * ROW_GAP;
-    const colTop = baseTop + (blockHeight - colH) / 2; // 每列在整体块内再次居中
-    colNodes.forEach((id, rowIdx) => {
+    // 计算每个节点的期望 y（重心）
+    const desired = colNodes.map((id, idx) => {
+      const ps = preds[id].filter((p) => yPos[p] !== undefined);
+      if (ps.length === 0) return { id, want: idx * ROW_STEP, idx };
+      const avg = ps.reduce((s, p) => s + yPos[p], 0) / ps.length;
+      return { id, want: avg, idx };
+    });
+    // 按期望高度排序（并列时保持原始顺序），再消解重叠
+    desired.sort((a, b) => (a.want - b.want) || (a.idx - b.idx));
+    let prevY = -Infinity;
+    desired.forEach((item) => {
+      let y = item.want;
+      if (y < prevY + ROW_STEP) y = prevY + ROW_STEP;
+      yPos[item.id] = y;
+      prevY = y;
+    });
+  });
+
+  // 归一化：整张图顶部对齐到 PAD_Y（不再整体居中）
+  const minY = Math.min(...ids.map((id) => yPos[id]));
+  const shift = PAD_Y - minY;
+  colKeys.forEach((d, colIdx) => {
+    columns[d].forEach((id) => {
       const node = nodeMap[id];
       node.x = PAD_X + colIdx * COL_STEP;
-      node.y = colTop + rowIdx * ROW_STEP;
+      node.y = yPos[id] + shift;
     });
   });
 
@@ -756,8 +801,16 @@ function buildAppendedPlan() {
   }
   const ta = stage.team_actions || {};
   if (Array.isArray(ta)) {
-    ta.push({ vid, state: 'SCHEDULED', action_type: '', actions });
+    // 数据服务器标准格式：team_actions 为 [{ team_id, car_actions: [...] }]
+    const entry = ta.find((e) => e.team_id === teamId);
+    if (entry) {
+      entry.car_actions = entry.car_actions || [];
+      entry.car_actions.push({ vid, state: 'SCHEDULED', action_type: '', actions });
+    } else {
+      ta.push({ team_id: teamId, car_actions: [{ vid, state: 'SCHEDULED', action_type: '', actions }] });
+    }
   } else {
+    // 旧 mock 格式：team_actions 为 { [teamId]: [...] }
     ta[teamId] = ta[teamId] || [];
     ta[teamId].push({ vid, state: 'SCHEDULED', action_type: '', actions });
   }
@@ -789,10 +842,15 @@ function buildUpdatedPlan() {
   for (const stage of plan.stages || []) {
     const ta = stage.team_actions || {};
     if (Array.isArray(ta)) {
-      for (const v of ta) {
-        if (v.vid === vid) v.actions = actions;
+      // 数据服务器标准格式：team_actions 为 [{ team_id, car_actions: [...] }]
+      for (const entry of ta) {
+        const cars = entry.car_actions || [];
+        for (const v of cars) {
+          if (v.vid === vid) v.actions = actions;
+        }
       }
     } else {
+      // 旧 mock 格式：team_actions 为 { [teamId]: [...] }
       for (const key of Object.keys(ta)) {
         for (const v of ta[key]) {
           if (v.vid === vid) v.actions = actions;
@@ -811,9 +869,11 @@ function buildUpdatedPlan() {
   // 更新 vehicle_summary
   if (plan.vehicle_summary) {
     for (const vs of plan.vehicle_summary) {
-      if (vs.vid === vid && vs.stages?.[0]) {
-        vs.stages[0].actions = actions;
+      if (vs.vid === vid) {
         vs.total_actions = actions.length;
+        for (const st of vs.stages || []) {
+          st.actions = actions;
+        }
       }
     }
   }
@@ -822,7 +882,14 @@ function buildUpdatedPlan() {
   return plan;
 }
 
+function onKeydown(e) {
+  if (e.key === 'Escape' && drawingLine.value) {
+    cancelConnect();
+  }
+}
+
 onMounted(() => {
+  window.addEventListener('keydown', onKeydown);
   if (props.editMode) {
     initEditMode();
   } else if (props.presetVehicleType) {
@@ -830,6 +897,13 @@ onMounted(() => {
     selectedVehicleType.value = props.presetVehicleType;
     step.value = 'edit';
   }
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown);
+  window.removeEventListener('mousemove', onDrawingMove);
+  window.removeEventListener('mousemove', onDragMove);
+  window.removeEventListener('mouseup', onDragEnd);
 });
 
 async function savePlan() {
@@ -1302,6 +1376,24 @@ async function savePlan() {
 .asc-node.cat-payload .asc-node-port:hover {
   background: #ffb454;
   box-shadow: 0 0 8px rgba(255, 180, 84, 0.8);
+}
+
+/* 连线进行中：画布提示可落点，所有节点入口高亮呼吸 */
+.asc-canvas.is-connecting {
+  cursor: crosshair;
+}
+
+.asc-canvas.is-connecting .asc-node-port {
+  animation: asc-port-pulse 1.1s ease-in-out infinite;
+}
+
+.asc-canvas.is-connecting .asc-node {
+  cursor: crosshair;
+}
+
+@keyframes asc-port-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 222, 200, 0); }
+  50% { box-shadow: 0 0 8px 2px rgba(0, 222, 200, 0.55); }
 }
 
 .asc-node-remove {
