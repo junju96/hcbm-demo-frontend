@@ -1263,7 +1263,7 @@ const executeDeleteVehicleActions = async () => {
   const vid = vehicleToDelete.value.vid;
   const planId = selectedPlan.value.plan_id;
 
-  // 构造更新后的 plan：移除该车辆相关的 stages.team_actions、car_actions、vehicle_summary
+  // 构造更新后的 plan（仅用于本地视图刷新）
   const updatedPlan = JSON.parse(JSON.stringify(selectedPlan.value));
 
   // 移除 stages 中该车辆（直接过滤车辆对象，而不是仅清空 actions）
@@ -1293,8 +1293,15 @@ const executeDeleteVehicleActions = async () => {
 
   updatedPlan.updated_at = new Date().toISOString();
 
+  // 构造 PATCH body：后端只接受白名单字段，避免发送完整 plan 导致大 body
+  const patchBody = {
+    stages: updatedPlan.stages || [],
+    car_actions: updatedPlan.car_actions || [],
+    vehicle_summary: updatedPlan.vehicle_summary || [],
+  };
+
   try {
-    const result = await patchOperatorPlan(planId, updatedPlan);
+    const result = await patchOperatorPlan(planId, patchBody);
     if (!result.ok) {
       appendSystemMessage(`删除车辆行动序列失败：${result.data?.message || result.error || '未知错误'}`);
       return;
@@ -1308,7 +1315,11 @@ const executeDeleteVehicleActions = async () => {
     } else {
       appendSystemMessage('已删除该车辆行动序列并同步到数据服务器');
     }
-    // 删除后立即刷新地图显示，不再调用 refreshDetail 避免被远程旧数据覆盖
+    // 删除后刷新地图显示
+    await clearPlanOnMap();
+    if ((updatedPlan.vehicle_summary || []).length > 0) {
+      await drawPlanOnMap(updatedPlan);
+    }
   } catch (err) {
     appendSystemMessage(`删除车辆行动序列失败：${err.message || err}`);
   } finally {
@@ -1331,11 +1342,16 @@ const closeCreator = () => {
 
 const onCreatorSaved = async (plan) => {
   if (creatorEditMode.value) {
-    // 编辑模式：刷新当前选中方案详情
+    // 编辑模式：同步到数据服务器后刷新当前选中方案详情
     selectedPlan.value = plan;
-    refreshDetail(plan.plan_id);
+    const syncResult = await syncOperatorPlanToDataServer(plan.plan_id);
+    if (!syncResult.ok) {
+      appendSystemMessage(`编辑已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
+    } else {
+      appendSystemMessage('已编辑车辆行动序列并同步到数据服务器');
+    }
+    await refreshDetail(plan.plan_id);
     closeCreator();
-    appendSystemMessage('已本地更新行动序列，点击“发布为正式行动方案”后同步到数据服务器');
     return;
   }
 

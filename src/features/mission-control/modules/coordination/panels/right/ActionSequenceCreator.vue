@@ -959,6 +959,23 @@ onUnmounted(() => {
   window.removeEventListener('mouseup', onDragEnd);
 });
 
+const ALLOWED_PATCH_KEYS = new Set([
+  'title', 'description', 'state', 'teams', 'targets',
+  'stages', 'search_text', 'car_actions', 'vehicle_summary',
+]);
+
+function toPatchBody(plan) {
+  // 后端 PATCH 只接受白名单字段，过滤掉 runtime_state 等非必要字段，减小 body 体积
+  const body = {};
+  for (const key of ALLOWED_PATCH_KEYS) {
+    if (plan[key] !== undefined) {
+      body[key] = plan[key];
+    }
+  }
+  body.updated_at = new Date().toISOString();
+  return body;
+}
+
 async function savePlan() {
   if (nodes.value.length === 0) {
     alert('请至少添加一个元任务');
@@ -969,7 +986,7 @@ async function savePlan() {
     // 编辑模式：只更新本地 task_pool，不同步数据服务器
     const updatedPlan = buildUpdatedPlan();
     try {
-      const result = await patchOperatorPlan(props.editPlan.plan_id, updatedPlan);
+      const result = await patchOperatorPlan(props.editPlan.plan_id, toPatchBody(updatedPlan));
       if (!result.ok) {
         alert(`保存失败：${result.data?.message || result.error || result.statusText || '未知错误'}`);
         return;
@@ -985,7 +1002,7 @@ async function savePlan() {
     // 追加模式：把新车辆行动序列追加到已有方案
     const updatedPlan = buildAppendedPlan();
     try {
-      const result = await patchOperatorPlan(props.appendPlan.plan_id, updatedPlan);
+      const result = await patchOperatorPlan(props.appendPlan.plan_id, toPatchBody(updatedPlan));
       if (!result.ok) {
         alert(`保存失败：${result.data?.message || result.error || result.statusText || '未知错误'}`);
         return;
