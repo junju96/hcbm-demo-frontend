@@ -601,6 +601,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save']);
 
 const editedParam = ref({});
+const targetInitializedPoints = new WeakSet();
 const routeList = ref([]);
 const loadingRoutes = ref(false);
 const targetList = ref([]);
@@ -1015,6 +1016,9 @@ function onRouteChange() {
 }
 
 function initFromRouteSelection() {
+  // 只有底盘机动类元任务才需要从路线资源初始化 points
+  const type = normalizedActionType.value;
+  if (!['auto-move', 'formation-move'].includes(type)) return;
   if (!routeList.value.length) return;
   // 新建/未设置路线时，默认选中第一条路线
   if (!editedParam.value.route_id) {
@@ -1039,6 +1043,10 @@ function onAreaChange() {
 }
 
 function initFromAreaSelection() {
+  // 只有需要区域参数的元任务才从区域资源初始化 area
+  const type = normalizedActionType.value;
+  const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'air-recon', 'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming', 'payload-silent'];
+  if (!needsArea.includes(type)) return;
   if (!areaList.value.length) return;
   // 新建/未设置区域时，默认选中第一个区域
   if (!editedParam.value.area_id) {
@@ -1055,12 +1063,15 @@ function initFromTargetSelection() {
       pt.target_ref = targetList.value[0]?.resource_id || '';
     }
     if (!pt.target_ref) return;
+    // 只有 target_ref 从空变为有值时才用目标坐标覆盖，避免每次 targetList 加载都覆盖用户手动输入
+    if (targetInitializedPoints.has(pt)) return;
     const target = targetList.value.find((item) => item.resource_id === pt.target_ref);
     if (target) {
       const loc = target.location || {};
       pt.lon = Number(loc.longitude ?? loc.lon ?? 0);
       pt.lat = Number(loc.latitude ?? loc.lat ?? 0);
       pt.alt = Number(loc.altitude ?? loc.alt ?? 0);
+      targetInitializedPoints.add(pt);
     }
   });
 }
