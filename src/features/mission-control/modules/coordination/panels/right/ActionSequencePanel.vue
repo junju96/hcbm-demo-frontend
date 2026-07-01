@@ -826,14 +826,11 @@ const missingVehicleTypes = computed(() => {
 });
 
 const vehicleTypeNameMap = {
-  'Chassis-UGV': '底盘车',
   'Fire-Support-UGV': '火力车',
   'Recon-Strike-UGV': '侦打车',
   'Patrol-UGV': '巡逻车',
   'Electronic-UGV': '电磁车',
-  'Communication-UGV': '通信车',
   'Air-Ground-UAV': '空地车',
-  'UGV': '无人车',
 };
 
 const getVehicleDisplayName = (vehicle) => {

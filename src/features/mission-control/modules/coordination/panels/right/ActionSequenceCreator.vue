@@ -280,12 +280,10 @@ function selectVehicle(vehicle) {
 
 function inferVehicleTypeFromResourceType(rt) {
   const map = {
-    'Chassis-UGV': 'Chassis-UGV',
     'Fire-Support-UGV': 'Fire-Support-UGV',
     'Recon-Strike-UGV': 'Recon-Strike-UGV',
     'Patrol-UGV': 'Patrol-UGV',
     'Electronic-UGV': 'Electronic-UGV',
-    'Communication-UGV': 'Communication-UGV',
     'Air-Ground-UAV': 'Air-Ground-UAV',
   };
   return map[rt] || '';
@@ -310,9 +308,7 @@ function initEditMode() {
   }
 
   selectedVehicleType.value = inferVehicleTypeFromResourceType(props.editVehicleType || resourceType);
-  if (!selectedVehicleType.value) {
-    selectedVehicleType.value = 'Chassis-UGV';
-  }
+  // 无法识别车型时保持为空，底盘类元任务仍可拖拽使用
   selectedVehicle.value = {
     type: selectedVehicleType.value,
     resource_type: selectedVehicleType.value,

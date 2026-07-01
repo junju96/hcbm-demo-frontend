@@ -618,7 +618,6 @@ const normalizedActionType = computed(() => {
 const normalizedVehicleType = computed(() => {
   const rt = String(props.vehicleType || '').toLowerCase().replace(/-/g, '_');
   const map = {
-    'chassis_ugv': 'chassis',
     'fire_support_ugv': 'fire_support',
     'recon_strike_ugv': 'recon_strike',
     'patrol_ugv': 'patrol',

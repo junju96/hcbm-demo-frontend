@@ -4,28 +4,8 @@
     viewBox="0 0 100 100"
     xmlns="http://www.w3.org/2000/svg"
   >
-    <!-- 底盘车 - 基础平台 -->
-    <template v-if="vehicleType === 'Chassis-UGV'">
-      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <!-- 履带底盘 -->
-        <rect x="14" y="58" width="72" height="20" rx="10" stroke-width="2" />
-        <circle class="vi-fill" cx="26" cy="68" r="3" stroke-width="1.5" />
-        <circle class="vi-fill" cx="38" cy="68" r="3" stroke-width="1.5" />
-        <circle class="vi-fill" cx="50" cy="68" r="3" stroke-width="1.5" />
-        <circle class="vi-fill" cx="62" cy="68" r="3" stroke-width="1.5" />
-        <circle class="vi-fill" cx="74" cy="68" r="3" stroke-width="1.5" />
-        <!-- 平台车体 -->
-        <rect class="vi-soft" x="22" y="42" width="56" height="18" rx="4" stroke-width="2" />
-        <!-- 驾驶舱 -->
-        <rect x="28" y="32" width="18" height="11" rx="2" stroke-width="1.8" />
-        <!-- 货台模块 -->
-        <rect x="54" y="34" width="16" height="9" rx="1.5" stroke-width="1.6" />
-        <line x1="58" y1="38" x2="66" y2="38" stroke-width="1.4" opacity="0.6" />
-      </g>
-    </template>
-
     <!-- 火力车 - 炮塔平台 -->
-    <template v-else-if="vehicleType === 'Fire-Support-UGV'">
+    <template v-if="vehicleType === 'Fire-Support-UGV'">
       <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <rect x="14" y="58" width="72" height="20" rx="10" stroke-width="2" />
         <circle class="vi-fill" cx="26" cy="68" r="3" stroke-width="1.5" />
