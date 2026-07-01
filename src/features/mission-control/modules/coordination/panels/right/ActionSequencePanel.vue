@@ -1299,21 +1299,16 @@ const executeDeleteVehicleActions = async () => {
       appendSystemMessage(`删除车辆行动序列失败：${result.data?.message || result.error || '未知错误'}`);
       return;
     }
-    const savedPlan = result.data?.data || updatedPlan;
-    // 后端返回的 savedPlan 可能没有最新 vehicle_summary，直接用本地构造的数据刷新视图
-    selectedPlan.value = savedPlan;
-    // 强制让 vehicle_summary 与本地构造一致
-    if (updatedPlan.vehicle_summary !== undefined && Array.isArray(savedPlan.vehicle_summary)) {
-      selectedPlan.value = { ...savedPlan, vehicle_summary: updatedPlan.vehicle_summary };
-    }
-    // 同步到数据服务器，避免轮询时旧数据覆盖本地删除结果
+    // 直接用本地构造的删除后 plan 刷新视图，避免后端 PATCH 返回的投影数据不完整
+    selectedPlan.value = updatedPlan;
+    // 同步到数据服务器
     const syncResult = await syncOperatorPlanToDataServer(planId);
     if (!syncResult.ok) {
       appendSystemMessage(`删除已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
     } else {
       appendSystemMessage('已删除该车辆行动序列并同步到数据服务器');
     }
-    await refreshDetail(planId);
+    // 删除后立即刷新地图显示，不再调用 refreshDetail 避免被远程旧数据覆盖
   } catch (err) {
     appendSystemMessage(`删除车辆行动序列失败：${err.message || err}`);
   } finally {
