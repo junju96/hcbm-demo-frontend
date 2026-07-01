@@ -215,7 +215,7 @@ const vehicleOptions = computed(() => {
 });
 
 const selectedVehicleName = computed(() => {
-  const v = vehicleOptions.find((item) => item.type === selectedVehicleType.value);
+  const v = vehicleOptions.value.find((item) => item.type === selectedVehicleType.value);
   return v ? v.name : selectedVehicleType.value;
 });
 
