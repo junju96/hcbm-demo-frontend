@@ -820,7 +820,7 @@ const supportedVehicleTypes = computed(() =>
 
 const missingVehicleTypes = computed(() => {
   const existingTypes = new Set((vehicleActions.value || []).map((v) => v.resource_type).filter(Boolean));
-  return supportedVehicleTypes.filter((v) => !existingTypes.has(v.type));
+  return supportedVehicleTypes.value.filter((v) => !existingTypes.has(v.type));
 });
 
 const vehicleTypeNameMap = {
