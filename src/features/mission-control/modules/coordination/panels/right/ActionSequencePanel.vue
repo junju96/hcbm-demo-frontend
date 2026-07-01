@@ -1183,6 +1183,16 @@ const saveActionParam = async (newParam) => {
     appendSystemMessage(`行动参数已保存 | ${action.name}`);
     closeParamDialog();
 
+    // 操控端模式下：把本地 plan 同步到数据服务器，避免后端服务重启或页面刷新后丢失
+    if (isControlMode.value) {
+      const syncResult = await syncOperatorPlanToDataServer(planId);
+      if (!syncResult.ok) {
+        appendSystemMessage(`参数已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
+      } else {
+        appendSystemMessage('参数已同步到数据服务器');
+      }
+    }
+
     // 重新拉取后端最新 plan（本地 local_dirty 会优先使用本地缓存），
     // 确保 selectedPlan 与本地持久化数据一致，避免 points 等嵌套字段显示旧值
     await refreshDetail(planId);
