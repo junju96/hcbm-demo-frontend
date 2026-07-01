@@ -1415,12 +1415,16 @@ const loadPlans = async (silent = false) => {
 
 const refreshDetail = async (planId) => {
   if (!planId) return;
-  const oldCoords = extractPlanCoordinates(selectedPlan.value);
-  // 协同席 / 操控端区分数据源
-  const result = isControlMode.value
-    ? await fetchOperatorPlanDetail(planId)
-    : await fetchActionSequencePlanDetail(planId);
-  if (result.ok) {
+  try {
+    const oldCoords = extractPlanCoordinates(selectedPlan.value);
+    // 协同席 / 操控端区分数据源
+    const result = isControlMode.value
+      ? await fetchOperatorPlanDetail(planId)
+      : await fetchActionSequencePlanDetail(planId);
+    if (!result.ok) {
+      console.warn('[ActionSequencePanel] refreshDetail failed:', result.error);
+      return;
+    }
     const newPlan = result.data;
     const newCoords = extractPlanCoordinates(newPlan);
     // 坐标未变化则跳过清空重绘，只更新数据
@@ -1437,32 +1441,49 @@ const refreshDetail = async (planId) => {
     } else {
       console.log('[MapDraw] no coordinates in refreshed data, cleared only');
     }
+  } catch (e) {
+    console.error('[ActionSequencePanel] refreshDetail error:', e);
   }
 };
 
 const selectPlan = async (planId) => {
   console.log(`[MapDraw] selectPlan called, planId=${planId}, isControlMode=${isControlMode.value}`);
   // 切换 plan 时先清除旧地图对象
-  await clearPlanOnMap();
+  try {
+    await clearPlanOnMap();
+  } catch (e) {
+    console.warn('[MapDraw] clearPlanOnMap error:', e);
+  }
   selectedPlanId.value = planId;
   loadingDetail.value = true;
-  // 协同席从协同席数据服务查详情，操控端从操控席数据服务查详情
-  const result = isControlMode.value
-    ? await fetchOperatorPlanDetail(planId)
-    : await fetchActionSequencePlanDetail(planId);
-  loadingDetail.value = false;
-  console.log(`[MapDraw] selectPlan result.ok=${result.ok}, error=${result.error || 'none'}`);
-  if (result.ok) {
-    selectedPlan.value = result.data;
-    const vs = result.data.vehicle_summary || [];
-    const firstAction = (vs[0]?.stages || [{}])[0]?.actions?.[0];
-    console.log('[MapDraw] selectPlan firstAction keys:', firstAction ? Object.keys(firstAction) : 'no actions');
-    console.log('[MapDraw] selectPlan firstAction action_type:', firstAction?.action_type);
-    // 新 plan 加载成功后自动上图
-    await drawPlanOnMap(selectedPlan.value);
-  } else {
+  try {
+    // 协同席从协同席数据服务查详情，操控端从操控席数据服务查详情
+    const result = isControlMode.value
+      ? await fetchOperatorPlanDetail(planId)
+      : await fetchActionSequencePlanDetail(planId);
+    console.log(`[MapDraw] selectPlan result.ok=${result.ok}, error=${result.error || 'none'}`);
+    if (result.ok) {
+      selectedPlan.value = result.data;
+      const vs = result.data.vehicle_summary || [];
+      const firstAction = (vs[0]?.stages || [{}])[0]?.actions?.[0];
+      console.log('[MapDraw] selectPlan firstAction keys:', firstAction ? Object.keys(firstAction) : 'no actions');
+      console.log('[MapDraw] selectPlan firstAction action_type:', firstAction?.action_type);
+      // 新 plan 加载成功后自动上图
+      try {
+        await drawPlanOnMap(selectedPlan.value);
+      } catch (e) {
+        console.warn('[MapDraw] drawPlanOnMap error:', e);
+      }
+    } else {
+      selectedPlan.value = null;
+      appendSystemMessage('获取方案详情失败: ' + (result.error || '未知错误'));
+    }
+  } catch (e) {
+    console.error('[ActionSequencePanel] selectPlan error:', e);
     selectedPlan.value = null;
-    appendSystemMessage('获取方案详情失败: ' + (result.error || '未知错误'));
+    appendSystemMessage('获取方案详情异常: ' + (e?.message || '未知错误'));
+  } finally {
+    loadingDetail.value = false;
   }
 };
 

@@ -14,14 +14,22 @@ const joinApiUrl = (path) => {
 };
 
 export const safeFetch = async (url, options) => {
+  // 默认 8 秒超时，避免地图服务等不可达时界面一直等待
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), options?.timeout || 8000);
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!response.ok) {
       return { ok: false, error: `HTTP ${response.status}`, data: null };
     }
     const data = await response.json();
     return { ok: true, error: null, data };
   } catch (error) {
+    clearTimeout(timeoutId);
+    if (error?.name === 'AbortError') {
+      return { ok: false, error: '请求超时', data: null };
+    }
     return { ok: false, error: error?.message || 'Network error', data: null };
   }
 };
