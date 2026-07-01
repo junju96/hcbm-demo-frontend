@@ -420,7 +420,23 @@ export const fetchResourcePoolByType = async (taskType, limit = 50) => {
   return { ok: true, data: { items, total: result.data?.data?.total || 0 } };
 };
 
+/** 获取当前已连接的无人车列表（协同席） */
+export const fetchActionSequenceVehicles = async () => {
+  const result = await getJson(joinApiUrl('/api/v1/action-sequences/vehicles'));
+  if (!result.ok) return result;
+  const items = result.data?.data?.items || [];
+  return { ok: true, data: { items, total: result.data?.data?.total || 0 } };
+};
+
 /* ==================== 操控端行动序列 API ==================== */
+
+/** 操控端 — 获取当前已连接的无人车列表 */
+export const fetchOperatorVehicles = async () => {
+  const result = await getJson(joinApiUrl('/api/v1/action-sequences/operator/vehicles'));
+  if (!result.ok) return result;
+  const items = result.data?.data?.items || [];
+  return { ok: true, data: { items, total: result.data?.data?.total || 0 } };
+};
 
 /** 操控端 — 获取行动方案列表 */
 export const fetchOperatorPlans = async () => {

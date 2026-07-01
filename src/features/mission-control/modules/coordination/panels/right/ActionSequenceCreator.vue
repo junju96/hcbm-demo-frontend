@@ -12,9 +12,9 @@
           <div class="asc-vehicle-grid">
             <div
               v-for="v in vehicleOptions"
-              :key="v.type"
+              :key="v.vid || v.type"
               class="asc-vehicle-card"
-              @click="selectVehicle(v.type)"
+              @click="selectVehicle(v)"
             >
               <div class="asc-vehicle-icon">
                 <VehicleIcon :vehicle-type="v.type" />
@@ -171,12 +171,18 @@ const props = defineProps({
   // 追加模式：将新车辆行动序列追加到已有方案中，而不是创建新方案
   appendMode: { type: Boolean, default: false },
   appendPlan: { type: Object, default: null },
+  // 当前可选的车辆列表（从资源池获取的实际已连接无人车）
+  availableVehicles: { type: Array, default: () => [] },
+  // 预选中车辆完整对象（含 vid），用于从“各车行动序列”新建时直接指定具体车辆
+  presetVehicle: { type: Object, default: null },
 });
 
 const emit = defineEmits(['close', 'saved']);
 
 const step = ref('select-vehicle');
 const selectedVehicleType = ref('');
+// 当前选中的完整车辆对象（含 vid），从 availableVehicles 中选择
+const selectedVehicle = ref(null);
 const canvasRef = ref(null);
 const nodes = ref([]);
 const lines = ref([]);
@@ -186,13 +192,27 @@ const tempLine = ref(null);
 const draggingNode = ref(null);
 const dragOffset = ref({ x: 0, y: 0 });
 
-const vehicleOptions = [
+// 默认车辆选项（资源池不可达时的兜底）
+const defaultVehicleOptions = [
   { type: 'Fire-Support-UGV', name: '火力车' },
   { type: 'Recon-Strike-UGV', name: '侦打车' },
   { type: 'Patrol-UGV', name: '巡逻车' },
   { type: 'Electronic-UGV', name: '电磁车' },
   { type: 'Air-Ground-UAV', name: '空地车' },
 ];
+
+const vehicleOptions = computed(() => {
+  if (props.availableVehicles && props.availableVehicles.length > 0) {
+    return props.availableVehicles.map((v) => ({
+      type: v.resource_type,
+      name: v.display_name || v.name || v.resource_type,
+      vid: v.vid,
+      resource_name: v.resource_name,
+      supported_action_types: v.supported_action_types || [],
+    }));
+  }
+  return defaultVehicleOptions;
+});
 
 const selectedVehicleName = computed(() => {
   const v = vehicleOptions.find((item) => item.type === selectedVehicleType.value);
@@ -251,8 +271,9 @@ const payloadTaskMap = {
 
 const payloadTasks = computed(() => payloadTaskMap[selectedVehicleType.value] || []);
 
-function selectVehicle(type) {
-  selectedVehicleType.value = type;
+function selectVehicle(vehicle) {
+  selectedVehicle.value = vehicle;
+  selectedVehicleType.value = vehicle.type || vehicle.resource_type || '';
   step.value = 'edit';
 }
 
@@ -291,6 +312,11 @@ function initEditMode() {
   if (!selectedVehicleType.value) {
     selectedVehicleType.value = 'Chassis-UGV';
   }
+  selectedVehicle.value = {
+    type: selectedVehicleType.value,
+    resource_type: selectedVehicleType.value,
+    vid,
+  };
 
   // 收集该车辆所有 stages 中的 actions
   const allActions = [];
@@ -728,7 +754,7 @@ function buildPlan() {
   const planId = `PLAN_${Date.now()}`;
   const stageId = `STAGE_${Date.now()}`;
   const teamId = 'TEAM_NEW';
-  const vid = `equipment:new-${Date.now()}`;
+  const vid = selectedVehicle.value?.vid || `equipment:new-${Date.now()}`;
   const actions = buildActionsForVid(vid);
 
   return {
@@ -767,7 +793,7 @@ function buildPlan() {
 function buildAppendedPlan() {
   const plan = JSON.parse(JSON.stringify(props.appendPlan));
   const now = Date.now();
-  const vid = `equipment:${selectedVehicleType.value.toLowerCase().replace(/_/g, '-').replace(/[^a-z0-9-]/g, '')}-${now}`;
+  const vid = selectedVehicle.value?.vid || `equipment:${selectedVehicleType.value.toLowerCase().replace(/_/g, '-').replace(/[^a-z0-9-]/g, '')}-${now}`;
   const actions = buildActionsForVid(vid, plan);
 
   const teamId = plan.teams?.[0]?.team_id || 'TEAM_APPEND';
@@ -892,8 +918,14 @@ onMounted(() => {
   window.addEventListener('keydown', onKeydown);
   if (props.editMode) {
     initEditMode();
-  } else if (props.presetVehicleType) {
+  } else if (props.presetVehicle) {
     // 从某车“新建”进入时，跳过车辆选择，直接进编辑界面
+    selectedVehicle.value = props.presetVehicle;
+    selectedVehicleType.value = props.presetVehicle.resource_type || props.presetVehicle.type || '';
+    step.value = 'edit';
+  } else if (props.presetVehicleType) {
+    // 兼容旧逻辑：只传入类型时，构造一个简化车辆对象
+    selectedVehicle.value = { type: props.presetVehicleType, resource_type: props.presetVehicleType };
     selectedVehicleType.value = props.presetVehicleType;
     step.value = 'edit';
   }

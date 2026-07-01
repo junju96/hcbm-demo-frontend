@@ -274,7 +274,7 @@
         <div class="as-dialog-header">选择要新建行动序列的车型</div>
         <div class="as-dialog-body">
           <label v-for="v in missingVehicleTypes" :key="v.type" class="as-dialog-item">
-            <input type="radio" :value="v.type" v-model="selectedMissingVehicleType" />
+            <input type="radio" :value="v" v-model="selectedMissingVehicle" />
             <span>{{ v.name }} {{ v.type ? '(' + v.type + ')' : '' }}</span>
           </label>
         </div>
@@ -283,7 +283,7 @@
           <button
             class="as-btn primary"
             type="button"
-            :disabled="!selectedMissingVehicleType"
+            :disabled="!selectedMissingVehicle"
             @click="confirmMissingVehicleSelection"
           >
             确认
@@ -322,8 +322,10 @@
         :edit-plan="creatorEditPlan"
         :edit-vehicle-vid="creatorEditVehicleVid"
         :preset-vehicle-type="creatorPresetVehicleType"
+        :preset-vehicle="creatorPresetVehicle"
         :append-mode="creatorAppendMode"
         :append-plan="creatorAppendPlan"
+        :available-vehicles="supportedVehicleTypes"
         @close="closeCreator"
         @saved="onCreatorSaved"
       />
@@ -336,6 +338,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import {
   fetchActionSequencePlans,
   fetchActionSequencePlanDetail,
+  fetchActionSequenceVehicles,
   updateActionParam,
   startActionSequence,
   pauseActionSequence,
@@ -344,6 +347,7 @@ import {
   dispatchActionSequence,
   fetchOperatorPlans,
   fetchOperatorPlanDetail,
+  fetchOperatorVehicles,
   startOperatorPlan,
   pauseOperatorPlan,
   resumeOperatorPlan,
@@ -382,6 +386,8 @@ const vehicleRuntimeStates = ref({});
 const loadingPlans = ref(false);
 const loadingDetail = ref(false);
 const controlLoading = ref(false);
+// 当前已连接（online）的无人车列表，从资源池接口获取
+const onlineVehicles = ref([]);
 
 /* ---------- 多车控制弹窗 ---------- */
 const showVehicleDialog = ref(false);
@@ -405,12 +411,13 @@ const creatorEditMode = ref(false);
 const creatorEditPlan = ref(null);
 const creatorEditVehicleVid = ref('');
 const creatorPresetVehicleType = ref('');
+const creatorPresetVehicle = ref(null);
 const creatorAppendMode = ref(false);
 const creatorAppendPlan = ref(null);
 
 /* ---------- 缺失车型选择弹窗 ---------- */
 const showMissingVehicleDialog = ref(false);
-const selectedMissingVehicleType = ref('');
+const selectedMissingVehicle = ref(null);
 
 /* ---------- 删除车型行动序列确认弹窗 ---------- */
 const showDeleteConfirmDialog = ref(false);
@@ -801,13 +808,15 @@ const vehicleActions = computed(() => {
   return selectedPlan.value.vehicle_summary || [];
 });
 
-const supportedVehicleTypes = [
-  { type: 'Recon-Strike-UGV', name: '侦打车' },
-  { type: 'Air-Ground-UAV', name: '空地车' },
-  { type: 'Fire-Support-UGV', name: '火力车' },
-  { type: 'Electronic-UGV', name: '电磁车' },
-  { type: 'Patrol-UGV', name: '巡逻车' },
-];
+const supportedVehicleTypes = computed(() =>
+  onlineVehicles.value.map((v) => ({
+    type: v.resource_type,
+    name: v.display_name || vehicleTypeNameMap[v.resource_type] || v.resource_type,
+    vid: v.vid,
+    resource_name: v.resource_name,
+    supported_action_types: v.supported_action_types || [],
+  }))
+);
 
 const missingVehicleTypes = computed(() => {
   const existingTypes = new Set((vehicleActions.value || []).map((v) => v.resource_type).filter(Boolean));
@@ -1186,6 +1195,7 @@ const openCreator = () => {
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
   creatorPresetVehicleType.value = '';
+  creatorPresetVehicle.value = null;
   creatorAppendMode.value = false;
   creatorAppendPlan.value = null;
   showCreator.value = true;
@@ -1197,42 +1207,46 @@ const openCreatorForEdit = (vehicle) => {
   creatorEditPlan.value = selectedPlan.value;
   creatorEditVehicleVid.value = vehicle.vid;
   creatorPresetVehicleType.value = '';
+  creatorPresetVehicle.value = null;
   creatorAppendMode.value = false;
   creatorAppendPlan.value = null;
   showCreator.value = true;
 };
 
-const openCreatorForVehicle = (vehicleType) => {
+const openCreatorForVehicle = (vehicle) => {
   creatorEditMode.value = false;
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
-  creatorPresetVehicleType.value = vehicleType || '';
+  creatorPresetVehicleType.value = vehicle?.type || '';
+  creatorPresetVehicle.value = vehicle || null;
   creatorAppendMode.value = false;
   creatorAppendPlan.value = null;
   showCreator.value = true;
 };
 
-const openCreatorAppendToPlan = (vehicleType) => {
+const openCreatorAppendToPlan = (vehicle) => {
   if (!selectedPlan.value) return;
   creatorEditMode.value = false;
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
-  creatorPresetVehicleType.value = vehicleType || '';
+  creatorPresetVehicleType.value = vehicle?.type || '';
+  creatorPresetVehicle.value = vehicle || null;
   creatorAppendMode.value = true;
   creatorAppendPlan.value = selectedPlan.value;
   showCreator.value = true;
 };
 
 const openMissingVehicleSelector = () => {
-  selectedMissingVehicleType.value = missingVehicleTypes.value[0]?.type || '';
+  selectedMissingVehicle.value = missingVehicleTypes.value[0] || null;
   showMissingVehicleDialog.value = true;
 };
 
 const confirmMissingVehicleSelection = () => {
-  if (!selectedMissingVehicleType.value) return;
+  if (!selectedMissingVehicle.value) return;
+  const vehicle = selectedMissingVehicle.value;
   showMissingVehicleDialog.value = false;
-  openCreatorAppendToPlan(selectedMissingVehicleType.value);
-  selectedMissingVehicleType.value = '';
+  openCreatorAppendToPlan(vehicle);
+  selectedMissingVehicle.value = null;
 };
 
 const confirmDeleteVehicleActions = (vehicle) => {
@@ -1310,6 +1324,7 @@ const closeCreator = () => {
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
   creatorPresetVehicleType.value = '';
+  creatorPresetVehicle.value = null;
   creatorAppendMode.value = false;
   creatorAppendPlan.value = null;
 };
@@ -1354,6 +1369,18 @@ const onCreatorSaved = async (plan) => {
   selectedPlanId.value = plan.plan_id;
   closeCreator();
   appendSystemMessage('已新建本地预览方案，可继续编辑参数');
+};
+
+const loadOnlineVehicles = async () => {
+  const result = isControlMode.value
+    ? await fetchOperatorVehicles()
+    : await fetchActionSequenceVehicles();
+  if (result.ok) {
+    onlineVehicles.value = result.data.items || [];
+  } else {
+    console.warn('[ActionSequencePanel] loadOnlineVehicles failed:', result.error);
+    onlineVehicles.value = [];
+  }
 };
 
 const loadPlans = async (silent = false) => {
@@ -1440,6 +1467,7 @@ const selectPlan = async (planId) => {
 };
 
 const onRefresh = () => {
+  loadOnlineVehicles();
   loadPlans();
   if (selectedPlanId.value) selectPlan(selectedPlanId.value);
   appendSystemMessage('已刷新');
@@ -1701,6 +1729,7 @@ const stopAutoRefresh = () => {
 const onWindowResize = () => recomputeLines();
 
 onMounted(() => {
+  loadOnlineVehicles();
   loadPlans();
   updateMarqueeStates();
   startAutoRefresh();
