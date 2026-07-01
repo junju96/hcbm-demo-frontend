@@ -420,6 +420,14 @@ export const updateActionParam = async (planId, actionId, param) => {
   return result;
 };
 
+/** 操控端 — 更新行动中指定 action 的 param */
+export const updateOperatorActionParam = async (planId, actionId, param) => {
+  const result = await patchJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/actions/${actionId}`), {
+    param,
+  });
+  return result;
+};
+
 /** 查询本地资源池资源（ROUTE / AREA / TARGET 等） */
 export const fetchResourcePoolByType = async (taskType, limit = 50) => {
   const result = await getJson(joinApiUrl(`/api/v1/resources/by_type/${taskType}?limit=${limit}`));

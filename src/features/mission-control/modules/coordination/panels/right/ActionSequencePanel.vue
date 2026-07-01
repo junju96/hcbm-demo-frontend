@@ -341,6 +341,7 @@ import {
   fetchActionSequencePlanDetail,
   fetchActionSequenceVehicles,
   updateActionParam,
+  updateOperatorActionParam,
   startActionSequence,
   pauseActionSequence,
   resumeActionSequence,
@@ -1158,8 +1159,10 @@ const saveActionParam = async (newParam) => {
     const planId = selectedPlanId.value;
     const actionId = action.action_id;
 
-    // 先调用后端保存
-    const result = await updateActionParam(planId, actionId, newParam);
+    // 先调用后端保存（操控端/协同席使用不同数据服务）
+    const result = isControlMode.value
+      ? await updateOperatorActionParam(planId, actionId, newParam)
+      : await updateActionParam(planId, actionId, newParam);
     if (!result.ok) {
       appendSystemMessage('参数保存失败: ' + (result.error || '未知错误'));
       return;
