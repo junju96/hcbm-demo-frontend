@@ -159,7 +159,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import VehicleIcon from './VehicleIcon.vue';
 import { createOperatorPlan, patchOperatorPlan } from '../../api/coordinationApi.js';
 
@@ -916,6 +916,20 @@ function onKeydown(e) {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown);
+  initFromProps();
+});
+
+watch(
+  () => [props.editMode, props.editVehicleVid, props.editPlan],
+  ([editMode, editVehicleVid, editPlan]) => {
+    if (editMode && editPlan && editVehicleVid) {
+      initEditMode();
+    }
+  },
+  { immediate: true }
+);
+
+function initFromProps() {
   if (props.editMode) {
     initEditMode();
   } else if (props.presetVehicle) {
@@ -929,7 +943,7 @@ onMounted(() => {
     selectedVehicleType.value = props.presetVehicleType;
     step.value = 'edit';
   }
-});
+}
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown);
