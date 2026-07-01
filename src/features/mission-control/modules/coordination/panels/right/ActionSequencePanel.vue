@@ -1183,6 +1183,10 @@ const saveActionParam = async (newParam) => {
     appendSystemMessage(`行动参数已保存 | ${action.name}`);
     closeParamDialog();
 
+    // 重新拉取后端最新 plan（本地 local_dirty 会优先使用本地缓存），
+    // 确保 selectedPlan 与本地持久化数据一致，避免 points 等嵌套字段显示旧值
+    await refreshDetail(planId);
+
     // 参数变更可能影响地图显示，重新上图
     await clearPlanOnMap();
     await drawPlanOnMap(selectedPlan.value);
