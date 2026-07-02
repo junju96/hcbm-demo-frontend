@@ -160,8 +160,8 @@
                       :style="cardStyle(vehicle, action)"
                       @dblclick="openParamDialog(action, vehicle)"
                     >
-                      <div class="as-card-header" :title="action.name">
-                        <span class="marquee-text">{{ action.name }}</span>
+                      <div class="as-card-header" :title="getActionDisplayName(action)">
+                        <span class="marquee-text">{{ getActionDisplayName(action) }}</span>
                       </div>
                       <div class="as-card-meta">
                         <span class="as-card-stage" :title="action.stage_title">
@@ -842,6 +842,43 @@ const getVehicleDisplayName = (vehicle) => {
   const suffixMatch = rawVid.match(/(\d+)$/);
   const suffix = suffixMatch ? suffixMatch[1] : rawVid;
   return `${cnType}-${suffix}`;
+};
+
+const actionTypeDisplayMap = {
+  'auto-move': '自主机动',
+  'follow-move': '跟随机动',
+  'silent-guard': '静默值守',
+  'set-return-point': '设置返航点',
+  'return-to-base': '开启返航',
+  'formation-move': '编队机动',
+  'manual-task': '人工任务',
+  'pose-adjust': '姿态调整',
+  'air-recon': '空中侦察',
+  'lens-recon': '光电侦察',
+  'search-and-shoot': '侦察打击',
+  'recon-strike': '侦察打击',
+  '40mm-gun-launch': '40炮打击',
+  'at-missile-launch': '红箭13导弹打击',
+  'gun-shot': '机枪打击',
+  '7.62mm-gun-shot': '机枪打击',
+  'rocket-launch': '火箭弹打击',
+  'loitering-munition-launch': '巡飞弹打击',
+  'laser-illumination': '激光照射',
+  'sound-expel': '强声拒止',
+  'acoustic-deterrence': '强声拒止',
+  'light-expel': '强光拒止',
+  'light-deterrence': '强光拒止',
+  'em-recon': '电磁侦察',
+  'electronic-recon': '电磁侦察',
+  'em-interference': '电磁干扰',
+  'electronic-jamming': '电磁干扰',
+  'payload-silent': '载荷静默',
+};
+
+const getActionDisplayName = (action) => {
+  if (!action) return '';
+  const raw = String(action.action_type || action.action_id || '').toLowerCase().replace(/_/g, '-');
+  return actionTypeDisplayMap[raw] || action.name || action.action_id || '未知行动';
 };
 
 /* ---------- 方法 ---------- */
