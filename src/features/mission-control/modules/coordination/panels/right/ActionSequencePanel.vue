@@ -355,6 +355,7 @@ import {
   resumeOperatorPlan,
   stopOperatorPlan,
   dispatchOperatorPlan,
+  patchOperatorPlan,
   syncOperatorPlanToDataServer,
   batchAddMapObjects,
   batchDeleteMapObjects,
@@ -1313,7 +1314,6 @@ const confirmDeleteVehicleActions = (vehicle) => {
   stopAutoRefresh();
   vehicleToDelete.value = vehicle;
   showDeleteConfirmDialog.value = true;
-  console.log('[DeleteVehicle] confirm dialog opened, vehicle=', vehicle?.vid);
 };
 
 const cancelDeleteVehicleActions = () => {
@@ -1323,13 +1323,7 @@ const cancelDeleteVehicleActions = () => {
 };
 
 const executeDeleteVehicleActions = async () => {
-  // eslint-disable-next-line no-alert
-  alert('[DeleteVehicle] execute called');
-  console.log('[DeleteVehicle] execute called, vehicleToDelete=', vehicleToDelete.value, 'selectedPlan=', selectedPlan.value);
-  if (!vehicleToDelete.value || !selectedPlan.value) {
-    console.log('[DeleteVehicle] early return: missing vehicleToDelete or selectedPlan');
-    return;
-  }
+  if (!vehicleToDelete.value || !selectedPlan.value) return;
   const vid = vehicleToDelete.value.vid;
   const planId = selectedPlan.value.plan_id;
 
@@ -1371,35 +1365,7 @@ const executeDeleteVehicleActions = async () => {
   };
 
   try {
-    console.log('[DeleteVehicle] start, planId=', planId, 'vid=', vid);
-    console.log('[DeleteVehicle] patchBody raw=', patchBody);
-    const bodyToSend = JSON.parse(JSON.stringify(patchBody));
-    console.log('[DeleteVehicle] bodyToSend=', bodyToSend);
-    try {
-      console.log('[DeleteVehicle] typeof patchOperatorPlan=', typeof patchOperatorPlan);
-    } catch (e) {
-      console.error('[DeleteVehicle] error accessing patchOperatorPlan:', e);
-    }
-    // 直接调用 fetch 测试，绕过 patchOperatorPlan
-    let directStatus = 'not-called';
-    try {
-      const directResult = await fetch(`/api/v1/action-sequences/operator/plans/${planId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyToSend),
-      });
-      directStatus = directResult.status;
-    } catch (fetchErr) {
-      directStatus = 'error: ' + fetchErr.message;
-    }
-    console.log('[DeleteVehicle] direct fetch status=', directStatus);
-    let result = { ok: false, error: 'not-called' };
-    try {
-      result = await patchOperatorPlan(planId, bodyToSend);
-    } catch (planErr) {
-      result = { ok: false, error: planErr.message || String(planErr) };
-    }
-    console.log('[DeleteVehicle] patch result=', result);
+    const result = await patchOperatorPlan(planId, JSON.parse(JSON.stringify(patchBody)));
     if (!result.ok) {
       appendSystemMessage(`删除车辆行动序列失败：${result.data?.message || result.error || '未知错误'}`);
       return;
@@ -1408,7 +1374,6 @@ const executeDeleteVehicleActions = async () => {
     selectedPlan.value = updatedPlan;
     // 同步到数据服务器
     const syncResult = await syncOperatorPlanToDataServer(planId);
-    console.log('[DeleteVehicle] sync result=', syncResult);
     if (!syncResult.ok) {
       appendSystemMessage(`删除已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
     } else {
