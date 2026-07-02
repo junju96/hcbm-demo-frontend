@@ -70,8 +70,9 @@ function defaultProtect() {
 }
 
 function addCommonFields(p) {
-  p.disconnect_strategy = p.disconnect_strategy ?? 'continue';
-  p.mission_duration = p.mission_duration ?? '00:00:00';
+  // 旧数据可能保存为空字符串，用 || 兜底确保有合法默认值
+  p.disconnect_strategy = p.disconnect_strategy || 'continue';
+  p.mission_duration = p.mission_duration || '00:00:00';
   p.enable_start_time = p.enable_start_time ?? false;
   p.start_time = p.start_time ?? '';
 }
