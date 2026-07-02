@@ -1323,6 +1323,8 @@ const cancelDeleteVehicleActions = () => {
 };
 
 const executeDeleteVehicleActions = async () => {
+  // eslint-disable-next-line no-alert
+  alert('[DeleteVehicle] execute called');
   console.log('[DeleteVehicle] execute called, vehicleToDelete=', vehicleToDelete.value, 'selectedPlan=', selectedPlan.value);
   if (!vehicleToDelete.value || !selectedPlan.value) {
     console.log('[DeleteVehicle] early return: missing vehicleToDelete or selectedPlan');
