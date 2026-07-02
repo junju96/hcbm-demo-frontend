@@ -1047,6 +1047,25 @@ function initFromAreaSelection() {
   const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'air-recon', 'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming', 'payload-silent'];
   if (!needsArea.includes(type)) return;
   if (!areaList.value.length) return;
+
+  // 如果 action 自身已经保存了区域点数据，优先使用 action 的数据，
+  // 不要用区域资源的 polygon 覆盖用户手动编辑过的区域点。
+  if (Array.isArray(editedParam.value.area) && editedParam.value.area.length > 0) {
+    // 仅当 area_id 为空时，尝试根据当前 area 点匹配区域资源（最佳努力）
+    if (!editedParam.value.area_id) {
+      const matched = areaList.value.find((a) =>
+        Array.isArray(a.polygon) &&
+        a.polygon.length === editedParam.value.area.length &&
+        a.polygon.every((pt, idx) => {
+          const saved = editedParam.value.area[idx];
+          return saved && pt.lon === saved.lon && pt.lat === saved.lat;
+        })
+      );
+      editedParam.value.area_id = matched?.resource_id || areaList.value[0]?.resource_id || '';
+    }
+    return;
+  }
+
   // 新建/未设置区域时，默认选中第一个区域
   if (!editedParam.value.area_id) {
     editedParam.value.area_id = areaList.value[0]?.resource_id || '';
