@@ -1373,6 +1373,14 @@ const executeDeleteVehicleActions = async () => {
     console.log('[DeleteVehicle] patchBody raw=', patchBody);
     const bodyToSend = JSON.parse(JSON.stringify(patchBody));
     console.log('[DeleteVehicle] bodyToSend=', bodyToSend);
+    console.log('[DeleteVehicle] typeof patchOperatorPlan=', typeof patchOperatorPlan, patchOperatorPlan);
+    // 直接调用 fetch 测试，绕过 patchOperatorPlan
+    const directResult = await fetch(`/api/v1/action-sequences/operator/plans/${planId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyToSend),
+    });
+    console.log('[DeleteVehicle] direct fetch status=', directResult.status);
     const result = await patchOperatorPlan(planId, bodyToSend);
     console.log('[DeleteVehicle] patch result=', result);
     if (!result.ok) {
