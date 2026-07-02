@@ -801,8 +801,7 @@ function buildActionsForVid(vid, planBase = null) {
       .filter((fromId) => idToSeq[fromId] !== undefined)
       .map((fromId) => String(idToSeq[fromId]));
     return {
-      resource_id: `action:${n.id}`,
-      action_id: n.actionType.toUpperCase().replace(/-/g, '_'),
+      // 新建时 action_id / resource_id 由数据服务器分配，前端不预置
       name: n.name,
       vid,
       action_seq: idx + 1,

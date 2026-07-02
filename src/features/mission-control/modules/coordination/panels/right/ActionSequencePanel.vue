@@ -1313,6 +1313,7 @@ const confirmDeleteVehicleActions = (vehicle) => {
   stopAutoRefresh();
   vehicleToDelete.value = vehicle;
   showDeleteConfirmDialog.value = true;
+  console.log('[DeleteVehicle] confirm dialog opened, vehicle=', vehicle?.vid);
 };
 
 const cancelDeleteVehicleActions = () => {
@@ -1364,7 +1365,10 @@ const executeDeleteVehicleActions = async () => {
   };
 
   try {
+    console.log('[DeleteVehicle] start, planId=', planId, 'vid=', vid);
+    console.log('[DeleteVehicle] patchBody=', JSON.parse(JSON.stringify(patchBody)));
     const result = await patchOperatorPlan(planId, patchBody);
+    console.log('[DeleteVehicle] patch result=', result);
     if (!result.ok) {
       appendSystemMessage(`删除车辆行动序列失败：${result.data?.message || result.error || '未知错误'}`);
       return;
@@ -1373,6 +1377,7 @@ const executeDeleteVehicleActions = async () => {
     selectedPlan.value = updatedPlan;
     // 同步到数据服务器
     const syncResult = await syncOperatorPlanToDataServer(planId);
+    console.log('[DeleteVehicle] sync result=', syncResult);
     if (!syncResult.ok) {
       appendSystemMessage(`删除已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
     } else {
