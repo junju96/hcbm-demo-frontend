@@ -162,6 +162,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import VehicleIcon from './VehicleIcon.vue';
 import { createOperatorPlan, patchOperatorPlan } from '../../api/coordinationApi.js';
+import { normalizeActionParam } from './actionParamNormalizer';
 
 const props = defineProps({
   editMode: { type: Boolean, default: false },
@@ -732,6 +733,7 @@ function buildActionsForVid(vid, planBase = null) {
   const basePlanId = planBase?.plan_id || (props.editMode ? props.editPlan?.plan_id : `PLAN_${Date.now()}`);
   const baseStageId = planBase?.stages?.[0]?.stage_id || (props.editMode ? (props.editPlan?.stages?.[0]?.stage_id || `STAGE_${Date.now()}`) : `STAGE_${Date.now()}`);
   const baseTeamId = planBase?.teams?.[0]?.team_id || (props.editMode ? (props.editPlan?.teams?.[0]?.team_id || 'TEAM_NEW') : 'TEAM_NEW');
+  const vehicleType = selectedVehicle.value?.resource_type || selectedVehicleType.value || '';
 
   return sorted.map((id, idx) => {
     const n = nodeMap[id];
@@ -746,7 +748,7 @@ function buildActionsForVid(vid, planBase = null) {
       action_seq: idx + 1,
       action_type: n.actionType,
       description: n.name,
-      param: n.param,
+      param: normalizeActionParam(n.param, n.actionType, vehicleType),
       dependencies: deps.length ? deps : undefined,
       state: 'SCHEDULED',
       task_type: 'ACTION',
