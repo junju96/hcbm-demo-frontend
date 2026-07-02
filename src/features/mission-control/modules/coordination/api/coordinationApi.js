@@ -522,6 +522,13 @@ export const syncOperatorPlanToDataServer = async (planId) => {
   return result;
 };
 
+/** 操控端 — 删除方案中指定车辆的行动序列（会同步把数据服务器上 action/car_action 置 DELETED） */
+export const deleteOperatorVehicle = async (planId, vid) => {
+  const cleanVid = String(vid).replace('equipment:', '');
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/vehicles/${cleanVid}/delete`), {});
+  return result;
+};
+
 /* ==================== 地图服务 API ==================== */
 
 const MAP_SERVICE_BASE_URL = 'http://25.11.1.178:28001';

@@ -357,6 +357,7 @@ import {
   dispatchOperatorPlan,
   patchOperatorPlan,
   syncOperatorPlanToDataServer,
+  deleteOperatorVehicle,
   batchAddMapObjects,
   batchDeleteMapObjects,
   batchAddRouteDisplay,
@@ -1327,62 +1328,51 @@ const executeDeleteVehicleActions = async () => {
   const vid = vehicleToDelete.value.vid;
   const planId = selectedPlan.value.plan_id;
 
-  // 构造更新后的 plan（仅用于本地视图刷新）
-  const updatedPlan = JSON.parse(JSON.stringify(selectedPlan.value));
-
-  // 移除 stages 中该车辆（直接过滤车辆对象，而不是仅清空 actions）
-  for (const stage of updatedPlan.stages || []) {
-    const ta = stage.team_actions || {};
-    if (Array.isArray(ta)) {
-      for (const v of ta) {
-        const cars = v.car_actions || v.team_actions || [];
-        const filtered = cars.filter((c) => c.vid !== vid);
-        if (v.car_actions) v.car_actions = filtered;
-        else v.team_actions = filtered;
-      }
-    } else {
-      for (const key of Object.keys(ta)) {
-        ta[key] = (ta[key] || []).filter((v) => v.vid !== vid);
-      }
-    }
-  }
-
-  // 移除 car_actions 中该车辆
-  if (updatedPlan.car_actions) {
-    updatedPlan.car_actions = updatedPlan.car_actions.filter((v) => v.vid !== vid);
-  }
-
-  // 移除 vehicle_summary 中该车辆
-  updatedPlan.vehicle_summary = (updatedPlan.vehicle_summary || []).filter((v) => v.vid !== vid);
-
-  updatedPlan.updated_at = new Date().toISOString();
-
-  // 构造 PATCH body：后端只接受白名单字段，避免发送完整 plan 导致大 body
-  const patchBody = {
-    stages: updatedPlan.stages || [],
-    car_actions: updatedPlan.car_actions || [],
-    vehicle_summary: updatedPlan.vehicle_summary || [],
-  };
-
   try {
-    const result = await patchOperatorPlan(planId, JSON.parse(JSON.stringify(patchBody)));
+    // 走后端新接口：由后端把数据服务器上该车辆的 action/car_action 置 DELETED，
+    // 再更新本地 plan 并同步到数据服务器。
+    const result = await deleteOperatorVehicle(planId, vid);
     if (!result.ok) {
       appendSystemMessage(`删除车辆行动序列失败：${result.data?.message || result.error || '未知错误'}`);
       return;
     }
-    // 直接用本地构造的删除后 plan 刷新视图，避免后端 PATCH 返回的投影数据不完整
-    selectedPlan.value = updatedPlan;
-    // 同步到数据服务器
-    const syncResult = await syncOperatorPlanToDataServer(planId);
-    if (!syncResult.ok) {
-      appendSystemMessage(`删除已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
+
+    const detail = result.data?.data || result.data || {};
+    // 删除成功后，用后端返回的最新 plan 刷新视图；若后端未返回 plan，则本地构造
+    const refreshed = await fetchOperatorPlanDetail(planId);
+    if (refreshed.ok && refreshed.data) {
+      selectedPlan.value = refreshed.data;
     } else {
-      appendSystemMessage('已删除该车辆行动序列并同步到数据服务器');
+      // 兜底：本地过滤掉该车辆
+      const updatedPlan = JSON.parse(JSON.stringify(selectedPlan.value));
+      for (const stage of updatedPlan.stages || []) {
+        const ta = stage.team_actions || {};
+        if (Array.isArray(ta)) {
+          for (const v of ta) {
+            const cars = v.car_actions || v.team_actions || [];
+            const filtered = cars.filter((c) => c.vid !== vid);
+            if (v.car_actions) v.car_actions = filtered;
+            else v.team_actions = filtered;
+          }
+        } else {
+          for (const key of Object.keys(ta)) {
+            ta[key] = (ta[key] || []).filter((v) => v.vid !== vid);
+          }
+        }
+      }
+      updatedPlan.car_actions = (updatedPlan.car_actions || []).filter((v) => v.vid !== vid);
+      updatedPlan.vehicle_summary = (updatedPlan.vehicle_summary || []).filter((v) => v.vid !== vid);
+      selectedPlan.value = updatedPlan;
     }
+
+    appendSystemMessage(
+      `已删除该车辆行动序列并同步到数据服务器（actions: ${(detail.deleted_actions || []).length}, car_actions: ${(detail.deleted_car_actions || []).length}）`
+    );
+
     // 删除后刷新地图显示
     await clearPlanOnMap();
-    if ((updatedPlan.vehicle_summary || []).length > 0) {
-      await drawPlanOnMap(updatedPlan);
+    if ((selectedPlan.value?.vehicle_summary || []).length > 0) {
+      await drawPlanOnMap(selectedPlan.value);
     }
   } catch (err) {
     appendSystemMessage(`删除车辆行动序列失败：${err.message || err}`);
