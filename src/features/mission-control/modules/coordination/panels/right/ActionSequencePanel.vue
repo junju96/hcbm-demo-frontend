@@ -293,14 +293,14 @@
     </div>
 
     <!-- 删除确认弹窗 -->
-    <div v-if="showDeleteConfirmDialog" class="as-dialog-overlay" @click.self="showDeleteConfirmDialog = false">
+    <div v-if="showDeleteConfirmDialog" class="as-dialog-overlay" @click.self="cancelDeleteVehicleActions">
       <div class="as-dialog">
         <div class="as-dialog-header">确认删除</div>
         <div class="as-dialog-body">
           确定要删除 <strong>{{ vehicleToDelete ? getVehicleDisplayName(vehicleToDelete) : '' }}</strong> 的行动序列吗？此操作仅本地生效，删除后可在下发前重新编辑。
         </div>
         <div class="as-dialog-footer">
-          <button class="as-btn" type="button" @click="showDeleteConfirmDialog = false">取消</button>
+          <button class="as-btn" type="button" @click="cancelDeleteVehicleActions">取消</button>
           <button class="as-btn danger" type="button" @click="executeDeleteVehicleActions">删除</button>
         </div>
       </div>
@@ -1137,6 +1137,7 @@ const getVehicleRuntimeState = (vehicle) => {
 /* ---------- 行动参数弹窗 ---------- */
 const openParamDialog = (action, vehicle) => {
   if (!action || !action.action_id) return;
+  stopAutoRefresh(); // 编辑参数期间暂停轮询，避免旧数据覆盖
   editingAction.value = action;
   editingVehicleVid.value = vehicle?.vid || action.vid || '';
   editingVehicleType.value = vehicle?.resource_type || '';
@@ -1148,6 +1149,7 @@ const closeParamDialog = () => {
   editingAction.value = null;
   editingVehicleVid.value = '';
   editingVehicleType.value = '';
+  startAutoRefresh(); // 关闭弹窗后恢复轮询
 };
 
 const saveActionParam = async (newParam) => {
@@ -1207,6 +1209,7 @@ const saveActionParam = async (newParam) => {
 
 /* ---------- 新建/编辑方案弹窗 ---------- */
 const openCreator = () => {
+  stopAutoRefresh();
   creatorEditMode.value = false;
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
@@ -1219,6 +1222,7 @@ const openCreator = () => {
 
 const openCreatorForEdit = (vehicle) => {
   if (!selectedPlan.value) return;
+  stopAutoRefresh();
   creatorEditMode.value = true;
   creatorEditPlan.value = selectedPlan.value;
   creatorEditVehicleVid.value = vehicle.vid;
@@ -1231,6 +1235,7 @@ const openCreatorForEdit = (vehicle) => {
 };
 
 const openCreatorForVehicle = (vehicle) => {
+  stopAutoRefresh();
   creatorEditMode.value = false;
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
@@ -1243,6 +1248,7 @@ const openCreatorForVehicle = (vehicle) => {
 
 const openCreatorAppendToPlan = (vehicle) => {
   if (!selectedPlan.value) return;
+  stopAutoRefresh();
   creatorEditMode.value = false;
   creatorEditPlan.value = null;
   creatorEditVehicleVid.value = '';
@@ -1267,8 +1273,15 @@ const confirmMissingVehicleSelection = () => {
 };
 
 const confirmDeleteVehicleActions = (vehicle) => {
+  stopAutoRefresh();
   vehicleToDelete.value = vehicle;
   showDeleteConfirmDialog.value = true;
+};
+
+const cancelDeleteVehicleActions = () => {
+  showDeleteConfirmDialog.value = false;
+  vehicleToDelete.value = null;
+  startAutoRefresh();
 };
 
 const executeDeleteVehicleActions = async () => {
@@ -1338,6 +1351,7 @@ const executeDeleteVehicleActions = async () => {
   } finally {
     showDeleteConfirmDialog.value = false;
     vehicleToDelete.value = null;
+    startAutoRefresh(); // 删除完成或失败后均恢复轮询
   }
 };
 
@@ -1351,6 +1365,7 @@ const closeCreator = () => {
   creatorPresetVehicle.value = null;
   creatorAppendMode.value = false;
   creatorAppendPlan.value = null;
+  startAutoRefresh(); // 关闭 Creator 弹窗后恢复轮询
 };
 
 const onCreatorSaved = async (plan) => {
