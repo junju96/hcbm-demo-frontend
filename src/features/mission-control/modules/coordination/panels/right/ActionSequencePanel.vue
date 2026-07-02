@@ -1323,7 +1323,11 @@ const cancelDeleteVehicleActions = () => {
 };
 
 const executeDeleteVehicleActions = async () => {
-  if (!vehicleToDelete.value || !selectedPlan.value) return;
+  console.log('[DeleteVehicle] execute called, vehicleToDelete=', vehicleToDelete.value, 'selectedPlan=', selectedPlan.value);
+  if (!vehicleToDelete.value || !selectedPlan.value) {
+    console.log('[DeleteVehicle] early return: missing vehicleToDelete or selectedPlan');
+    return;
+  }
   const vid = vehicleToDelete.value.vid;
   const planId = selectedPlan.value.plan_id;
 
