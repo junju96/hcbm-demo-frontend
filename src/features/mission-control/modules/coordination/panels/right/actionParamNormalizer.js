@@ -70,8 +70,16 @@ function defaultProtect() {
 }
 
 function addCommonFields(p) {
+  // 兼容协调卡协议中的数字格式：0-停车；1-一键返航；2-继续任务
+  const numericStrategy = { 0: 'stop', 1: 'return', 2: 'continue' };
+  const rawStrategy = p.disconnect_strategy;
+  if (typeof rawStrategy === 'number' && rawStrategy in numericStrategy) {
+    p.disconnect_strategy = numericStrategy[rawStrategy];
+  } else if (!['continue', 'stop', 'return'].includes(rawStrategy)) {
+    p.disconnect_strategy = 'continue';
+  }
+
   // 旧数据可能保存为空字符串，用 || 兜底确保有合法默认值
-  p.disconnect_strategy = p.disconnect_strategy || 'continue';
   p.mission_duration = p.mission_duration || '00:00:00';
   p.enable_start_time = p.enable_start_time ?? false;
   p.start_time = p.start_time ?? '';
