@@ -2,8 +2,8 @@
   <div class="apd-overlay" @click.self="onClose">
     <div class="apd-dialog">
       <div class="apd-header">
-        <div class="apd-title">{{ action?.name || '行动参数' }}</div>
-        <div class="apd-subtitle">{{ actionTypeLabel }} · {{ vehicleName }}</div>
+        <div class="apd-title">{{ actionTypeLabel || action?.name || '行动参数' }}</div>
+        <div class="apd-subtitle">{{ action?.name || '' }} · {{ vehicleName }}</div>
         <button class="apd-close" type="button" @click="onClose">×</button>
       </div>
 
