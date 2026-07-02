@@ -81,9 +81,11 @@
           <div class="as-vehicle-seq-title">
             <span>各车行动序列</span>
             <button
-              v-if="isControlMode && missingVehicleTypes.length > 0"
+              v-if="isControlMode"
               class="as-btn mini primary"
               type="button"
+              :disabled="missingVehicleTypes.length === 0"
+              :title="missingVehicleTypes.length === 0 ? '暂无可新建的车型（车辆可能未上线或已存在）' : ''"
               @click="openMissingVehicleSelector"
             >
               + 新建
@@ -192,9 +194,11 @@
         <div v-else-if="selectedPlanId && !loadingDetail" class="as-empty-detail">
           <div>暂无行动序列数据</div>
           <button
-            v-if="isControlMode && missingVehicleTypes.length > 0"
+            v-if="isControlMode"
             class="as-btn mini primary as-empty-new-btn"
             type="button"
+            :disabled="missingVehicleTypes.length === 0"
+            :title="missingVehicleTypes.length === 0 ? '暂无可新建的车型（车辆可能未上线或已存在）' : ''"
             @click="openMissingVehicleSelector"
           >
             + 新建行动序列
@@ -277,6 +281,9 @@
             <input type="radio" :value="v" v-model="selectedMissingVehicle" />
             <span>{{ v.name }} {{ v.type ? '(' + v.type + ')' : '' }}</span>
           </label>
+          <div v-if="missingVehicleTypes.length === 0" class="as-dialog-empty">
+            暂无可新建的车型，请检查车辆在线状态或刷新后重试。
+          </div>
         </div>
         <div class="as-dialog-footer">
           <button class="as-btn" type="button" @click="showMissingVehicleDialog = false">取消</button>
@@ -1804,6 +1811,20 @@ watch(
   { deep: true }
 );
 
+// 切换到操控端行动序列视图时，重新加载可用车辆列表，确保“新建行动序列”按钮能正确显示
+watch(isControlMode, (newVal, oldVal) => {
+  if (newVal && !oldVal) {
+    loadOnlineVehicles();
+  }
+});
+
+// 在操控端选中方案且车辆列表为空时，也重新加载可用车辆，避免空状态漏掉新建按钮
+watch([isControlMode, selectedPlanId], ([control, planId]) => {
+  if (control && planId && onlineVehicles.value.length === 0) {
+    loadOnlineVehicles();
+  }
+});
+
 /* ---------- 自动刷新 ---------- */
 let autoRefreshTimer = null;
 const startAutoRefresh = () => {
@@ -2527,6 +2548,13 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 0.6rem;
+}
+
+.as-dialog-empty {
+  color: rgba(241, 254, 255, 0.6);
+  font-size: 0.9rem;
+  padding: 0.6rem 0;
+  text-align: center;
 }
 
 @media (max-width: 900px) {
