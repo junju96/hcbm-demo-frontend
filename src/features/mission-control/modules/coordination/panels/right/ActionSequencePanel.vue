@@ -1375,15 +1375,30 @@ const executeDeleteVehicleActions = async () => {
     console.log('[DeleteVehicle] patchBody raw=', patchBody);
     const bodyToSend = JSON.parse(JSON.stringify(patchBody));
     console.log('[DeleteVehicle] bodyToSend=', bodyToSend);
-    console.log('[DeleteVehicle] typeof patchOperatorPlan=', typeof patchOperatorPlan, patchOperatorPlan);
+    try {
+      console.log('[DeleteVehicle] typeof patchOperatorPlan=', typeof patchOperatorPlan);
+    } catch (e) {
+      console.error('[DeleteVehicle] error accessing patchOperatorPlan:', e);
+    }
     // 直接调用 fetch 测试，绕过 patchOperatorPlan
-    const directResult = await fetch(`/api/v1/action-sequences/operator/plans/${planId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bodyToSend),
-    });
-    console.log('[DeleteVehicle] direct fetch status=', directResult.status);
-    const result = await patchOperatorPlan(planId, bodyToSend);
+    let directStatus = 'not-called';
+    try {
+      const directResult = await fetch(`/api/v1/action-sequences/operator/plans/${planId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyToSend),
+      });
+      directStatus = directResult.status;
+    } catch (fetchErr) {
+      directStatus = 'error: ' + fetchErr.message;
+    }
+    console.log('[DeleteVehicle] direct fetch status=', directStatus);
+    let result = { ok: false, error: 'not-called' };
+    try {
+      result = await patchOperatorPlan(planId, bodyToSend);
+    } catch (planErr) {
+      result = { ok: false, error: planErr.message || String(planErr) };
+    }
     console.log('[DeleteVehicle] patch result=', result);
     if (!result.ok) {
       appendSystemMessage(`删除车辆行动序列失败：${result.data?.message || result.error || '未知错误'}`);
