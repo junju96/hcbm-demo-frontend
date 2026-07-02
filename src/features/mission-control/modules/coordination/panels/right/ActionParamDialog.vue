@@ -609,7 +609,8 @@ const areaList = ref([]);
 const loadingAreas = ref(false);
 
 const normalizedActionType = computed(() => {
-  const raw = String(props.action?.action_type || '').toLowerCase();
+  // 兼容下划线格式（如 SEARCH_AND_SHOOT、AUTO_MOVE）与中划线格式（如 search-and-shoot）
+  const raw = String(props.action?.action_type || '').toLowerCase().replace(/_/g, '-');
   console.log('[ActionParamDialog] raw action_type:', props.action?.action_type, 'normalized:', raw);
   return raw;
 });
