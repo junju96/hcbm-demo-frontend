@@ -55,12 +55,17 @@ const deleteJson = (url) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-const patchJson = (url, body) =>
-  safeFetch(url, {
+const patchJson = (url, body) => {
+  console.log('[API:patchJson] url=', url, 'body=', body);
+  return safeFetch(url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  }).then((result) => {
+    console.log('[API:patchJson] result=', result);
+    return result;
   });
+};
 
 /* ==================== Task Pool 资源查询 ==================== */
 
