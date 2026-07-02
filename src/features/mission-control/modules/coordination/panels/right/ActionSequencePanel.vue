@@ -1370,8 +1370,10 @@ const executeDeleteVehicleActions = async () => {
 
   try {
     console.log('[DeleteVehicle] start, planId=', planId, 'vid=', vid);
-    console.log('[DeleteVehicle] patchBody=', JSON.parse(JSON.stringify(patchBody)));
-    const result = await patchOperatorPlan(planId, patchBody);
+    console.log('[DeleteVehicle] patchBody raw=', patchBody);
+    const bodyToSend = JSON.parse(JSON.stringify(patchBody));
+    console.log('[DeleteVehicle] bodyToSend=', bodyToSend);
+    const result = await patchOperatorPlan(planId, bodyToSend);
     console.log('[DeleteVehicle] patch result=', result);
     if (!result.ok) {
       appendSystemMessage(`删除车辆行动序列失败：${result.data?.message || result.error || '未知错误'}`);
