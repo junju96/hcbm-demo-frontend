@@ -601,7 +601,6 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save']);
 
 const editedParam = ref({});
-const targetInitializedPoints = new WeakSet();
 const routeList = ref([]);
 const loadingRoutes = ref(false);
 const targetList = ref([]);
@@ -1019,6 +1018,25 @@ function initFromRouteSelection() {
   const type = normalizedActionType.value;
   if (!['auto-move', 'formation-move'].includes(type)) return;
   if (!routeList.value.length) return;
+
+  // 如果 action 自身已经保存了路径点数据，优先使用 action 的数据，
+  // 不要用路线资源的 points 覆盖用户手动编辑过的路径点。
+  if (Array.isArray(editedParam.value.points) && editedParam.value.points.length > 0) {
+    // 仅当 route_id 为空时，尝试根据现有 points 匹配路线资源（最佳努力）
+    if (!editedParam.value.route_id) {
+      const matched = routeList.value.find((r) =>
+        Array.isArray(r.points) &&
+        r.points.length === editedParam.value.points.length &&
+        r.points.every((pt, idx) => {
+          const saved = editedParam.value.points[idx];
+          return saved && pt.lon === saved.lon && pt.lat === saved.lat;
+        })
+      );
+      editedParam.value.route_id = matched?.resource_id || '';
+    }
+    return;
+  }
+
   // 新建/未设置路线时，默认选中第一条路线
   if (!editedParam.value.route_id) {
     editedParam.value.route_id = routeList.value[0]?.resource_id || '';
@@ -1081,15 +1099,18 @@ function initFromTargetSelection() {
       pt.target_ref = targetList.value[0]?.resource_id || '';
     }
     if (!pt.target_ref) return;
-    // 只有 target_ref 从空变为有值时才用目标坐标覆盖，避免每次 targetList 加载都覆盖用户手动输入
-    if (targetInitializedPoints.has(pt)) return;
+
+    // 如果 point 已经有用户手动输入的坐标（非 0），保留用户坐标，
+    // 避免每次打开弹窗都用目标资源坐标覆盖。
+    const hasUserCoord = Number(pt.lon) !== 0 || Number(pt.lat) !== 0;
+    if (hasUserCoord) return;
+
     const target = targetList.value.find((item) => item.resource_id === pt.target_ref);
     if (target) {
       const loc = target.location || {};
       pt.lon = Number(loc.longitude ?? loc.lon ?? 0);
       pt.lat = Number(loc.latitude ?? loc.lat ?? 0);
       pt.alt = Number(loc.altitude ?? loc.alt ?? 0);
-      targetInitializedPoints.add(pt);
     }
   });
 }
