@@ -246,11 +246,51 @@ const chassisTasks = [
   { actionType: 'Pose-Adjust', name: '姿态调整', defaultParam: { pose: [9000, 0, 0], pose_deviation: [36100, 9100, 9100], limited_speed: 10, safe_mode: 0 } },
 ];
 
-function getActionDisplayName(actionType) {
+function inferActionTypeFromId(actionId) {
+  if (!actionId) return '';
+  const aid = String(actionId).toLowerCase().replace(/_/g, '-');
+  const mapping = {
+    'auto-move': 'auto-move',
+    'follow-move': 'follow-move',
+    'silent-guard': 'silent-guard',
+    'set-return-point': 'set-return-point',
+    'return-to-base': 'return-to-base',
+    'formation-move': 'formation-move',
+    'manual-task': 'manual-task',
+    'pose-adjust': 'pose-adjust',
+    'air-recon': 'air-recon',
+    'lens-recon': 'lens-recon',
+    'search-and-shoot': 'search-and-shoot',
+    'recon-strike': 'search-and-shoot',
+    '40mm-gun-launch': '40mm-gun-launch',
+    'at-missile-launch': 'at-missile-launch',
+    'gun-shot': '7.62mm-gun-shot',
+    '7.62mm-gun-shot': '7.62mm-gun-shot',
+    'rocket-launch': 'rocket-launch',
+    'loitering-munition-launch': 'loitering-munition-launch',
+    'laser-illumination': 'laser-illumination',
+    'sound-expel': 'sound-expel',
+    'acoustic-deterrence': 'sound-expel',
+    'light-expel': 'light-expel',
+    'light-deterrence': 'light-expel',
+    'em-recon': 'em-recon',
+    'electronic-recon': 'em-recon',
+    'em-interference': 'em-interference',
+    'electronic-jamming': 'em-interference',
+    'payload-silent': 'payload-silent',
+  };
+  return mapping[aid] || aid;
+}
+
+function getActionDisplayName(actionType, actionId = '') {
   if (!actionType) return '';
   const normalized = String(actionType).toLowerCase().replace(/_/g, '-');
   const allTasks = [...chassisTasks, ...Object.values(payloadTaskMap).flat()];
-  const found = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/_/g, '-') === normalized);
+  let found = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/_/g, '-') === normalized);
+  if (!found && actionId) {
+    const inferred = inferActionTypeFromId(actionId);
+    found = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/_/g, '-') === inferred);
+  }
   return found?.name || actionType;
 }
 
@@ -361,8 +401,10 @@ function initEditMode() {
   nodes.value = allActions.map((a, idx) => {
     const id = `node_${a.action_id || a.action_seq || idx}_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
     seqToNodeId[String(a.action_seq)] = id;
-    const actionType = a.action_type || '';
-    const displayName = getActionDisplayName(actionType);
+    const rawActionType = a.action_type || '';
+    const isUnknown = !rawActionType || rawActionType.toLowerCase().includes('unknown');
+    const actionType = isUnknown ? inferActionTypeFromId(a.action_id) : rawActionType;
+    const displayName = getActionDisplayName(actionType, a.action_id);
     return {
       id,
       actionType,
