@@ -203,6 +203,14 @@ const defaultVehicleOptions = [
   { type: 'Air-Ground-UAV', name: '空地车' },
 ];
 
+const vehicleTypeNameMap = {
+  'Fire-Support-UGV': '火力车',
+  'Recon-Strike-UGV': '侦打车',
+  'Patrol-UGV': '巡逻车',
+  'Electronic-UGV': '电磁车',
+  'Air-Ground-UAV': '空地车',
+};
+
 const vehicleOptions = computed(() => {
   if (props.availableVehicles && props.availableVehicles.length > 0) {
     return props.availableVehicles.map((v) => ({
@@ -218,7 +226,7 @@ const vehicleOptions = computed(() => {
 
 const selectedVehicleName = computed(() => {
   const v = vehicleOptions.value.find((item) => item.type === selectedVehicleType.value);
-  return v ? v.name : selectedVehicleType.value;
+  return v ? v.name : (vehicleTypeNameMap[selectedVehicleType.value] || selectedVehicleType.value);
 });
 
 const headerTitle = computed(() => {
@@ -237,6 +245,14 @@ const chassisTasks = [
   { actionType: 'Manual-Task', name: '人工任务', defaultParam: { type: 1 } },
   { actionType: 'Pose-Adjust', name: '姿态调整', defaultParam: { pose: [9000, 0, 0], pose_deviation: [36100, 9100, 9100], limited_speed: 10, safe_mode: 0 } },
 ];
+
+function getActionDisplayName(actionType) {
+  if (!actionType) return '';
+  const normalized = String(actionType).toLowerCase().replace(/_/g, '-');
+  const allTasks = [...chassisTasks, ...Object.values(payloadTaskMap).flat()];
+  const found = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/_/g, '-') === normalized);
+  return found?.name || actionType;
+}
 
 const payloadTaskMap = {
   'Fire-Support-UGV': [
@@ -345,11 +361,13 @@ function initEditMode() {
   nodes.value = allActions.map((a, idx) => {
     const id = `node_${a.action_id || a.action_seq || idx}_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
     seqToNodeId[String(a.action_seq)] = id;
+    const actionType = a.action_type || '';
+    const displayName = getActionDisplayName(actionType);
     return {
       id,
-      actionType: a.action_type || '',
-      name: a.name || '',
-      category: a.action_type && chassisTasks.some((t) => t.actionType === a.action_type) ? 'chassis' : 'payload',
+      actionType,
+      name: displayName || a.name || '',
+      category: actionType && chassisTasks.some((t) => t.actionType === actionType) ? 'chassis' : 'payload',
       param: JSON.parse(JSON.stringify(a.param || {})),
       // 先给个占位坐标，稍后交给 autoLayout 按依赖图重新排布
       x: PAD_X,
