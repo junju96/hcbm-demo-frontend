@@ -921,11 +921,15 @@ const inferActionTypeFromParam = (param) => {
 const getActionDisplayName = (action) => {
   if (!action) return '';
   let raw = String(action.action_type || '').toLowerCase().replace(/_/g, '-');
-  if ((!raw || raw === 'unknown' || raw === 'unknown-action') && isGenericActionId(action.action_id)) {
-    const inferred = inferActionTypeFromParam(action.param);
+  if (!raw || raw === 'unknown' || raw === 'unknown-action') {
+    let inferred = '';
+    if (isGenericActionId(action.action_id)) {
+      inferred = inferActionTypeFromParam(action.param);
+    } else {
+      inferred = String(action.action_id || '').toLowerCase().replace(/_/g, '-');
+    }
     if (inferred) raw = inferred;
   }
-  if (!raw) raw = String(action.action_id || '').toLowerCase().replace(/_/g, '-');
   return actionTypeDisplayMap[raw] || action.name || action.action_id || '未知行动';
 };
 
