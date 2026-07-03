@@ -884,9 +884,48 @@ const actionTypeDisplayMap = {
   'payload-silent': '载荷静默',
 };
 
+const isGenericActionId = (actionId) => {
+  if (!actionId) return true;
+  const aid = String(actionId).toLowerCase();
+  return /^action-\d+$/.test(aid);
+};
+
+const inferActionTypeFromParam = (param) => {
+  if (!param || typeof param !== 'object') return '';
+  const p = param;
+  if (['ene', 'freq', 'meat'].some((k) => k in p)) return 'laser-illumination';
+  if (['points1', 'points2', 'points3'].some((k) => k in p)) return 'air-recon';
+  if ('frequency' in p) return 'protect' in p || p.sort === 1 ? 'em-interference' : 'em-recon';
+  if (Object.keys(p).length === 0) return 'set-return-point';
+  if (Object.keys(p).length === 1 && 'time' in p) return 'silent-guard';
+  if ('area' in p && 'direct' in p) return 'lens-recon';
+  if ('area' in p) return 'search-and-shoot';
+  if ('points' in p && Array.isArray(p.points) && p.points.length > 0) {
+    const first = p.points[0];
+    if (first && typeof first === 'object') {
+      if (first.ammo_type === 2) return '40mm-gun-launch';
+      if (first.ammo_type === 1) return '7.62mm-gun-shot';
+      if ('ammo_type' in first) return 'at-missile-launch';
+      if ('r' in first || p.type === 2) return 'rocket-launch';
+      if ('loiter' in p || p.type === 3) return 'loitering-munition-launch';
+    }
+    if ('formation_mode' in p) return 'formation-move';
+    if ('limited_speed' in p) return 'auto-move';
+  }
+  if ('distance' in p && 'x' in p && 'y' in p) return 'follow-move';
+  if ('pose' in p) return 'pose-adjust';
+  if ('type' in p && Object.keys(p).length === 1) return 'manual-task';
+  return '';
+};
+
 const getActionDisplayName = (action) => {
   if (!action) return '';
-  const raw = String(action.action_type || action.action_id || '').toLowerCase().replace(/_/g, '-');
+  let raw = String(action.action_type || '').toLowerCase().replace(/_/g, '-');
+  if ((!raw || raw === 'unknown' || raw === 'unknown-action') && isGenericActionId(action.action_id)) {
+    const inferred = inferActionTypeFromParam(action.param);
+    if (inferred) raw = inferred;
+  }
+  if (!raw) raw = String(action.action_id || '').toLowerCase().replace(/_/g, '-');
   return actionTypeDisplayMap[raw] || action.name || action.action_id || '未知行动';
 };
 
