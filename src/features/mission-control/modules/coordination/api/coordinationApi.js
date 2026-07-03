@@ -524,8 +524,9 @@ export const syncOperatorPlanToDataServer = async (planId) => {
 
 /** 操控端 — 删除方案中指定车辆的行动序列（会同步把数据服务器上 action/car_action 置 DELETED） */
 export const deleteOperatorVehicle = async (planId, vid) => {
-  const cleanVid = String(vid).replace('equipment:', '');
-  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/vehicles/${cleanVid}/delete`), {});
+  // 保留完整 vid（如 equipment:ZD02），后端按完整 vid 匹配 car_action
+  const encodedVid = encodeURIComponent(String(vid));
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/vehicles/${encodedVid}/delete`), {});
   return result;
 };
 
