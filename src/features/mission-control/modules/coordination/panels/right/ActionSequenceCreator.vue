@@ -308,7 +308,6 @@ const payloadTaskMap = {
     { actionType: '40mm-Gun-Launch', name: '40炮打击', defaultParam: { time: 45, sort: 1, num: 1, points: [] } },
     { actionType: 'AT-Missile-Launch', name: '红箭13导弹打击', defaultParam: { time: 60, sort: 1, num: 1, points: [] } },
     { actionType: '7.62mm-Gun-Shot', name: '机枪打击', defaultParam: { time: 30, sort: 1, num: 1, points: [] } },
-    { actionType: 'Laser-Illumination', name: '激光照射', defaultParam: { time: 120, act: 1, param1: 0, param2: 0, ene: 80, freq: 1000, meat: 30, delay: 5, max: 10, type: 1, strategy: 0, lon: 116.407, lat: 39.904, alt: 2100 } },
   ],
   'Patrol-UGV': [
     { actionType: 'Lens-Recon', name: '光电侦察', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
