@@ -56,7 +56,7 @@
                 class="as-btn primary"
                 type="button"
                 :disabled="controlLoading"
-                @click="onDispatch"
+                @click="openDispatchSeatDialog"
               >
                 {{ controlLoading ? '处理中…' : '下发' }}
               </button>
@@ -81,11 +81,10 @@
           <div class="as-vehicle-seq-title">
             <span>各车行动序列</span>
             <button
-              v-if="isControlMode"
               class="as-btn mini primary"
               type="button"
-              :disabled="missingVehicleTypes.length === 0"
-              :title="missingVehicleTypes.length === 0 ? '暂无可新建的车型（车辆可能未上线或已存在）' : ''"
+              :disabled="(isControlMode ? missingVehicleTypes : appendableVehicleTypes).length === 0"
+              :title="(isControlMode ? missingVehicleTypes : appendableVehicleTypes).length === 0 ? '暂无可新建的车型（车辆可能未上线或已存在）' : ''"
               @click="openMissingVehicleSelector"
             >
               + 新建
@@ -99,26 +98,27 @@
             >
               <div class="as-vehicle-header">
                 <span class="as-vehicle-name">{{ getVehicleDisplayName(vehicle) }}</span>
-                <div class="as-vehicle-controls" v-if="isControlMode">
-                  <template v-if="getVehicleRuntimeState(vehicle) === 'SCHEDULED'">
-                    <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('start', [vehicle.vid])">开始</button>
-                  </template>
-                  <template v-if="getVehicleRuntimeState(vehicle) === 'ACTIVE'">
-                    <button class="as-btn mini warn" type="button" :disabled="controlLoading" @click="executeControl('pause', [vehicle.vid])">暂停</button>
-                  </template>
-                  <template v-if="getVehicleRuntimeState(vehicle) === 'PAUSED'">
-                    <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('resume', [vehicle.vid])">继续</button>
-                  </template>
-                  <template v-if="getVehicleRuntimeState(vehicle) === 'DONE'">
-                    <span class="as-state-badge done">已完成</span>
-                  </template>
-                  <template v-if="['ACTIVE', 'PAUSED'].includes(getVehicleRuntimeState(vehicle))">
-                    <button class="as-btn mini danger" type="button" :disabled="controlLoading" @click="executeControl('stop', [vehicle.vid])">停止</button>
+                <div class="as-vehicle-controls">
+                  <template v-if="isControlMode">
+                    <template v-if="getVehicleRuntimeState(vehicle) === 'SCHEDULED'">
+                      <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('start', [vehicle.vid])">开始</button>
+                    </template>
+                    <template v-if="getVehicleRuntimeState(vehicle) === 'ACTIVE'">
+                      <button class="as-btn mini warn" type="button" :disabled="controlLoading" @click="executeControl('pause', [vehicle.vid])">暂停</button>
+                    </template>
+                    <template v-if="getVehicleRuntimeState(vehicle) === 'PAUSED'">
+                      <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('resume', [vehicle.vid])">继续</button>
+                    </template>
+                    <template v-if="getVehicleRuntimeState(vehicle) === 'DONE'">
+                      <span class="as-state-badge done">已完成</span>
+                    </template>
+                    <template v-if="['ACTIVE', 'PAUSED'].includes(getVehicleRuntimeState(vehicle))">
+                      <button class="as-btn mini danger" type="button" :disabled="controlLoading" @click="executeControl('stop', [vehicle.vid])">停止</button>
+                    </template>
                   </template>
                   <button class="as-btn mini" type="button" @click="openCreatorForEdit(vehicle)">编辑</button>
                   <button class="as-btn mini danger" type="button" @click="confirmDeleteVehicleActions(vehicle)">删除</button>
                 </div>
-                <span v-else class="as-vehicle-count">{{ vehicle.total_actions }} 个行动</span>
               </div>
               <div class="as-action-cards" :data-vid="vehicle.vid">
                 <!-- 跨层依赖连线（按真实卡片位置绘制平滑曲线） -->
@@ -194,11 +194,11 @@
         <div v-else-if="selectedPlanId && !loadingDetail" class="as-empty-detail">
           <div>暂无行动序列数据</div>
           <button
-            v-if="isControlMode"
+            v-if="supportedVehicleTypes.length > 0"
             class="as-btn mini primary as-empty-new-btn"
             type="button"
-            :disabled="missingVehicleTypes.length === 0"
-            :title="missingVehicleTypes.length === 0 ? '暂无可新建的车型（车辆可能未上线或已存在）' : ''"
+            :disabled="supportedVehicleTypes.length === 0"
+            :title="supportedVehicleTypes.length === 0 ? '暂无可新建的车型（车辆可能未上线或已存在）' : ''"
             @click="openMissingVehicleSelector"
           >
             + 新建行动序列
@@ -272,10 +272,10 @@
       </div>
     </div>
 
-    <!-- 缺失车型选择弹窗 -->
+    <!-- 缺失/追加车型选择弹窗 -->
     <div v-if="showMissingVehicleDialog" class="as-dialog-overlay" @click.self="showMissingVehicleDialog = false">
       <div class="as-dialog">
-        <div class="as-dialog-header">选择要新建行动序列的车型</div>
+        <div class="as-dialog-header">{{ isControlMode ? '选择要新建行动序列的车型' : '选择要追加行动序列的车型' }}</div>
         <div class="as-dialog-body">
           <label v-for="v in missingVehicleTypes" :key="v.type" class="as-dialog-item">
             <input type="radio" :value="v" v-model="selectedMissingVehicle" />
@@ -313,6 +313,69 @@
       </div>
     </div>
 
+    <!-- 协同席下发席位选择弹窗 -->
+    <div v-if="showDispatchSeatDialog" class="as-dialog-overlay" @click.self="cancelDispatchSeatSelection">
+      <div class="as-dialog">
+        <div class="as-dialog-header">选择要下发的席位</div>
+        <div class="as-dialog-body">
+          <label class="as-dialog-item">
+            <input
+              type="checkbox"
+              :checked="selectedDispatchSeats.length === SEAT_OPTIONS.length && SEAT_OPTIONS.length > 0"
+              @change="toggleDispatchSeatSelectAll"
+            />
+            <span>全部席位</span>
+          </label>
+          <label v-for="s in SEAT_OPTIONS" :key="s.id" class="as-dialog-item">
+            <input type="checkbox" :value="s.id" v-model="selectedDispatchSeats" />
+            <span>{{ s.label }}</span>
+          </label>
+        </div>
+        <div class="as-dialog-footer">
+          <button class="as-btn" type="button" @click="cancelDispatchSeatSelection">取消</button>
+          <button
+            class="as-btn primary"
+            type="button"
+            :disabled="selectedDispatchSeats.length === 0"
+            @click="confirmDispatchSeatSelection"
+          >
+            确认下发
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操控端车辆选择弹窗 -->
+    <div v-if="showVehicleSelectDialog" class="as-dialog-overlay" @click.self="onCancelSelectVehicle">
+      <div class="as-dialog">
+        <div class="as-dialog-header">选择操控车辆</div>
+        <div class="as-dialog-body">
+          <p style="margin: 0 0 0.8rem; color: rgba(241,254,255,0.85);">请从当前已连接车辆中选择一辆，用于接收 MissionService 反馈：</p>
+          <label
+            v-for="v in connectedVehicles"
+            :key="v.vid"
+            class="as-dialog-item"
+            :class="{ active: selectedConnectedVehicleId === v.vid }"
+          >
+            <input v-model="selectedConnectedVehicleId" type="radio" :value="v.vid" />
+            <span style="font-weight: 600;">{{ v.name || v.resource_name || v.vid }}</span>
+            <span style="margin-left: auto; color: rgba(241,254,255,0.65); font-size: 12px;">{{ v.vmf ? `VMF: ${v.vmf}` : '' }} {{ v.ip ? `IP: ${v.ip}` : '' }}</span>
+          </label>
+        </div>
+        <div class="as-dialog-footer">
+          <button class="as-btn" type="button" :disabled="selectingVehicle" @click="onCancelSelectVehicle">取消</button>
+          <button
+            class="as-btn primary"
+            type="button"
+            :disabled="!selectedConnectedVehicleId || selectingVehicle"
+            @click="onConfirmSelectVehicle"
+          >
+            {{ selectingVehicle ? '处理中…' : '确认' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 行动参数编辑弹窗：teleport 到 body，避免被右侧面板裁切 -->
     <Teleport to="body">
       <ActionParamDialog
@@ -322,6 +385,7 @@
         :vehicle-type="editingVehicleType"
         @close="closeParamDialog"
         @save="saveActionParam"
+        @cancel="saveActionParam"
       />
       <ActionSequenceCreator
         v-if="showCreator"
@@ -334,6 +398,7 @@
         :append-mode="creatorAppendMode"
         :append-plan="creatorAppendPlan"
         :available-vehicles="supportedVehicleTypes"
+        :is-control-mode="isControlMode"
         @close="closeCreator"
         @saved="onCreatorSaved"
       />
@@ -354,9 +419,14 @@ import {
   resumeActionSequence,
   stopActionSequence,
   dispatchActionSequence,
+  dispatchForwardPlan,
+  patchPlan,
+  deleteVehicle,
   fetchOperatorPlans,
   fetchOperatorPlanDetail,
   fetchOperatorVehicles,
+  fetchOperatorConnectedVehicles,
+  selectOperatorVehicle,
   startOperatorPlan,
   pauseOperatorPlan,
   resumeOperatorPlan,
@@ -408,6 +478,22 @@ const selectedVehicleVids = ref([]);
 /* ---------- 操控端下发弹窗（复选） ---------- */
 const showDispatchVehicleDialog = ref(false);
 const selectedDispatchVids = ref([]);
+
+/* ---------- 协同席下发席位选择弹窗 ---------- */
+const SEAT_OPTIONS = [
+  { id: '1', label: '席位1' },
+  { id: '2', label: '席位2' },
+  { id: '3', label: '席位3' },
+  { id: '4', label: '席位4' },
+];
+const showDispatchSeatDialog = ref(false);
+const selectedDispatchSeats = ref([]);
+
+/* ---------- 操控端车辆选择弹窗 ---------- */
+const showVehicleSelectDialog = ref(false);
+const connectedVehicles = ref([]);
+const selectedConnectedVehicleId = ref('');
+const selectingVehicle = ref(false);
 
 /* ---------- 行动参数弹窗 ---------- */
 const showParamDialog = ref(false);
@@ -835,6 +921,9 @@ const missingVehicleTypes = computed(() => {
   return supportedVehicleTypes.value.filter((v) => !existingTypes.has(v.type));
 });
 
+// 非操控席模式：详情页新增行动序列时可用的车型（允许已存在的车型再次追加）
+const appendableVehicleTypes = computed(() => supportedVehicleTypes.value);
+
 const vehicleTypeNameMap = {
   'Fire-Support-UGV': '火力车',
   'Recon-Strike-UGV': '侦打车',
@@ -884,23 +973,34 @@ const actionTypeDisplayMap = {
   'payload-silent': '载荷静默',
 };
 
+// 通用参数字段集合，推断 action_type 时应排除，避免误判
+const COMMON_PARAM_FIELDS = new Set(['disconnect_strategy', 'mission_duration', 'enable_start_time', 'start_time']);
+
 const isGenericActionId = (actionId) => {
   if (!actionId) return true;
   const aid = String(actionId).toLowerCase();
+  // 语义化 action_id（如 action:return-to-base:plan-1017:5）不算通用编号
+  if (/^action:[a-z0-9\.\-]+:/.test(aid)) return false;
   return /^action-\d+$/.test(aid);
 };
 
 const inferActionTypeFromParam = (param) => {
   if (!param || typeof param !== 'object') return '';
   const p = param;
-  if (['ene', 'freq', 'meat'].some((k) => k in p)) return 'laser-illumination';
-  if (['points1', 'points2', 'points3'].some((k) => k in p)) return 'air-recon';
-  if ('frequency' in p) return 'protect' in p || p.sort === 1 ? 'em-interference' : 'em-recon';
-  if (Object.keys(p).length === 0) return 'set-return-point';
-  if (Object.keys(p).length === 1 && 'time' in p) return 'silent-guard';
-  if ('area' in p && 'direct' in p) return 'lens-recon';
-  if ('area' in p) return 'search-and-shoot';
-  if ('points' in p && Array.isArray(p.points) && p.points.length > 0) {
+  const businessKeys = Object.keys(p).filter((k) => !COMMON_PARAM_FIELDS.has(k));
+  const has = (k) => k in p;
+  const businessHas = (k) => businessKeys.includes(k);
+
+  if (businessHas('ene') || businessHas('freq') || businessHas('meat')) return 'laser-illumination';
+  if (businessHas('points1') || businessHas('points2') || businessHas('points3')) return 'air-recon';
+  if (businessHas('frequency')) return 'protect' in p || p.sort === 1 ? 'em-interference' : 'em-recon';
+  if (businessHas('area') && businessHas('direct')) return 'lens-recon';
+  // 强声/强光拒止：area + attr + thr + dam===0（巡逻车特有）
+  if (businessHas('area') && businessHas('attr') && businessHas('thr') && p.dam === 0) {
+    return p.ammo === 0 ? 'sound-expel' : 'light-expel';
+  }
+  if (businessHas('area')) return 'search-and-shoot';
+  if (businessHas('points') && Array.isArray(p.points) && p.points.length > 0) {
     const first = p.points[0];
     if (first && typeof first === 'object') {
       if (first.ammo_type === 2) return '40mm-gun-launch';
@@ -909,28 +1009,195 @@ const inferActionTypeFromParam = (param) => {
       if ('r' in first || p.type === 2) return 'rocket-launch';
       if ('loiter' in p || p.type === 3) return 'loitering-munition-launch';
     }
-    if ('formation_mode' in p) return 'formation-move';
-    if ('limited_speed' in p) return 'auto-move';
+    // 编队机动：含 formation_mode 或路径点带 offsetX/offsetY
+    if (businessHas('formation_mode') || p.points.some((pt) => 'offsetX' in pt || 'offsetY' in pt)) return 'formation-move';
+    // 自主机动：points + limited_speed（且不是编队）
+    if (businessHas('limited_speed')) return 'auto-move';
   }
-  if ('distance' in p && 'x' in p && 'y' in p) return 'follow-move';
-  if ('pose' in p) return 'pose-adjust';
-  if ('type' in p && Object.keys(p).length === 1) return 'manual-task';
+  if (businessHas('distance') && businessHas('x') && businessHas('y')) return 'follow-move';
+  if (businessHas('pose')) return 'pose-adjust';
+
+  // 兜底：仅含业务字段为空 / 仅 time / 仅 type 时
+  if (businessKeys.length === 0) return '';
+  if (businessKeys.length === 1 && businessHas('time')) return 'silent-guard';
+  if (businessKeys.length === 1 && businessHas('type')) return 'manual-task';
   return '';
 };
 
 const getActionDisplayName = (action) => {
   if (!action) return '';
-  let raw = String(action.action_type || '').toLowerCase().replace(/_/g, '-');
+  // name 是中文业务名称，最可靠；优先按 name 推断 action_type
+  const nameInferred = inferActionTypeFromName(action.name);
+  let raw = nameInferred || String(action.action_type || '').toLowerCase().replace(/_/g, '-');
   if (!raw || raw === 'unknown' || raw === 'unknown-action') {
-    let inferred = '';
-    if (isGenericActionId(action.action_id)) {
-      inferred = inferActionTypeFromParam(action.param);
-    } else {
-      inferred = String(action.action_id || '').toLowerCase().replace(/_/g, '-');
-    }
+    const inferred = inferActionTypeFromId(action.action_id)
+      || inferActionTypeFromParam(action.param);
     if (inferred) raw = inferred;
   }
-  return actionTypeDisplayMap[raw] || action.name || action.action_id || '未知行动';
+  // 兼容 PascalCase 命名（如 Follow-Move / Search-And-Shoot）：去掉连字符后再查一次
+  let display = actionTypeDisplayMap[raw];
+  if (!display) {
+    display = actionTypeDisplayMap[raw.replace(/-/g, '')];
+  }
+  return display || action.name || action.action_id || '未知行动';
+};
+
+// 根据 action_type 推断 action.name，用于 name 为空时的兜底
+const inferActionName = (actionType) => {
+  const raw = String(actionType || '').toLowerCase().replace(/_/g, '-');
+  return actionTypeDisplayMap[raw] || actionTypeDisplayMap[raw.replace(/-/g, '')] || actionType;
+};
+
+const inferActionTypeFromId = (actionId) => {
+  if (!actionId) return '';
+  const aid = String(actionId).toLowerCase().replace(/_/g, '-');
+  // 针对语义化 action_id（如 action:return-to-base:plan-1017:5）先提取动作类型部分
+  const semanticMatch = aid.match(/^action:([a-z0-9\.\-]+):/);
+  if (semanticMatch) {
+    const semanticType = semanticMatch[1];
+    const mapping = {
+      'auto-move': 'auto-move',
+      'follow-move': 'follow-move',
+      'silent-guard': 'silent-guard',
+      'set-return-point': 'set-return-point',
+      'return-to-base': 'return-to-base',
+      'formation-move': 'formation-move',
+      'manual-task': 'manual-task',
+      'pose-adjust': 'pose-adjust',
+      'air-recon': 'air-recon',
+      'lens-recon': 'lens-recon',
+      'search-and-shoot': 'search-and-shoot',
+      'recon-strike': 'search-and-shoot',
+      '40mm-gun-launch': '40mm-gun-launch',
+      'at-missile-launch': 'at-missile-launch',
+      'gun-shot': '7.62mm-gun-shot',
+      '7.62mm-gun-shot': '7.62mm-gun-shot',
+      'rocket-launch': 'rocket-launch',
+      'loitering-munition-launch': 'loitering-munition-launch',
+      'laser-illumination': 'laser-illumination',
+      'sound-expel': 'sound-expel',
+      'acoustic-deterrence': 'sound-expel',
+      'light-expel': 'light-expel',
+      'light-deterrence': 'light-expel',
+      'em-recon': 'em-recon',
+      'electronic-recon': 'em-recon',
+      'em-interference': 'em-interference',
+      'electronic-jamming': 'em-interference',
+      'payload-silent': 'payload-silent',
+    };
+    if (semanticType in mapping) return mapping[semanticType];
+  }
+  // 项目实际数据服务器 action_id 前缀（如 CH_RETURN / FS_LENS / RS_40MM）
+  const projectMapping = {
+    // 底盘类
+    'ch-move': 'auto-move',
+    'ch-follow': 'follow-move',
+    'ch-silent': 'silent-guard',
+    'ch-set-return': 'set-return-point',
+    'ch-return': 'return-to-base',
+    'ch-formation': 'formation-move',
+    'ch-manual': 'manual-task',
+    'ch-pose': 'pose-adjust',
+    // 火力车
+    'fs-lens': 'lens-recon',
+    'fs-recon-strike': 'search-and-shoot',
+    'fs-gun': '7.62mm-gun-shot',
+    'fs-rocket': 'rocket-launch',
+    'fs-loiter': 'loitering-munition-launch',
+    // 侦打车
+    'rs-lens': 'lens-recon',
+    'rs-recon-strike': 'search-and-shoot',
+    'rs-40mm': '40mm-gun-launch',
+    'rs-at': 'at-missile-launch',
+    'rs-gun': '7.62mm-gun-shot',
+    'rs-laser': 'laser-illumination',
+    // 巡逻车
+    'pt-lens': 'lens-recon',
+    'pt-recon-strike': 'search-and-shoot',
+    'pt-gun': '7.62mm-gun-shot',
+    'pt-acoustic': 'sound-expel',
+    'pt-light': 'light-expel',
+    // 空地车 / 电磁车
+    'ag-air-recon': 'air-recon',
+    'el-recon': 'em-recon',
+    'el-jam': 'em-interference',
+    'el-silent': 'payload-silent',
+  };
+  if (aid in projectMapping) return projectMapping[aid];
+  return '';
+};
+
+const inferActionTypeFromName = (name) => {
+  if (!name) return '';
+  const n = String(name).trim();
+  const map = {
+    '自主机动': 'auto-move',
+    '跟随机动': 'follow-move',
+    '静默值守': 'silent-guard',
+    '设置返航点': 'set-return-point',
+    '开启返航': 'return-to-base',
+    '编队机动': 'formation-move',
+    '人工任务': 'manual-task',
+    '姿态调整': 'pose-adjust',
+    '空中侦察': 'air-recon',
+    '光电侦察': 'lens-recon',
+    '侦察打击': 'search-and-shoot',
+    '巡逻车侦察打击': 'search-and-shoot',
+    '机枪打击': '7.62mm-gun-shot',
+    '火箭弹打击': 'rocket-launch',
+    '巡飞弹打击': 'loitering-munition-launch',
+    '40炮打击': '40mm-gun-launch',
+    '红箭13导弹打击': 'at-missile-launch',
+    '激光照射': 'laser-illumination',
+    '强声拒止': 'sound-expel',
+    '强光拒止': 'light-expel',
+    '电磁侦察': 'em-recon',
+    '电磁干扰': 'em-interference',
+    '载荷静默': 'payload-silent',
+  };
+  if (n in map) return map[n];
+  // 英文 / PascalCase / 无连字符兜底
+  const norm = n.toLowerCase().replace(/[-_.]/g, '');
+  const enMap = {
+    'automove': 'auto-move',
+    'followmove': 'follow-move',
+    'silentguard': 'silent-guard',
+    'setreturnpoint': 'set-return-point',
+    'setreturn': 'set-return-point',
+    'returntobase': 'return-to-base',
+    'return': 'return-to-base',
+    'formationmove': 'formation-move',
+    'formation': 'formation-move',
+    'manualtask': 'manual-task',
+    'manual': 'manual-task',
+    'poseadjust': 'pose-adjust',
+    'airrecon': 'air-recon',
+    'lensrecon': 'lens-recon',
+    'searchandshoot': 'search-and-shoot',
+    'reconstrike': 'search-and-shoot',
+    '40mmgunlaunch': '40mm-gun-launch',
+    '40mmgun': '40mm-gun-launch',
+    'atmissilelaunch': 'at-missile-launch',
+    'atmissile': 'at-missile-launch',
+    'gunshot': '7.62mm-gun-shot',
+    '762mmgunshot': '7.62mm-gun-shot',
+    '762mmgun': '7.62mm-gun-shot',
+    'rocketlaunch': 'rocket-launch',
+    'loiteringmunitionlaunch': 'loitering-munition-launch',
+    'loiteringmunition': 'loitering-munition-launch',
+    'laserillumination': 'laser-illumination',
+    'laser': 'laser-illumination',
+    'soundexpel': 'sound-expel',
+    'acousticdeterrence': 'sound-expel',
+    'lightexpel': 'light-expel',
+    'lightdeterrence': 'light-expel',
+    'emrecon': 'em-recon',
+    'electronicrecon': 'em-recon',
+    'eminterference': 'em-interference',
+    'electronicjamming': 'em-interference',
+    'payloadsilent': 'payload-silent',
+  };
+  return enMap[norm] || '';
 };
 
 /* ---------- 方法 ---------- */
@@ -1136,6 +1403,18 @@ const getCardOffsets = (vehicle) => {
   Object.keys(offsets).forEach((id) => {
     offsets[id].top -= minTop;
   });
+  // 防御性兜底：若所有卡片 top 都为 0 且高度相同，说明 DOM 高度还没准备好，
+  // 此时用 action_seq 给出一个顺次堆叠的临时位置，避免卡片全部重叠在左上角。
+  const allSameTop = Object.values(offsets).every((o) => o.top === 0);
+  const hasNonTrivialHeight = Object.values(offsets).some((o) => o.h > CARD_FALLBACK_H);
+  if (allSameTop && hasNonTrivialHeight) {
+    let cursor = 0;
+    columns.flat().forEach((action) => {
+      const h = offsets[action.action_id].h;
+      offsets[action.action_id].top = cursor;
+      cursor += h + ROW_GAP;
+    });
+  }
   return offsets;
 };
 
@@ -1144,7 +1423,7 @@ const cardStyle = (vehicle, action) => {
   const offsets = getCardOffsets(vehicle);
   const o = offsets[action.action_id];
   if (!o) return {};
-  return { position: 'absolute', top: `${o.top}px`, left: '0' };
+  return { position: 'absolute', top: `${o.top}px`, left: '0', width: '100%' };
 };
 
 // 每列容器高度（取列内最靠下卡片的底部）
@@ -1381,7 +1660,9 @@ const executeDeleteVehicleActions = async () => {
   try {
     // 走后端新接口：由后端把数据服务器上该车辆的 action/car_action 置 DELETED，
     // 再更新本地 plan 并同步到数据服务器。
-    const result = await deleteOperatorVehicle(planId, vid);
+    const deleteFn = isControlMode.value ? deleteOperatorVehicle : deleteVehicle;
+    const fetchDetailFn = isControlMode.value ? fetchOperatorPlanDetail : fetchActionSequencePlanDetail;
+    const result = await deleteFn(planId, vid);
     if (!result.ok) {
       appendSystemMessage(`删除车辆行动序列失败：${result.data?.message || result.error || '未知错误'}`);
       return;
@@ -1389,7 +1670,7 @@ const executeDeleteVehicleActions = async () => {
 
     const detail = result.data?.data || result.data || {};
     // 删除成功后，用后端返回的最新 plan 刷新视图；若后端未返回 plan，则本地构造
-    const refreshed = await fetchOperatorPlanDetail(planId);
+    const refreshed = await fetchDetailFn(planId);
     if (refreshed.ok && refreshed.data) {
       selectedPlan.value = refreshed.data;
     } else {
@@ -1450,11 +1731,15 @@ const onCreatorSaved = async (plan) => {
   if (creatorEditMode.value) {
     // 编辑模式：同步到数据服务器后刷新当前选中方案详情
     selectedPlan.value = plan;
-    const syncResult = await syncOperatorPlanToDataServer(plan.plan_id);
-    if (!syncResult.ok) {
-      appendSystemMessage(`编辑已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
+    if (isControlMode.value) {
+      const syncResult = await syncOperatorPlanToDataServer(plan.plan_id);
+      if (!syncResult.ok) {
+        appendSystemMessage(`编辑已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
+      } else {
+        appendSystemMessage('已编辑车辆行动序列并同步到数据服务器');
+      }
     } else {
-      appendSystemMessage('已编辑车辆行动序列并同步到数据服务器');
+      appendSystemMessage('已编辑车辆行动序列');
     }
     await refreshDetail(plan.plan_id);
     closeCreator();
@@ -1464,12 +1749,16 @@ const onCreatorSaved = async (plan) => {
   if (creatorAppendMode.value) {
     // 追加模式：刷新当前方案详情，不新增方案条目
     selectedPlan.value = plan;
-    // 同步到数据服务器，避免轮询时旧数据覆盖本地追加结果
-    const syncResult = await syncOperatorPlanToDataServer(plan.plan_id);
-    if (!syncResult.ok) {
-      appendSystemMessage(`追加已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
+    if (isControlMode.value) {
+      // 同步到数据服务器，避免轮询时旧数据覆盖本地追加结果
+      const syncResult = await syncOperatorPlanToDataServer(plan.plan_id);
+      if (!syncResult.ok) {
+        appendSystemMessage(`追加已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
+      } else {
+        appendSystemMessage('已追加车辆行动序列到当前方案并同步到数据服务器');
+      }
     } else {
-      appendSystemMessage('已追加车辆行动序列到当前方案并同步到数据服务器');
+      appendSystemMessage('已追加车辆行动序列到当前方案');
     }
     await refreshDetail(plan.plan_id);
     closeCreator();
@@ -1713,6 +2002,7 @@ const confirmVehicleSelection = () => {
 
 const onDispatch = async () => {
   // 协同席 — 将方案下发到操控席数据服务端
+  // 保留旧逻辑作为兜底，新逻辑通过 openDispatchSeatDialog 触发
   controlLoading.value = true;
   const result = await dispatchActionSequence(selectedPlanId.value, {});
   controlLoading.value = false;
@@ -1720,6 +2010,43 @@ const onDispatch = async () => {
     appendSystemMessage('行动方案已下发到操控席');
   } else {
     appendSystemMessage('下发到操控席失败: ' + (result.data?.message || result.error || '未知错误'));
+  }
+};
+
+const openDispatchSeatDialog = () => {
+  selectedDispatchSeats.value = [];
+  showDispatchSeatDialog.value = true;
+};
+
+const cancelDispatchSeatSelection = () => {
+  showDispatchSeatDialog.value = false;
+  selectedDispatchSeats.value = [];
+};
+
+const toggleDispatchSeatSelectAll = (e) => {
+  if (e.target.checked) {
+    selectedDispatchSeats.value = SEAT_OPTIONS.map((s) => s.id);
+  } else {
+    selectedDispatchSeats.value = [];
+  }
+};
+
+const confirmDispatchSeatSelection = async () => {
+  if (!selectedPlanId.value || selectedDispatchSeats.value.length === 0) return;
+  showDispatchSeatDialog.value = false;
+  controlLoading.value = true;
+  try {
+    const result = await dispatchForwardPlan(selectedPlanId.value, selectedDispatchSeats.value, 30);
+    if (result.ok) {
+      appendSystemMessage(`行动方案已下发到席位 ${selectedDispatchSeats.value.join('、')}`);
+    } else {
+      appendSystemMessage('下发到席位失败: ' + (result.data?.message || result.error || '未知错误'));
+    }
+  } catch (err) {
+    appendSystemMessage('下发到席位失败: ' + (err.message || err));
+  } finally {
+    controlLoading.value = false;
+    selectedDispatchSeats.value = [];
   }
 };
 
@@ -1854,10 +2181,13 @@ watch(
   { deep: true }
 );
 
-// 切换到操控端行动序列视图时，重新加载可用车辆列表，确保“新建行动序列”按钮能正确显示
+// 切换到操控端行动序列视图时，重新加载可用车辆列表，并检查是否已选择实车
 watch(isControlMode, (newVal, oldVal) => {
   if (newVal && !oldVal) {
     loadOnlineVehicles();
+    // 调试：每次切到操控席行动序列都强制弹出车辆选择弹窗
+    selectedConnectedVehicleId.value = '';
+    ensureVehicleSelected(true);
   }
 });
 
@@ -1891,7 +2221,48 @@ onMounted(() => {
   updateMarqueeStates();
   startAutoRefresh();
   window.addEventListener('resize', onWindowResize);
+  // 操控端行动序列视图：进入时检查并提示选择车辆
+  if (isControlMode.value) {
+    ensureVehicleSelected();
+  }
 });
+
+/* ---------- 操控端车辆选择 ---------- */
+const ensureVehicleSelected = async (force = false) => {
+  if (!isControlMode.value) return;
+  const result = await fetchOperatorConnectedVehicles();
+  if (!result.ok) {
+    console.warn('[ActionSequencePanel] fetch connected vehicles failed:', result.error);
+    return;
+  }
+  connectedVehicles.value = result.data.items || [];
+  // 调试模式 force=true 时忽略后端已选状态，强制弹窗
+  if (!force) {
+    selectedConnectedVehicleId.value = result.data.selected || '';
+  }
+  // 未选中车辆时弹出选择框
+  if (!selectedConnectedVehicleId.value && connectedVehicles.value.length > 0) {
+    showVehicleSelectDialog.value = true;
+  }
+};
+
+const onConfirmSelectVehicle = async () => {
+  if (!selectedConnectedVehicleId.value) return;
+  selectingVehicle.value = true;
+  const result = await selectOperatorVehicle(selectedConnectedVehicleId.value);
+  selectingVehicle.value = false;
+  if (result.ok) {
+    showVehicleSelectDialog.value = false;
+    appendSystemMessage(`已选择车辆 ${selectedConnectedVehicleId.value} 并订阅反馈`);
+  } else {
+    console.warn('[ActionSequencePanel] select vehicle failed:', result.error);
+    alert(`选择车辆失败: ${result.error || '未知错误'}`);
+  }
+};
+
+const onCancelSelectVehicle = () => {
+  showVehicleSelectDialog.value = false;
+};
 
 onUnmounted(() => {
   stopAutoRefresh();
@@ -2281,6 +2652,9 @@ onUnmounted(() => {
   width: 166px; /* 卡片 160 + margin 3*2 */
   flex-shrink: 0;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* 同列内垂直连接线 */
@@ -2356,6 +2730,8 @@ onUnmounted(() => {
   gap: 0.35rem;
   transition: box-shadow 180ms ease, border-color 180ms ease;
   cursor: default;
+  margin: 3px; /* 给阴影留出溢出空间 */
+  box-sizing: border-box;
 }
 
 .as-action-card:hover {
@@ -2373,10 +2749,6 @@ onUnmounted(() => {
     box-shadow: 0 0 14px rgba(59, 130, 246, 0.55), 0 0 28px rgba(59, 130, 246, 0.25);
     border-color: rgba(59, 130, 246, 0.75);
   }
-}
-
-.as-action-card {
-  margin: 3px; /* 给阴影留出溢出空间 */
 }
 
 .as-action-card.state-active {

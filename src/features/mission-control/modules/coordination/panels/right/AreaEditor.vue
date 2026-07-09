@@ -9,20 +9,38 @@
         </option>
       </select>
     </label>
-    <div class="apd-section-title sub">区域点列表</div>
-    <div class="apd-route-table-head">
-      <span>经度</span>
-      <span>纬度</span>
-      <span>高度</span>
-      <span></span>
+
+    <div class="ae-list-head">
+      <span class="apd-section-title sub">区域点列表</span>
+      <span class="ae-count">{{ modelValue.length }} 个点</span>
     </div>
-    <div v-for="(pt, idx) in modelValue" :key="idx" class="apd-route-table-row" style="grid-template-columns: 1fr 1fr 1fr auto;">
-      <input v-model.number="pt.lon" type="number" step="0.000001" placeholder="经度" />
-      <input v-model.number="pt.lat" type="number" step="0.000001" placeholder="纬度" />
-      <input v-model.number="pt.alt" type="number" step="0.1" placeholder="高度" />
-      <button class="as-btn mini danger" type="button" :disabled="modelValue.length <= 1" @click="removePoint(idx)">删除</button>
+
+    <div class="ae-table">
+      <div class="ae-row ae-row-head">
+        <span class="ae-idx">#</span>
+        <span>经度</span>
+        <span>纬度</span>
+        <span>高度</span>
+        <span class="ae-op"></span>
+      </div>
+      <div v-for="(pt, idx) in modelValue" :key="idx" class="ae-row">
+        <span class="ae-idx">{{ idx + 1 }}</span>
+        <input v-model.number="pt.lon" type="number" step="0.000001" placeholder="经度" />
+        <input v-model.number="pt.lat" type="number" step="0.000001" placeholder="纬度" />
+        <input v-model.number="pt.alt" type="number" step="0.1" placeholder="高度" />
+        <button
+          class="ae-del"
+          type="button"
+          title="删除该点"
+          :disabled="modelValue.length <= 1"
+          @click="removePoint(idx)"
+        >
+          ×
+        </button>
+      </div>
     </div>
-    <button class="as-btn mini primary" type="button" @click="addPoint">+ 添加区域点</button>
+
+    <button class="as-btn mini primary ae-add" type="button" @click="addPoint">+ 添加区域点</button>
   </div>
 </template>
 
@@ -38,18 +56,18 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'update:areaId']);
 
 function defaultPoint() {
-  return { lon: 116.13, lat: 39.766, alt: 55 };
+  return { lon: 0, lat: 0, alt: 0 };
 }
 
 function applyAreaFromList(selectedId) {
   const area = props.areaList.find((a) => a.resource_id === selectedId);
-  if (area && Array.isArray(area.polygon)) {
+  if (area && Array.isArray(area.points)) {
     emit(
       'update:modelValue',
-      area.polygon.map((pt) => ({
-        lon: pt?.lon ?? pt?.longitude ?? 0,
-        lat: pt?.lat ?? pt?.latitude ?? 0,
-        alt: pt?.alt ?? pt?.altitude ?? 0,
+      area.points.map((pt) => ({
+        lon: pt?.lon ?? 0,
+        lat: pt?.lat ?? 0,
+        alt: pt?.alt ?? 0,
       }))
     );
   }
@@ -61,19 +79,25 @@ function onAreaChange(event) {
   applyAreaFromList(selectedId);
 }
 
+function isZeroPoint(pt) {
+  return !pt || (Number(pt.lon ?? 0) === 0 && Number(pt.lat ?? 0) === 0 && Number(pt.alt ?? 0) === 0);
+}
+
 watch(
-  () => [props.areaId, props.areaList.length],
-  ([selectedId, listLength], [prevSelectedId] = []) => {
+  () => [props.areaId, props.areaList.length, props.modelValue.length],
+  ([selectedId, listLength, modelLength], [prevSelectedId, prevListLength] = []) => {
     if (!listLength) return;
-    // 新建/未设置区域时，默认选中第一个区域
-    if (!selectedId) {
-      const first = props.areaList[0]?.resource_id;
-      if (first) {
-        emit('update:areaId', first);
-        applyAreaFromList(first);
+    const modelEmpty = !modelLength || props.modelValue.every(isZeroPoint);
+    // 区域列表刚加载完成、或当前点列表为空/全 0 时，必须回填坐标
+    if (modelEmpty || (selectedId && (!prevListLength || prevListLength === 0))) {
+      const id = selectedId || props.areaList[0]?.resource_id || '';
+      if (id) {
+        emit('update:areaId', id);
+        applyAreaFromList(id);
       }
       return;
     }
+    // 仅当切换区域时才触发回填，避免每次 props 更新都覆盖用户手动输入
     if (selectedId && selectedId !== prevSelectedId) {
       applyAreaFromList(selectedId);
     }
@@ -105,7 +129,7 @@ function removePoint(idx) {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.2rem;
 }
 
 .apd-field > span:first-child {
@@ -122,31 +146,61 @@ function removePoint(idx) {
   font-size: 0.82rem;
 }
 
-.apd-section-title {
-  font-size: 0.78rem;
-  color: rgba(0, 222, 200, 0.8);
+.ae-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-top: 0.3rem;
 }
 
-.apd-route-table-head {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
-  gap: 0.3rem;
-  font-size: 0.72rem;
-  color: rgba(226, 246, 248, 0.65);
-  padding: 0.25rem 0;
-  border-bottom: 1px solid rgba(0, 222, 200, 0.12);
+.apd-section-title {
+  font-size: 0.78rem;
+  color: rgba(0, 222, 200, 0.8);
 }
 
-.apd-route-table-row {
+.ae-count {
+  font-size: 0.7rem;
+  color: rgba(226, 246, 248, 0.5);
+}
+
+.ae-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 222, 200, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ae-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
+  grid-template-columns: 1.6rem 1fr 1fr 0.8fr 1.6rem;
   gap: 0.3rem;
   align-items: center;
-  padding: 0.2rem 0;
+  padding: 0.25rem 0.4rem;
 }
 
-.apd-route-table-row input {
+.ae-row + .ae-row {
+  border-top: 1px solid rgba(0, 222, 200, 0.08);
+}
+
+.ae-row-head {
+  background: rgba(0, 222, 200, 0.06);
+  font-size: 0.7rem;
+  color: rgba(226, 246, 248, 0.6);
+}
+
+.ae-row-head span {
+  padding: 0.1rem 0;
+}
+
+.ae-idx {
+  text-align: center;
+  font-size: 0.72rem;
+  color: rgba(226, 246, 248, 0.55);
+}
+
+.ae-row input {
+  min-width: 0;
   width: 100%;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(0, 222, 200, 0.2);
@@ -156,12 +210,46 @@ function removePoint(idx) {
   font-size: 0.75rem;
 }
 
+.ae-row input:focus {
+  outline: none;
+  border-color: rgba(0, 222, 200, 0.55);
+}
+
+.ae-del {
+  width: 1.4rem;
+  height: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.18);
+  color: #ffd9d9;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ae-del:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.4);
+}
+
+.ae-del:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.ae-add {
+  align-self: flex-start;
+}
+
 .as-btn {
   background: rgba(0, 222, 200, 0.12);
   border: 1px solid rgba(0, 222, 200, 0.25);
   border-radius: 5px;
   color: #f1feff;
-  padding: 0.2rem 0.5rem;
+  padding: 0.25rem 0.6rem;
   font-size: 0.75rem;
   cursor: pointer;
 }
@@ -169,15 +257,5 @@ function removePoint(idx) {
 .as-btn.primary {
   background: rgba(0, 222, 200, 0.75);
   color: #001016;
-}
-
-.as-btn.danger {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: rgba(239, 68, 68, 0.45);
-}
-
-.as-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 </style>

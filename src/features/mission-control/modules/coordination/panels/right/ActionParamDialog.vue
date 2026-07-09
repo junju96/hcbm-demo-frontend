@@ -51,7 +51,7 @@
               <input v-model.number="editedParam.limited_speed" type="number" min="0" max="80" />
             </label>
             <label class="apd-field">
-              <span>模式</span>
+              <span>安全模式</span>
               <div class="apd-radio-row">
                 <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="0" /><span>避障</span></label>
                 <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="1" /><span>突击</span></label>
@@ -76,7 +76,7 @@
             <label class="apd-field compact"><span>安全距离 (m)</span><input v-model.number="editedParam.distance" type="number" /></label>
             <label class="apd-field compact"><span>限速 (km/h)</span><input v-model.number="editedParam.limited_speed" type="number" /></label>
             <label class="apd-field">
-              <span>模式</span>
+              <span>安全模式</span>
               <div class="apd-radio-row">
                 <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="0" /><span>避障</span></label>
                 <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="1" /><span>突击</span></label>
@@ -141,7 +141,7 @@
               </select>
             </label>
             <label class="apd-field">
-              <span>模式</span>
+              <span>安全模式</span>
               <div class="apd-radio-row">
                 <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="0" /><span>避障</span></label>
                 <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="1" /><span>突击</span></label>
@@ -173,6 +173,9 @@
             <label class="apd-field compact"><span>航向 (×100)</span><input v-model.number="editedParam.pose[0]" type="number" /></label>
             <label class="apd-field compact"><span>俯仰 (×100)</span><input v-model.number="editedParam.pose[1]" type="number" /></label>
             <label class="apd-field compact"><span>倾斜 (×100)</span><input v-model.number="editedParam.pose[2]" type="number" /></label>
+            <label class="apd-field compact"><span>航向偏差 (×100)</span><input v-model.number="editedParam.pose_deviation[0]" type="number" /></label>
+            <label class="apd-field compact"><span>俯仰偏差 (×100)</span><input v-model.number="editedParam.pose_deviation[1]" type="number" /></label>
+            <label class="apd-field compact"><span>倾斜偏差 (×100)</span><input v-model.number="editedParam.pose_deviation[2]" type="number" /></label>
             <label class="apd-field compact"><span>限速 (km/h)</span><input v-model.number="editedParam.limited_speed" type="number" /></label>
           </div>
         </template>
@@ -266,29 +269,8 @@
             <label class="apd-field"><span>任务时间 (s)</span><input v-model.number="editedParam.time" type="number" /></label>
           </div>
           <div class="apd-section">
-            <div class="apd-section-title">区域选择</div>
-            <label class="apd-field">
-              <span>区域</span>
-              <select v-model="editedParam.area_id" @change="onAreaChange">
-                <option value="">-- 请选择区域 --</option>
-                <option v-for="area in areaList" :key="area.resource_id" :value="area.resource_id">
-                  {{ area.title || area.resource_id }}
-                </option>
-              </select>
-            </label>
-            <div class="apd-section-title sub">区域点列表</div>
-            <div class="apd-route-table-head">
-              <span>经度</span>
-              <span>纬度</span>
-              <span>高度</span>
-            </div>
-            <div v-for="(pt, idx) in editedParam.area" :key="idx" class="apd-route-table-row">
-              <input v-model.number="pt.lon" type="number" step="0.000001" />
-              <input v-model.number="pt.lat" type="number" step="0.000001" />
-              <input v-model.number="pt.alt" type="number" step="0.1" />
-              <button class="as-btn mini danger" type="button" :disabled="editedParam.area.length <= 1" @click="removePoint('area', idx)">删除</button>
-            </div>
-            <button class="as-btn mini primary" type="button" @click="addPoint('area')">+ 添加区域点</button>
+            <div class="apd-section-title">侦察区域</div>
+            <AreaEditor v-model="editedParam.area" :area-list="areaList" v-model:area-id="editedParam.area_id" />
           </div>
           <div v-if="editedParam.mode === 4" class="apd-section">
             <div class="apd-section-title">定向探测参数</div>
@@ -369,7 +351,7 @@
           </template>
         </template>
 
-        <!-- 11. 打击类（40mm / 机枪 / 红箭13 / 火箭弹 / 巡飞弹） -->
+        <!-- 11. 打击类（40mm / 红箭13 / 火箭弹 / 巡飞弹） -->
         <template v-else-if="isTargetListStrike">
           <div class="apd-section">
             <div class="apd-section-title">
@@ -402,16 +384,70 @@
               </select>
               <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removeTarget(idx)">删除</button>
             </div>
-            <label v-if="normalizedActionType === 'rocket-launch'" class="apd-field compact">
-              <span>打击类型</span>
-              <select v-model.number="editedParam.type">
-                <option :value="1">单点/多点打击</option>
-                <option :value="2">区域打击</option>
+            <label class="apd-field compact"><span>任务时间 (s)</span><input v-model.number="editedParam.time" type="number" /></label>
+            <label class="apd-check">
+              <input v-model.number="editedParam.sort" type="checkbox" :true-value="1" :false-value="0" />
+              <span>按顺序打击</span>
+            </label>
+          </div>
+        </template>
+
+        <!-- 11.5 机枪打击（简化版） -->
+        <template v-else-if="normalizedActionType === 'gun-shot' || normalizedActionType === '7.62mm-gun-shot'">
+          <div class="apd-section">
+            <div class="apd-section-title">
+              打击参数
+              <div class="apd-btn-group">
+                <button class="as-btn mini primary" type="button" @click="addGunShotPoint">+</button>
+                <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removeTarget(editedParam.points.length - 1)">-</button>
+              </div>
+            </div>
+            <div class="apd-target-table-head">
+              <span>目标</span>
+              <span>经度</span>
+              <span>纬度</span>
+              <span>高程</span>
+              <span>类型</span>
+              <span></span>
+            </div>
+            <div v-for="(t, idx) in editedParam.points" :key="idx" class="apd-target-table-row">
+              <select v-model="t.target_ref" @change="onTargetRefChange(idx)">
+                <option value="">-- 选择目标 --</option>
+                <option v-for="target in targetList" :key="target.resource_id" :value="target.resource_id">
+                  {{ target.title || target.resource_name || target.resource_id }}
+                </option>
               </select>
+              <input
+                :value="formatCoord(t.lon, 6)"
+                type="text"
+                inputmode="decimal"
+                placeholder="经度"
+                @blur="t.lon = parseCoordInput($event.target.value, 6)"
+              />
+              <input
+                :value="formatCoord(t.lat, 6)"
+                type="text"
+                inputmode="decimal"
+                placeholder="纬度"
+                @blur="t.lat = parseCoordInput($event.target.value, 6)"
+              />
+              <input
+                :value="formatCoord(t.alt, 1)"
+                type="text"
+                inputmode="decimal"
+                placeholder="高程"
+                @blur="t.alt = parseCoordInput($event.target.value, 1)"
+              />
+              <select v-model.number="t.tart">
+                <option v-for="(label, val) in targetTypeOptions" :key="val" :value="Number(val)">{{ label }}</option>
+              </select>
+              <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removeTarget(idx)">删除</button>
+            </div>
+            <label class="apd-check">
+              <input v-model.number="editedParam.sort" type="checkbox" :true-value="1" :false-value="0" />
+              <span>按顺序打击</span>
             </label>
             <label class="apd-field compact"><span>任务时间 (s)</span><input v-model.number="editedParam.time" type="number" /></label>
-            <label class="apd-field compact"><span>排序</span><input v-model.number="editedParam.sort" type="number" /></label>
-            <label class="apd-field compact"><span>目标数量</span><input v-model.number="editedParam.num" type="number" /></label>
           </div>
         </template>
 
@@ -489,7 +525,7 @@
           <div class="apd-section">
             <div class="apd-section-title">侦察/干扰参数</div>
             <label class="apd-field">
-              <span>模式</span>
+              <span>探测模式</span>
               <select v-model.number="editedParam.mode">
                 <option :value="1">单点探测</option>
                 <option :value="3">四点区域探测</option>
@@ -589,9 +625,9 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
-import { fetchResourcePoolByType } from '../../api/coordinationApi';
+import { fetchFusionedTargets } from '../../api/coordinationApi';
 import AreaEditor from './AreaEditor.vue';
-import { normalizeActionParam } from './actionParamNormalizer';
+import { normalizeActionParam, serializeActionParam } from './actionParamNormalizer';
 
 const props = defineProps({
   action: { type: Object, default: null },
@@ -599,19 +635,116 @@ const props = defineProps({
   vehicleType: { type: String, default: '' },
 });
 
-const emit = defineEmits(['close', 'save']);
+const emit = defineEmits(['close', 'save', 'cancel']);
 
 const editedParam = ref({});
-const routeList = ref([]);
-const loadingRoutes = ref(false);
-const targetList = ref([]);
-const loadingTargets = ref(false);
-const areaList = ref([]);
-const loadingAreas = ref(false);
+const fusionedTargets = ref([]);
+const loadingFusioned = ref(false);
+
+const STANDARD_ACTION_TYPES = new Set([
+  'auto-move', 'follow-move', 'silent-guard', 'set-return-point', 'return-to-base',
+  'formation-move', 'manual-task', 'pose-adjust', 'air-recon', 'lens-recon',
+  'search-and-shoot', 'recon-strike', '40mm-gun-launch', 'at-missile-launch',
+  'gun-shot', '7.62mm-gun-shot', 'rocket-launch', 'loitering-munition-launch',
+  'laser-illumination', 'sound-expel', 'acoustic-deterrence', 'light-expel',
+  'light-deterrence', 'em-recon', 'electronic-recon', 'em-interference',
+  'electronic-jamming', 'payload-silent',
+]);
+
+function inferActionTypeFromId(actionId) {
+  if (!actionId) return '';
+  const aid = String(actionId).toLowerCase().replace(/_/g, '-');
+  const semanticMatch = aid.match(/^action:([a-z0-9.\-]+):/);
+  if (semanticMatch) {
+    const mapping = {
+      'auto-move': 'auto-move', 'follow-move': 'follow-move', 'silent-guard': 'silent-guard',
+      'set-return-point': 'set-return-point', 'return-to-base': 'return-to-base',
+      'formation-move': 'formation-move', 'manual-task': 'manual-task', 'pose-adjust': 'pose-adjust',
+      'air-recon': 'air-recon', 'lens-recon': 'lens-recon', 'search-and-shoot': 'search-and-shoot',
+      'recon-strike': 'search-and-shoot', '40mm-gun-launch': '40mm-gun-launch',
+      'at-missile-launch': 'at-missile-launch', 'gun-shot': '7.62mm-gun-shot',
+      '7.62mm-gun-shot': '7.62mm-gun-shot', 'rocket-launch': 'rocket-launch',
+      'loitering-munition-launch': 'loitering-munition-launch', 'laser-illumination': 'laser-illumination',
+      'sound-expel': 'sound-expel', 'acoustic-deterrence': 'sound-expel', 'light-expel': 'light-expel',
+      'light-deterrence': 'light-expel', 'em-recon': 'em-recon', 'electronic-recon': 'em-recon',
+      'em-interference': 'em-interference', 'electronic-jamming': 'em-interference', 'payload-silent': 'payload-silent',
+    };
+    if (semanticMatch[1] in mapping) return mapping[semanticMatch[1]];
+  }
+  const projectMapping = {
+    'ch-move': 'auto-move', 'ch-follow': 'follow-move', 'ch-silent': 'silent-guard',
+    'ch-set-return': 'set-return-point', 'ch-return': 'return-to-base', 'ch-formation': 'formation-move',
+    'ch-manual': 'manual-task', 'ch-pose': 'pose-adjust',
+    'fs-lens': 'lens-recon', 'fs-recon-strike': 'search-and-shoot', 'fs-gun': '7.62mm-gun-shot',
+    'fs-rocket': 'rocket-launch', 'fs-loiter': 'loitering-munition-launch',
+    'rs-lens': 'lens-recon', 'rs-recon-strike': 'search-and-shoot', 'rs-40mm': '40mm-gun-launch',
+    'rs-at': 'at-missile-launch', 'rs-gun': '7.62mm-gun-shot', 'rs-laser': 'laser-illumination',
+    'pt-lens': 'lens-recon', 'pt-recon-strike': 'search-and-shoot', 'pt-gun': '7.62mm-gun-shot',
+    'pt-acoustic': 'sound-expel', 'pt-light': 'light-expel',
+    'ag-air-recon': 'air-recon', 'el-recon': 'em-recon', 'el-jam': 'em-interference', 'el-silent': 'payload-silent',
+  };
+  if (aid in projectMapping) return projectMapping[aid];
+  return '';
+}
+
+function inferActionTypeFromName(name) {
+  if (!name) return '';
+  const map = {
+    '自主机动': 'auto-move', '跟随机动': 'follow-move', '静默值守': 'silent-guard',
+    '设置返航点': 'set-return-point', '开启返航': 'return-to-base', '编队机动': 'formation-move',
+    '人工任务': 'manual-task', '姿态调整': 'pose-adjust', '空中侦察': 'air-recon',
+    '光电侦察': 'lens-recon', '侦察打击': 'search-and-shoot', '巡逻车侦察打击': 'search-and-shoot',
+    '机枪打击': '7.62mm-gun-shot', '火箭弹打击': 'rocket-launch', '巡飞弹打击': 'loitering-munition-launch',
+    '40炮打击': '40mm-gun-launch', '红箭13导弹打击': 'at-missile-launch', '激光照射': 'laser-illumination',
+    '强声拒止': 'sound-expel', '强光拒止': 'light-expel', '电磁侦察': 'em-recon', '电磁干扰': 'em-interference',
+    '载荷静默': 'payload-silent',
+  };
+  if (name in map) return map[name];
+  const compact = name.toLowerCase().replace(/[-_.\s]/g, '');
+  const enMap = {
+    'automove': 'auto-move', 'followmove': 'follow-move', 'silentguard': 'silent-guard',
+    'setreturnpoint': 'set-return-point', 'setreturn': 'set-return-point', 'returntobase': 'return-to-base',
+    'return': 'return-to-base', 'formationmove': 'formation-move', 'manualtask': 'manual-task',
+    'manual': 'manual-task', 'poseadjust': 'pose-adjust', 'airrecon': 'air-recon',
+    'lensrecon': 'lens-recon', 'searchandshoot': 'search-and-shoot', 'reconstrike': 'search-and-shoot',
+    '40mmgunlaunch': '40mm-gun-launch', '40mmgun': '40mm-gun-launch', 'atmissilelaunch': 'at-missile-launch',
+    'atmissile': 'at-missile-launch', 'gunshot': '7.62mm-gun-shot', '762mmgunshot': '7.62mm-gun-shot',
+    '762mmgun': '7.62mm-gun-shot', 'rocketlaunch': 'rocket-launch', 'loiteringmunitionlaunch': 'loitering-munition-launch',
+    'loiteringmunition': 'loitering-munition-launch', 'laserillumination': 'laser-illumination',
+    'laser': 'laser-illumination', 'soundexpel': 'sound-expel', 'acousticdeterrence': 'sound-expel',
+    'lightexpel': 'light-expel', 'lightdeterrence': 'light-expel', 'emrecon': 'em-recon',
+    'electronicrecon': 'em-recon', 'eminterference': 'em-interference', 'electronicjamming': 'em-interference',
+    'payloadsilent': 'payload-silent',
+  };
+  return enMap[compact] || '';
+}
+
+const routeList = computed(() =>
+  fusionedTargets.value.filter((t) => ['line', 'route'].includes(t.target_shape) && t.points.length > 0)
+);
+const areaList = computed(() =>
+  fusionedTargets.value.filter((t) => t.target_shape === 'region' && t.points.length > 0)
+);
+const targetList = computed(() =>
+  fusionedTargets.value.filter((t) => t.target_shape === 'point' && t.points.length > 0)
+);
+const loadingRoutes = computed(() => loadingFusioned.value);
+const loadingAreas = computed(() => loadingFusioned.value);
+const loadingTargets = computed(() => loadingFusioned.value);
 
 const normalizedActionType = computed(() => {
   // 兼容下划线格式（如 SEARCH_AND_SHOOT、AUTO_MOVE）与中划线格式（如 search-and-shoot）
   const raw = String(props.action?.action_type || '').toLowerCase().replace(/_/g, '-');
+  if (STANDARD_ACTION_TYPES.has(raw)) {
+    console.log('[ActionParamDialog] standard action_type:', props.action?.action_type, 'normalized:', raw);
+    return raw;
+  }
+  // action_type 被脏数据污染（如 FS_LENS / Return-To-Base）时，按 action_id / name 推断
+  const inferred = inferActionTypeFromId(props.action?.action_id) || inferActionTypeFromName(props.action?.name);
+  if (inferred) {
+    console.log('[ActionParamDialog] inferred action_type from id/name:', inferred, 'original:', props.action?.action_type);
+    return inferred;
+  }
   console.log('[ActionParamDialog] raw action_type:', props.action?.action_type, 'normalized:', raw);
   return raw;
 });
@@ -670,7 +803,7 @@ const vehicleName = computed(() =>
 );
 
 const isTargetListStrike = computed(() =>
-  ['40mm-gun-launch', 'gun-shot', '7.62mm-gun-shot', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch']
+  ['40mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch']
     .includes(normalizedActionType.value)
 );
 
@@ -684,6 +817,7 @@ const isElectronic = computed(() =>
 
 const showCommonParams = computed(() =>
   ['auto-move', 'follow-move', 'silent-guard', 'formation-move', 'manual-task', 'pose-adjust',
+   'set-return-point', 'return-to-base',
    'lens-recon', 'recon-strike', 'search-and-shoot', '40mm-gun-launch', 'gun-shot', '7.62mm-gun-shot',
    'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'laser-illumination',
    'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence',
@@ -721,36 +855,15 @@ function cloneParam(param) {
 }
 
 function defaultPoint() {
-  return { lon: 116.13, lat: 39.766, alt: 55, radius: -1, type: 1 };
+  return { lon: 0, lat: 0, alt: 0, radius: -1, type: 1 };
 }
 
 function defaultAreaPoint() {
-  return { lon: 116.13, lat: 39.766, alt: 55 };
-}
-
-function defaultStrikePoint() {
-  return { lon: 116.407, lat: 39.904, alt: 35, tart: 6, attr: 1, thr: 80, dam: 1, blk: 2, figt: 2, sug: 3, target_ref: '' };
+  return { lon: 0, lat: 0, alt: 0 };
 }
 
 function defaultDirect() {
   return { type: 1, cent: 9000, sear: 6000, up: 3000, down: -1000, dist: 2000, sens: 0 };
-}
-
-function defaultAirReconPoint() {
-  return {
-    lon: 116.13,
-    lat: 39.766,
-    alt: 100,
-    type: 0,
-    speed: 150,
-    camera: 2,
-    gimpitch: 36100,
-    gimyaw: 36100,
-    action: 1,
-    playaw: 36100,
-    zoom: 10,
-    loiter: 0,
-  };
 }
 
 function ensureShape() {
@@ -794,48 +907,39 @@ watch(targetList, (list) => {
 });
 
 onMounted(() => {
-  loadRoutes();
-  loadTargets();
-  loadAreas();
+  loadFusionedTargets();
 });
 
+async function loadFusionedTargets() {
+  loadingFusioned.value = true;
+  try {
+    const result = await fetchFusionedTargets(200);
+    if (result.ok) {
+      fusionedTargets.value = result.data?.items || [];
+    }
+  } finally {
+    loadingFusioned.value = false;
+  }
+}
+
+// 保留空壳函数以兼容模板中可能存在的引用（已无实际调用）
 async function loadRoutes() {
-  loadingRoutes.value = true;
-  try {
-    const result = await fetchResourcePoolByType('ROUTE', 50);
-    if (result.ok) routeList.value = result.data?.items || [];
-  } finally {
-    loadingRoutes.value = false;
-  }
+  await loadFusionedTargets();
 }
-
 async function loadAreas() {
-  loadingAreas.value = true;
-  try {
-    const result = await fetchResourcePoolByType('AREA', 50);
-    if (result.ok) areaList.value = result.data?.items || [];
-  } finally {
-    loadingAreas.value = false;
-  }
+  await loadFusionedTargets();
 }
-
 async function loadTargets() {
-  loadingTargets.value = true;
-  try {
-    const result = await fetchResourcePoolByType('TARGET', 50);
-    if (result.ok) targetList.value = result.data?.items || [];
-  } finally {
-    loadingTargets.value = false;
-  }
+  await loadFusionedTargets();
 }
 
 function onRouteChange() {
   const route = routeList.value.find((r) => r.resource_id === editedParam.value.route_id);
   if (route && Array.isArray(route.points)) {
     editedParam.value.points = route.points.map((pt) => ({
-      lon: pt?.lon ?? pt?.longitude ?? 0,
-      lat: pt?.lat ?? pt?.latitude ?? 0,
-      alt: pt?.alt ?? pt?.altitude ?? 0,
+      lon: pt?.lon ?? 0,
+      lat: pt?.lat ?? 0,
+      alt: pt?.alt ?? 0,
       radius: pt?.radius ?? -1,
       type: pt?.type ?? 1,
     }));
@@ -850,6 +954,7 @@ function initFromRouteSelection() {
 
   // 如果 action 自身已经保存了路径点数据，优先使用 action 的数据，
   // 不要用路线资源的 points 覆盖用户手动编辑过的路径点。
+  // 例外：若当前 points 全为默认 0，说明尚未真正设置，仍应从路线资源回填。
   if (Array.isArray(editedParam.value.points) && editedParam.value.points.length > 0) {
     // 仅当 route_id 为空时，尝试根据现有 points 匹配路线资源（最佳努力）
     if (!editedParam.value.route_id) {
@@ -863,6 +968,22 @@ function initFromRouteSelection() {
       );
       editedParam.value.route_id = matched?.resource_id || '';
     }
+
+    const selectedRoute = routeList.value.find((r) => r.resource_id === editedParam.value.route_id);
+    if (selectedRoute && Array.isArray(selectedRoute.points) && selectedRoute.points.length > 0) {
+      const isDefault = editedParam.value.points.every(
+        (pt) => pt && Number(pt.lon) === 0 && Number(pt.lat) === 0
+      );
+      const same = !isDefault &&
+        selectedRoute.points.length === editedParam.value.points.length &&
+        selectedRoute.points.every((pt, idx) => {
+          const saved = editedParam.value.points[idx];
+          return saved && pt.lon === saved.lon && pt.lat === saved.lat;
+        });
+      if (!same) {
+        onRouteChange();
+      }
+    }
     return;
   }
 
@@ -875,11 +996,11 @@ function initFromRouteSelection() {
 
 function applyAreaFromList() {
   const area = areaList.value.find((a) => a.resource_id === editedParam.value.area_id);
-  if (area && Array.isArray(area.polygon)) {
-    editedParam.value.area = area.polygon.map((pt) => ({
-      lon: pt?.lon ?? pt?.longitude ?? 0,
-      lat: pt?.lat ?? pt?.latitude ?? 0,
-      alt: pt?.alt ?? pt?.altitude ?? 0,
+  if (area && Array.isArray(area.points)) {
+    editedParam.value.area = area.points.map((pt) => ({
+      lon: pt?.lon ?? 0,
+      lat: pt?.lat ?? 0,
+      alt: pt?.alt ?? 0,
     }));
   }
 }
@@ -891,24 +1012,43 @@ function onAreaChange() {
 function initFromAreaSelection() {
   // 只有需要区域参数的元任务才从区域资源初始化 area
   const type = normalizedActionType.value;
-  const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'air-recon', 'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming', 'payload-silent'];
+  const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
   if (!needsArea.includes(type)) return;
   if (!areaList.value.length) return;
 
   // 如果 action 自身已经保存了区域点数据，优先使用 action 的数据，
-  // 不要用区域资源的 polygon 覆盖用户手动编辑过的区域点。
+  // 不要用区域资源的 points 覆盖用户手动编辑过的区域点。
+  // 例外：若当前 area 全为默认 0，说明尚未真正设置，仍应从区域资源回填。
   if (Array.isArray(editedParam.value.area) && editedParam.value.area.length > 0) {
     // 仅当 area_id 为空时，尝试根据当前 area 点匹配区域资源（最佳努力）
     if (!editedParam.value.area_id) {
       const matched = areaList.value.find((a) =>
-        Array.isArray(a.polygon) &&
-        a.polygon.length === editedParam.value.area.length &&
-        a.polygon.every((pt, idx) => {
+        Array.isArray(a.points) &&
+        a.points.length === editedParam.value.area.length &&
+        a.points.every((pt, idx) => {
           const saved = editedParam.value.area[idx];
           return saved && pt.lon === saved.lon && pt.lat === saved.lat;
         })
       );
       editedParam.value.area_id = matched?.resource_id || areaList.value[0]?.resource_id || '';
+    }
+
+    const selectedArea = areaList.value.find((a) => a.resource_id === editedParam.value.area_id);
+    if (selectedArea && Array.isArray(selectedArea.points) && selectedArea.points.length > 0) {
+      const isDefault = editedParam.value.area.every(
+        (pt) => pt && Number(pt.lon) === 0 && Number(pt.lat) === 0 && Number(pt.alt) === 0
+      );
+      // 区域资源真实点数与当前点数不同，或坐标不一致，或当前全为默认值时，
+      // 按区域资源重新回填，解决打开弹窗时区域点未加载/数量缺失的问题。
+      const sameCount = selectedArea.points.length === editedParam.value.area.length;
+      const sameCoords = sameCount &&
+        selectedArea.points.every((pt, idx) => {
+          const saved = editedParam.value.area[idx];
+          return saved && pt.lon === saved.lon && pt.lat === saved.lat && pt.alt === saved.alt;
+        });
+      if (isDefault || !sameCount || !sameCoords) {
+        applyAreaFromList();
+      }
     }
     return;
   }
@@ -935,13 +1075,38 @@ function initFromTargetSelection() {
     if (hasUserCoord) return;
 
     const target = targetList.value.find((item) => item.resource_id === pt.target_ref);
-    if (target) {
-      const loc = target.location || {};
-      pt.lon = Number(loc.longitude ?? loc.lon ?? 0);
-      pt.lat = Number(loc.latitude ?? loc.lat ?? 0);
-      pt.alt = Number(loc.altitude ?? loc.alt ?? 0);
+    if (target && target.points[0]) {
+      const loc = target.points[0];
+      pt.lon = Number(loc.lon ?? 0);
+      pt.lat = Number(loc.lat ?? 0);
+      pt.alt = Number(loc.alt ?? 0);
     }
   });
+}
+
+function defaultStrikePoint() {
+  return { lon: 0, lat: 0, alt: 0, tart: 0, attr: 0, thr: 0, dam: 0, blk: 0, figt: 0, sug: 0, target_ref: '' };
+}
+
+function defaultGunShotPoint() {
+  return { lon: 0, lat: 0, alt: 0, tart: 0, target_ref: '' };
+}
+
+function defaultAirReconPoint() {
+  return {
+    lon: 0,
+    lat: 0,
+    alt: 0,
+    type: 0,
+    speed: 0,
+    camera: 1,
+    gimpitch: 36100,
+    gimyaw: 36100,
+    action: 1,
+    playaw: 36100,
+    zoom: 0,
+    loiter: 0,
+  };
 }
 
 function addPoint(field) {
@@ -957,18 +1122,35 @@ function addTarget() {
   editedParam.value.points.push(defaultStrikePoint());
 }
 
+function addGunShotPoint() {
+  editedParam.value.points.push(defaultGunShotPoint());
+}
+
 function removeTarget(idx) {
   if (editedParam.value.points.length > 1) editedParam.value.points.splice(idx, 1);
+}
+
+function formatCoord(value, digits = 6) {
+  if (value === '' || value === null || value === undefined) return '';
+  const n = Number(value);
+  if (Number.isNaN(n)) return '';
+  return n.toFixed(digits);
+}
+
+function parseCoordInput(value, digits = 6) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return value;
+  return Number(n.toFixed(digits));
 }
 
 function onTargetRefChange(idx) {
   const t = editedParam.value.points[idx];
   const target = targetList.value.find((item) => item.resource_id === t.target_ref);
-  if (target) {
-    const loc = target.location || {};
-    t.lon = Number(loc.longitude ?? loc.lon ?? 0);
-    t.lat = Number(loc.latitude ?? loc.lat ?? 0);
-    t.alt = Number(loc.altitude ?? loc.alt ?? 0);
+  if (target && target.points[0]) {
+    const loc = target.points[0];
+    t.lon = Number(loc.lon ?? 0);
+    t.lat = Number(loc.lat ?? 0);
+    t.alt = Number(loc.alt ?? 0);
   }
 }
 
@@ -981,16 +1163,146 @@ function removeFreq(idx) {
 }
 
 function onClose() {
-  emit('close');
+  // 取消时如果已经自动回填过数据，把回填后的参数回传，避免用户只打开看了一眼就下发导致为空
+  if (hasAutoFilled.value) {
+    finalizeParam();
+    const cleaned = JSON.parse(JSON.stringify(editedParam.value));
+    if (Array.isArray(cleaned.points)) {
+      cleaned.points = cleaned.points.map(({ target_ref, ...rest }) => rest);
+    }
+    const serialized = serializeActionParam(cleaned);
+    emit('cancel', serialized);
+  } else {
+    emit('close');
+  }
+}
+
+const hasAutoFilled = ref(false);
+
+function isZeroPoint(pt) {
+  if (!pt || typeof pt !== 'object') return true;
+  const lon = Number(pt.lon ?? pt.longitude ?? 0);
+  const lat = Number(pt.lat ?? pt.latitude ?? 0);
+  return lon === 0 && lat === 0;
+}
+
+function isAllZeroPoints(list) {
+  return Array.isArray(list) && list.length > 0 && list.every((pt) => isZeroPoint(pt));
+}
+
+function fillAreaFromSelection() {
+  if (!areaList.value.length) return;
+  const id = editedParam.value.area_id || areaList.value[0]?.resource_id || '';
+  if (!id) return;
+  editedParam.value.area_id = id;
+  const area = areaList.value.find((a) => a.resource_id === id);
+  if (area && Array.isArray(area.points) && area.points.length > 0) {
+    editedParam.value.area = area.points.map((pt) => ({
+      lon: Number(pt?.lon ?? pt?.longitude ?? 0),
+      lat: Number(pt?.lat ?? pt?.latitude ?? 0),
+      alt: Number(pt?.alt ?? pt?.altitude ?? 0),
+    }));
+    hasAutoFilled.value = true;
+  }
+}
+
+function fillRouteFromSelection() {
+  if (!routeList.value.length) return;
+  const id = editedParam.value.route_id || routeList.value[0]?.resource_id || '';
+  if (!id) return;
+  editedParam.value.route_id = id;
+  const route = routeList.value.find((r) => r.resource_id === id);
+  if (route && Array.isArray(route.points) && route.points.length > 0) {
+    editedParam.value.points = route.points.map((pt) => ({
+      lon: Number(pt?.lon ?? pt?.longitude ?? 0),
+      lat: Number(pt?.lat ?? pt?.latitude ?? 0),
+      alt: Number(pt?.alt ?? pt?.altitude ?? 0),
+      radius: Number(pt?.radius ?? -1),
+      type: Number(pt?.type ?? 1),
+    }));
+    hasAutoFilled.value = true;
+  }
+}
+
+function fillStrikeTargets() {
+  if (!targetList.value.length || !Array.isArray(editedParam.value.points)) return;
+  editedParam.value.points.forEach((pt) => {
+    if (!pt) return;
+    if (!pt.target_ref) {
+      pt.target_ref = targetList.value[0]?.resource_id || '';
+    }
+    if (!pt.target_ref) return;
+    if (Number(pt.lon) !== 0 || Number(pt.lat) !== 0) return;
+    const target = targetList.value.find((item) => item.resource_id === pt.target_ref);
+    if (target && target.points && target.points[0]) {
+      const loc = target.points[0];
+      pt.lon = Number(loc.lon ?? 0);
+      pt.lat = Number(loc.lat ?? 0);
+      pt.alt = Number(loc.alt ?? 0);
+      hasAutoFilled.value = true;
+    }
+  });
+}
+
+function finalizeParam() {
+  // 保存前兜底：只要列表数据为空或全 0，就从已选资源回填，
+  // 避免异步加载/竞争导致编辑态有值但实际保存的是默认值 0。
+  const type = normalizedActionType.value;
+  const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
+  if (needsArea.includes(type)) {
+    if (!Array.isArray(editedParam.value.area) || editedParam.value.area.length === 0 || isAllZeroPoints(editedParam.value.area)) {
+      fillAreaFromSelection();
+    }
+  }
+  if (['auto-move', 'formation-move'].includes(type)) {
+    if (!Array.isArray(editedParam.value.points) || editedParam.value.points.length === 0 || isAllZeroPoints(editedParam.value.points)) {
+      fillRouteFromSelection();
+    }
+  }
+  if (['40mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'].includes(type)) {
+    fillStrikeTargets();
+    if (Array.isArray(editedParam.value.points)) {
+      editedParam.value.num = editedParam.value.points.length;
+    }
+  }
+  // 空中侦察：points1/2/3 兜底回填
+  if (type === 'air-recon') {
+    ['points1', 'points2', 'points3'].forEach((field) => {
+      const list = editedParam.value[field];
+      if (!Array.isArray(list) || list.length === 0 || isAllZeroPoints(list)) {
+        const first = areaList.value[0];
+        if (first && Array.isArray(first.points) && first.points.length > 0) {
+          editedParam.value[field] = first.points.map((pt) => ({
+            lon: Number(pt?.lon ?? pt?.longitude ?? 0),
+            lat: Number(pt?.lat ?? pt?.latitude ?? 0),
+            alt: Number(pt?.alt ?? pt?.altitude ?? 0),
+            type: 0,
+            speed: 0,
+            camera: 1,
+            gimpitch: 36100,
+            gimyaw: 36100,
+            action: 1,
+            playaw: 36100,
+            zoom: 0,
+            loiter: 0,
+          }));
+          hasAutoFilled.value = true;
+        }
+      }
+    });
+  }
 }
 
 function onSave() {
+  finalizeParam();
   const cleaned = JSON.parse(JSON.stringify(editedParam.value));
   // 清理辅助字段：target_ref 仅用于 UI 选择，不下发
   if (Array.isArray(cleaned.points)) {
     cleaned.points = cleaned.points.map(({ target_ref, ...rest }) => rest);
   }
-  emit('save', cleaned);
+  // 保存前把 UI 字符串格式转换为后端协议数字格式（如断连策略）
+  const serialized = serializeActionParam(cleaned);
+  emit('save', serialized);
 }
 </script>
 

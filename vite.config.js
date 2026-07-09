@@ -12,6 +12,11 @@ export default defineConfig({
         target: 'http://25.11.1.178:28001',
         changeOrigin: true,
       },
+      // 态势池接口代理（更具体，需放在 /api 之前）
+      '/api/v1/situation_pool': {
+        target: 'http://25.11.1.178:28802',
+        changeOrigin: true,
+      },
       // API 请求代理，解决开发环境跨域问题
       '/api': {
         target: 'http://localhost:28600',

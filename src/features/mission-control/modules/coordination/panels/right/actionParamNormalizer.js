@@ -10,18 +10,18 @@ function clone(obj) {
 }
 
 function defaultPoint() {
-  return { lon: 116.397128, lat: 39.909231, alt: 435, radius: -1, type: 1 };
+  return { lon: 0, lat: 0, alt: 0, radius: -1, type: 1 };
 }
 
 function defaultAreaPoint() {
-  return { lon: 116.397128, lat: 39.909231, alt: 435 };
+  return { lon: 0, lat: 0, alt: 0 };
 }
 
 function defaultAirReconPoint() {
   return {
-    lon: 116.397128,
-    lat: 39.909231,
-    alt: 435,
+    lon: 0,
+    lat: 0,
+    alt: 0,
     type: 0,
     speed: 0,
     camera: 1,
@@ -36,9 +36,9 @@ function defaultAirReconPoint() {
 
 function defaultStrikePoint() {
   return {
-    lon: 116.397128,
-    lat: 39.909231,
-    alt: 435,
+    lon: 0,
+    lat: 0,
+    alt: 0,
     tart: 0,
     attr: 0,
     thr: 0,
@@ -47,6 +47,15 @@ function defaultStrikePoint() {
     figt: 0,
     sug: 0,
     target_ref: '',
+  };
+}
+
+function defaultGunShotPoint() {
+  return {
+    lon: 0,
+    lat: 0,
+    alt: 0,
+    tart: 0,
   };
 }
 
@@ -83,6 +92,31 @@ function addCommonFields(p) {
   p.mission_duration = p.mission_duration || '00:00:00';
   p.enable_start_time = p.enable_start_time ?? false;
   p.start_time = p.start_time ?? '';
+}
+
+/**
+ * 保存前序列化：把 UI 友好的字符串/布尔值转换为后端协议需要的格式。
+ * 目前主要处理断连策略：UI 用字符串 'continue'/'stop'/'return'，
+ * 协调卡协议要求数字 2/0/1。
+ */
+export function serializeActionParam(param) {
+  const p = clone(param) || {};
+  const strategyMap = { continue: 2, stop: 0, return: 1 };
+  const raw = p.disconnect_strategy;
+  if (typeof raw === 'string' && raw in strategyMap) {
+    p.disconnect_strategy = strategyMap[raw];
+  } else if (typeof raw === 'number' && [0, 1, 2].includes(raw)) {
+    // 已是合法数字，保持原样
+  } else {
+    p.disconnect_strategy = 2;
+  }
+
+  // 确保通用参数字段始终存在，避免后端因字段缺失而使用旧值
+  p.mission_duration = p.mission_duration || '00:00:00';
+  p.enable_start_time = p.enable_start_time ?? false;
+  p.start_time = p.start_time ?? '';
+
+  return p;
 }
 
 function isPatrolVehicle(vehicleType) {
@@ -140,7 +174,7 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     p.time = p.time ?? 300;
     addCommonFields(p);
   } else if (type === 'set-return-point' || type === 'return-to-base') {
-    // 无参数
+    addCommonFields(p);
   } else if (type === 'formation-move') {
     p.points = Array.isArray(p.points) && p.points.length ? p.points : [defaultPoint(), defaultPoint()];
     p.limited_speed = p.limited_speed ?? 20;
@@ -151,8 +185,8 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     p.type = p.type ?? 1;
     addCommonFields(p);
   } else if (type === 'pose-adjust') {
-    p.pose = Array.isArray(p.pose) ? p.pose : [9000, 0, 0];
-    p.pose_deviation = Array.isArray(p.pose_deviation) ? p.pose_deviation : [36100, 9100, 9100];
+    p.pose = Array.isArray(p.pose) ? p.pose : [0, 0, 0];
+    p.pose_deviation = Array.isArray(p.pose_deviation) ? p.pose_deviation : [0, 0, 0];
     p.limited_speed = p.limited_speed ?? 10;
     p.safe_mode = p.safe_mode ?? 0;
     addCommonFields(p);
@@ -174,6 +208,7 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     addCommonFields(p);
   } else if (type === 'search-and-shoot' || type === 'recon-strike') {
     p.time = p.time ?? 180;
+    // 侦察打击区域点默认给两个占位点；如果 action 自身已保存区域点则保留原数量
     p.area = Array.isArray(p.area) && p.area.length ? p.area : [defaultAreaPoint(), defaultAreaPoint()];
     p.area_id = p.area_id ?? '';
     if (vt === 'patrol') {
@@ -188,12 +223,18 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
       p.strategy = p.strategy ?? 0;
     }
     addCommonFields(p);
-  } else if (type === 'rocket-launch' || type === 'loitering-munition-launch' || type === '40mm-gun-launch' || type === 'at-missile-launch' || type === 'gun-shot' || type === '7.62mm-gun-shot') {
+  } else if (type === 'rocket-launch' || type === 'loitering-munition-launch' || type === '40mm-gun-launch' || type === 'at-missile-launch') {
     p.points = Array.isArray(p.points) && p.points.length ? p.points.map((pt) => ({ ...pt, target_ref: pt.target_ref || '' })) : [defaultStrikePoint()];
     p.time = p.time ?? 60;
     p.sort = p.sort ?? 0;
-    p.num = p.num ?? p.points.length;
+    p.num = p.points.length;
     if (type === 'rocket-launch') p.type = p.type ?? 1;
+    addCommonFields(p);
+  } else if (type === 'gun-shot' || type === '7.62mm-gun-shot') {
+    p.points = Array.isArray(p.points) && p.points.length ? p.points : [defaultGunShotPoint()];
+    p.time = p.time ?? 60;
+    p.sort = p.sort ?? 0;
+    p.num = p.points.length;
     addCommonFields(p);
   } else if (type === 'laser-illumination') {
     p.time = p.time ?? 120;

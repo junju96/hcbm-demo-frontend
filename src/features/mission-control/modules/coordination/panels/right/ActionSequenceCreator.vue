@@ -161,8 +161,8 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import VehicleIcon from './VehicleIcon.vue';
-import { createOperatorPlan, patchOperatorPlan } from '../../api/coordinationApi.js';
-import { normalizeActionParam } from './actionParamNormalizer';
+import { createOperatorPlan, patchOperatorPlan, patchPlan, fetchFusionedTargets } from '../../api/coordinationApi.js';
+import { normalizeActionParam, serializeActionParam } from './actionParamNormalizer';
 
 const props = defineProps({
   editMode: { type: Boolean, default: false },
@@ -177,6 +177,8 @@ const props = defineProps({
   availableVehicles: { type: Array, default: () => [] },
   // 预选中车辆完整对象（含 vid），用于从“各车行动序列”新建时直接指定具体车辆
   presetVehicle: { type: Object, default: null },
+  // 当前模式：true=操控席，false=协同席；影响保存时调用的 API
+  isControlMode: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -194,6 +196,21 @@ const tempLine = ref(null);
 const draggingNode = ref(null);
 const dragOffset = ref({ x: 0, y: 0 });
 
+// 态势资源：区域/路线/目标，用于保存时自动填充默认坐标
+const fusionedTargets = ref([]);
+const loadingFusioned = ref(false);
+const fusionedLoaded = ref(false);
+
+const areaList = computed(() =>
+  fusionedTargets.value.filter((t) => t.target_shape === 'region' && t.points.length > 0)
+);
+const routeList = computed(() =>
+  fusionedTargets.value.filter((t) => ['line', 'route'].includes(t.target_shape) && t.points.length > 0)
+);
+const targetList = computed(() =>
+  fusionedTargets.value.filter((t) => t.target_shape === 'point' && t.points.length > 0)
+);
+
 // 默认车辆选项（资源池不可达时的兜底）
 const defaultVehicleOptions = [
   { type: 'Fire-Support-UGV', name: '火力车' },
@@ -210,6 +227,9 @@ const vehicleTypeNameMap = {
   'Electronic-UGV': '电磁车',
   'Air-Ground-UAV': '空地车',
 };
+
+// 通用参数字段集合，用于从 param 推断 action_type 时排除
+const COMMON_PARAM_FIELDS = new Set(['disconnect_strategy', 'mission_duration', 'enable_start_time', 'start_time']);
 
 const vehicleOptions = computed(() => {
   if (props.availableVehicles && props.availableVehicles.length > 0) {
@@ -235,6 +255,20 @@ const headerTitle = computed(() => {
   return `新建方案 - ${selectedVehicleName.value}`;
 });
 
+async function loadFusionedTargets() {
+  if (loadingFusioned.value || fusionedLoaded.value) return;
+  loadingFusioned.value = true;
+  try {
+    const result = await fetchFusionedTargets(200);
+    if (result.ok) {
+      fusionedTargets.value = result.data?.items || [];
+      fusionedLoaded.value = true;
+    }
+  } finally {
+    loadingFusioned.value = false;
+  }
+}
+
 const chassisTasks = [
   { actionType: 'Auto-Move', name: '自主机动', defaultParam: { points: [], limited_speed: 20, safe_mode: 0, loop_mode: 0 } },
   { actionType: 'Follow-Move', name: '跟随机动', defaultParam: { x: 960, y: 540, width: 1920, height: 1080, distance: 10, limited_speed: 15, safe_mode: 0, strategy: 0 } },
@@ -249,6 +283,81 @@ const chassisTasks = [
 function inferActionTypeFromId(actionId) {
   if (!actionId) return '';
   const aid = String(actionId).toLowerCase().replace(/_/g, '-');
+  // 针对语义化 action_id（如 action:return-to-base:plan-1017:5）先提取动作类型部分
+  const semanticMatch = aid.match(/^action:([a-z0-9\.\-]+):/);
+  if (semanticMatch) {
+    const semanticType = semanticMatch[1];
+    const mapping = {
+      'auto-move': 'auto-move',
+      'follow-move': 'follow-move',
+      'silent-guard': 'silent-guard',
+      'set-return-point': 'set-return-point',
+      'return-to-base': 'return-to-base',
+      'formation-move': 'formation-move',
+      'manual-task': 'manual-task',
+      'pose-adjust': 'pose-adjust',
+      'air-recon': 'air-recon',
+      'lens-recon': 'lens-recon',
+      'search-and-shoot': 'search-and-shoot',
+      'recon-strike': 'search-and-shoot',
+      '40mm-gun-launch': '40mm-gun-launch',
+      'at-missile-launch': 'at-missile-launch',
+      'gun-shot': '7.62mm-gun-shot',
+      '7.62mm-gun-shot': '7.62mm-gun-shot',
+      'rocket-launch': 'rocket-launch',
+      'loitering-munition-launch': 'loitering-munition-launch',
+      'laser-illumination': 'laser-illumination',
+      'sound-expel': 'sound-expel',
+      'acoustic-deterrence': 'sound-expel',
+      'light-expel': 'light-expel',
+      'light-deterrence': 'light-expel',
+      'em-recon': 'em-recon',
+      'electronic-recon': 'em-recon',
+      'em-interference': 'em-interference',
+      'electronic-jamming': 'em-interference',
+      'payload-silent': 'payload-silent',
+    };
+    if (semanticType in mapping) return mapping[semanticType];
+  }
+  // 针对通用 action_id（如 action:plan-1017:3:timestamp）无法推断时，返回空让 param 兜底
+  if (/^action:plan-\d+:\d+:\d+$/.test(aid)) return '';
+  // 项目实际数据服务器 action_id 前缀（如 CH_RETURN / FS_LENS / RS_40MM）
+  const projectMapping = {
+    // 底盘类
+    'ch-move': 'auto-move',
+    'ch-follow': 'follow-move',
+    'ch-silent': 'silent-guard',
+    'ch-set-return': 'set-return-point',
+    'ch-return': 'return-to-base',
+    'ch-formation': 'formation-move',
+    'ch-manual': 'manual-task',
+    'ch-pose': 'pose-adjust',
+    // 火力车
+    'fs-lens': 'lens-recon',
+    'fs-recon-strike': 'search-and-shoot',
+    'fs-gun': '7.62mm-gun-shot',
+    'fs-rocket': 'rocket-launch',
+    'fs-loiter': 'loitering-munition-launch',
+    // 侦打车
+    'rs-lens': 'lens-recon',
+    'rs-recon-strike': 'search-and-shoot',
+    'rs-40mm': '40mm-gun-launch',
+    'rs-at': 'at-missile-launch',
+    'rs-gun': '7.62mm-gun-shot',
+    'rs-laser': 'laser-illumination',
+    // 巡逻车
+    'pt-lens': 'lens-recon',
+    'pt-recon-strike': 'search-and-shoot',
+    'pt-gun': '7.62mm-gun-shot',
+    'pt-acoustic': 'sound-expel',
+    'pt-light': 'light-expel',
+    // 空地车 / 电磁车
+    'ag-air-recon': 'air-recon',
+    'el-recon': 'em-recon',
+    'el-jam': 'em-interference',
+    'el-silent': 'payload-silent',
+  };
+  if (aid in projectMapping) return projectMapping[aid];
   const mapping = {
     'auto-move': 'auto-move',
     'follow-move': 'follow-move',
@@ -279,7 +388,120 @@ function inferActionTypeFromId(actionId) {
     'electronic-jamming': 'em-interference',
     'payload-silent': 'payload-silent',
   };
-  return mapping[aid] || aid;
+  return mapping[aid] || '';
+}
+
+function inferActionTypeFromParam(param) {
+  if (!param || typeof param !== 'object') return '';
+  const p = param;
+  const businessKeys = Object.keys(p).filter((k) => !COMMON_PARAM_FIELDS.has(k));
+  const has = (k) => k in p;
+  const businessHas = (k) => businessKeys.includes(k);
+
+  if (businessHas('ene') || businessHas('freq') || businessHas('meat')) return 'laser-illumination';
+  if (businessHas('points1') || businessHas('points2') || businessHas('points3')) return 'air-recon';
+  if (businessHas('frequency')) return (businessHas('protect') || p.sort === 1) ? 'em-interference' : 'em-recon';
+  if (businessHas('area') && businessHas('direct')) return 'lens-recon';
+  // 强声/强光拒止：area + attr + thr + dam===0（巡逻车特有）
+  if (businessHas('area') && businessHas('attr') && businessHas('thr') && p.dam === 0) {
+    return p.ammo === 0 ? 'sound-expel' : 'light-expel';
+  }
+  if (businessHas('area')) return 'search-and-shoot';
+  if (businessHas('points') && Array.isArray(p.points) && p.points.length > 0) {
+    const first = p.points[0];
+    if (first && typeof first === 'object') {
+      if (first.ammo_type === 2) return '40mm-gun-launch';
+      if (first.ammo_type === 1) return '7.62mm-gun-shot';
+      if ('ammo_type' in first) return 'at-missile-launch';
+      if ('r' in first || p.type === 2) return 'rocket-launch';
+      if ('loiter' in p || p.type === 3) return 'loitering-munition-launch';
+    }
+    // 编队机动：含 formation_mode 或路径点带 offsetX/offsetY
+    if (businessHas('formation_mode') || p.points.some((pt) => 'offsetX' in pt || 'offsetY' in pt)) return 'formation-move';
+    // 自主机动：points + limited_speed（且不是编队）
+    if (businessHas('limited_speed')) return 'auto-move';
+  }
+  if (businessHas('distance') && businessHas('x') && businessHas('y')) return 'follow-move';
+  if (businessHas('pose')) return 'pose-adjust';
+
+  // 兜底：仅含业务字段为空 / 仅 time / 仅 type 时
+  if (businessKeys.length === 0) return '';
+  if (businessKeys.length === 1 && businessHas('time')) return 'silent-guard';
+  if (businessKeys.length === 1 && businessHas('type')) return 'manual-task';
+  return '';
+}
+
+function inferActionTypeFromName(name) {
+  if (!name) return '';
+  const n = String(name).trim();
+  const map = {
+    '自主机动': 'auto-move',
+    '跟随机动': 'follow-move',
+    '静默值守': 'silent-guard',
+    '设置返航点': 'set-return-point',
+    '开启返航': 'return-to-base',
+    '编队机动': 'formation-move',
+    '人工任务': 'manual-task',
+    '姿态调整': 'pose-adjust',
+    '空中侦察': 'air-recon',
+    '光电侦察': 'lens-recon',
+    '侦察打击': 'search-and-shoot',
+    '巡逻车侦察打击': 'search-and-shoot',
+    '机枪打击': '7.62mm-gun-shot',
+    '火箭弹打击': 'rocket-launch',
+    '巡飞弹打击': 'loitering-munition-launch',
+    '40炮打击': '40mm-gun-launch',
+    '红箭13导弹打击': 'at-missile-launch',
+    '激光照射': 'laser-illumination',
+    '强声拒止': 'sound-expel',
+    '强光拒止': 'light-expel',
+    '电磁侦察': 'em-recon',
+    '电磁干扰': 'em-interference',
+    '载荷静默': 'payload-silent',
+  };
+  if (n in map) return map[n];
+  // 英文 / PascalCase / 无连字符兜底
+  const norm = n.toLowerCase().replace(/[-_.]/g, '');
+  const enMap = {
+    'automove': 'auto-move',
+    'followmove': 'follow-move',
+    'silentguard': 'silent-guard',
+    'setreturnpoint': 'set-return-point',
+    'setreturn': 'set-return-point',
+    'returntobase': 'return-to-base',
+    'return': 'return-to-base',
+    'formationmove': 'formation-move',
+    'formation': 'formation-move',
+    'manualtask': 'manual-task',
+    'manual': 'manual-task',
+    'poseadjust': 'pose-adjust',
+    'airrecon': 'air-recon',
+    'lensrecon': 'lens-recon',
+    'searchandshoot': 'search-and-shoot',
+    'reconstrike': 'search-and-shoot',
+    '40mmgunlaunch': '40mm-gun-launch',
+    '40mmgun': '40mm-gun-launch',
+    'atmissilelaunch': 'at-missile-launch',
+    'atmissile': 'at-missile-launch',
+    'gunshot': '7.62mm-gun-shot',
+    '762mmgunshot': '7.62mm-gun-shot',
+    '762mmgun': '7.62mm-gun-shot',
+    'rocketlaunch': 'rocket-launch',
+    'loiteringmunitionlaunch': 'loitering-munition-launch',
+    'loiteringmunition': 'loitering-munition-launch',
+    'laserillumination': 'laser-illumination',
+    'laser': 'laser-illumination',
+    'soundexpel': 'sound-expel',
+    'acousticdeterrence': 'sound-expel',
+    'lightexpel': 'light-expel',
+    'lightdeterrence': 'light-expel',
+    'emrecon': 'em-recon',
+    'electronicrecon': 'em-recon',
+    'eminterference': 'em-interference',
+    'electronicjamming': 'em-interference',
+    'payloadsilent': 'payload-silent',
+  };
+  return enMap[norm] || '';
 }
 
 function getActionDisplayName(actionType, actionId = '') {
@@ -290,6 +512,12 @@ function getActionDisplayName(actionType, actionId = '') {
   if (!found && actionId) {
     const inferred = inferActionTypeFromId(actionId);
     found = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/_/g, '-') === inferred);
+  }
+  // 兼容 PascalCase 的 action_type（如 Follow-Move / Search-And-Shoot）在 allTasks 中找不到的情况
+  if (!found) {
+    const compact = normalized.replace(/-/g, '').replace(/\./g, '');
+    const lowerFound = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/-/g, '').replace(/\./g, '') === compact);
+    if (lowerFound) return lowerFound.name;
   }
   return found?.name || actionType;
 }
@@ -332,6 +560,7 @@ function selectVehicle(vehicle) {
   selectedVehicle.value = vehicle;
   selectedVehicleType.value = vehicle.type || vehicle.resource_type || '';
   step.value = 'edit';
+  loadFusionedTargets();
 }
 
 function inferVehicleTypeFromResourceType(rt) {
@@ -401,15 +630,26 @@ function initEditMode() {
     const id = `node_${a.action_id || a.action_seq || idx}_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
     seqToNodeId[String(a.action_seq)] = id;
     const rawActionType = a.action_type || '';
+    // name 是中文业务名称，最可靠；优先按 name 推断 action_type，可修复脏数据中
+    // action_type 与 name 不一致的问题（如开启返航被存成 set-return-point）
+    const nameInferred = inferActionTypeFromName(a.name);
     const isUnknown = !rawActionType || rawActionType.toLowerCase().includes('unknown');
-    const actionType = isUnknown ? inferActionTypeFromId(a.action_id) : rawActionType;
-    const displayName = getActionDisplayName(actionType, a.action_id);
+    let actionType = nameInferred || rawActionType;
+    if (!actionType || String(actionType).toLowerCase().includes('unknown')) {
+      actionType = inferActionTypeFromId(a.action_id)
+        || inferActionTypeFromParam(a.param)
+        || actionType;
+    }
+    const displayName = getActionDisplayName(actionType, a.action_id) || a.name || '';
     return {
       id,
       actionType,
       name: displayName || a.name || '',
-      category: actionType && chassisTasks.some((t) => t.actionType === actionType) ? 'chassis' : 'payload',
+      category: actionType && chassisTasks.some((t) => String(t.actionType).toLowerCase().replace(/-/g, '').replace(/_/g, '').replace(/\./g, '') === String(actionType).toLowerCase().replace(/-/g, '').replace(/_/g, '').replace(/\./g, '')) ? 'chassis' : 'payload',
       param: JSON.parse(JSON.stringify(a.param || {})),
+      // 编辑模式保留原始依赖与 action_id，避免保存时丢失关联
+      originalActionId: a.action_id || undefined,
+      originalDependencies: a.dependencies || undefined,
       // 先给个占位坐标，稍后交给 autoLayout 按依赖图重新排布
       x: PAD_X,
       y: PAD_Y,
@@ -753,6 +993,103 @@ function autoLayout() {
   updateLines();
 }
 
+function isZeroPoint(pt) {
+  if (!pt || typeof pt !== 'object') return true;
+  const lon = Number(pt.lon ?? pt.longitude ?? 0);
+  const lat = Number(pt.lat ?? pt.latitude ?? 0);
+  return lon === 0 && lat === 0;
+}
+
+function isAllZeroPoints(list) {
+  return Array.isArray(list) && list.length > 0 && list.every((pt) => isZeroPoint(pt));
+}
+
+function needsCoordinateFill(list) {
+  return !Array.isArray(list) || list.length === 0 || isAllZeroPoints(list);
+}
+
+function fillAreaFromFirst(param) {
+  const first = areaList.value[0];
+  if (!first || !Array.isArray(first.points) || first.points.length === 0) return;
+  param.area_id = first.resource_id;
+  param.area = first.points.map((pt) => ({
+    lon: Number(pt?.lon ?? pt?.longitude ?? 0),
+    lat: Number(pt?.lat ?? pt?.latitude ?? 0),
+    alt: Number(pt?.alt ?? pt?.altitude ?? 0),
+  }));
+}
+
+function fillRouteFromFirst(param) {
+  const first = routeList.value[0];
+  if (!first || !Array.isArray(first.points) || first.points.length === 0) return;
+  param.route_id = first.resource_id;
+  param.points = first.points.map((pt) => ({
+    lon: Number(pt?.lon ?? pt?.longitude ?? 0),
+    lat: Number(pt?.lat ?? pt?.latitude ?? 0),
+    alt: Number(pt?.alt ?? pt?.altitude ?? 0),
+    radius: Number(pt?.radius ?? -1),
+    type: Number(pt?.type ?? 1),
+  }));
+}
+
+function fillTargetFromFirst(param) {
+  const first = targetList.value[0];
+  if (!first || !Array.isArray(first.points) || first.points.length === 0) return;
+  const loc = first.points[0];
+  param.points = [{
+    lon: Number(loc?.lon ?? loc?.longitude ?? 0),
+    lat: Number(loc?.lat ?? loc?.latitude ?? 0),
+    alt: Number(loc?.alt ?? loc?.altitude ?? 0),
+    tart: 0,
+  }];
+  param.num = param.points.length;
+}
+
+function fillAirReconFromFirst(param) {
+  const first = areaList.value[0];
+  if (!first || !Array.isArray(first.points) || first.points.length === 0) return;
+  param.points1 = first.points.map((pt) => ({
+    lon: Number(pt?.lon ?? pt?.longitude ?? 0),
+    lat: Number(pt?.lat ?? pt?.latitude ?? 0),
+    alt: Number(pt?.alt ?? pt?.altitude ?? 0),
+    type: 0,
+    speed: 0,
+    camera: 1,
+    gimpitch: 36100,
+    gimyaw: 36100,
+    action: 1,
+    playaw: 36100,
+    zoom: 0,
+    loiter: 0,
+  }));
+}
+
+/**
+ * 保存前自动填充：如果 action 的坐标列表为空或全 0，
+ * 默认使用态势池中第一个可用资源（区域/路线/目标）的坐标。
+ */
+function autoFillCoordinates(param, actionType) {
+  const type = String(actionType || '').toLowerCase().replace(/_/g, '-');
+  // 需要区域的元任务
+  const areaTypes = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
+  if (areaTypes.includes(type)) {
+    if (needsCoordinateFill(param.area)) fillAreaFromFirst(param);
+  }
+  // 需要路线的底盘机动类
+  if (['auto-move', 'formation-move'].includes(type)) {
+    if (needsCoordinateFill(param.points)) fillRouteFromFirst(param);
+  }
+  // 打击类：从目标资源取第一个点
+  if (['40mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'].includes(type)) {
+    if (needsCoordinateFill(param.points)) fillTargetFromFirst(param);
+    param.num = Array.isArray(param.points) ? param.points.length : 0;
+  }
+  // 空中侦察：航路点默认用第一个区域
+  if (type === 'air-recon') {
+    if (needsCoordinateFill(param.points1)) fillAirReconFromFirst(param);
+  }
+}
+
 function buildActionsForVid(vid, planBase = null) {
   // 按连线拓扑排序：从入度为 0 的节点开始
   const inDegree = {};
@@ -799,14 +1136,24 @@ function buildActionsForVid(vid, planBase = null) {
     const deps = (incoming[id] || [])
       .filter((fromId) => idToSeq[fromId] !== undefined)
       .map((fromId) => String(idToSeq[fromId]));
+    const displayName = n.name || getActionDisplayName(n.actionType);
+    // 推断最终 action_type：优先按显示名称（中文）推断，可修复节点 actionType 被脏数据污染的情况
+    let finalActionType = inferActionTypeFromName(displayName) || n.actionType;
+    if (!finalActionType || String(finalActionType).toLowerCase().includes('unknown')) {
+      finalActionType = inferActionTypeFromId(n.originalActionId)
+        || inferActionTypeFromParam(n.param)
+        || finalActionType;
+    }
+    const normalizedParam = normalizeActionParam(n.param, finalActionType, vehicleType);
+    autoFillCoordinates(normalizedParam, finalActionType);
     return {
       // 新建时 action_id / resource_id 由数据服务器分配，前端不预置
-      name: n.name,
+      name: displayName,
       vid,
       action_seq: idx + 1,
-      action_type: n.actionType,
-      description: n.name,
-      param: normalizeActionParam(n.param, n.actionType, vehicleType),
+      action_type: finalActionType,
+      description: displayName,
+      param: serializeActionParam(normalizedParam),
       dependencies: deps.length ? deps : undefined,
       state: 'SCHEDULED',
       task_type: 'ACTION',
@@ -817,12 +1164,19 @@ function buildActionsForVid(vid, planBase = null) {
   });
 }
 
+function deriveCarActionType(actions) {
+  // car_actions / team_actions 中车辆层级的 action_type 取首个 action 的类型，
+  // 避免保存后该字段为空，也便于后端/数据服务器识别车辆主要任务类型。
+  return actions?.[0]?.action_type || '';
+}
+
 function buildPlan() {
   const planId = `PLAN_${Date.now()}`;
   const stageId = `STAGE_${Date.now()}`;
   const teamId = 'TEAM_NEW';
   const vid = selectedVehicle.value?.vid || `equipment:new-${Date.now()}`;
   const actions = buildActionsForVid(vid);
+  const carActionType = deriveCarActionType(actions);
 
   return {
     resource_id: `plan:${planId}`,
@@ -850,7 +1204,7 @@ function buildPlan() {
         target_ids: [],
         state: 'SCHEDULED',
         team_actions: {
-          [teamId]: [{ vid, state: 'SCHEDULED', action_type: '', actions }],
+          [teamId]: [{ vid, state: 'SCHEDULED', action_type: carActionType, actions }],
         },
       },
     ],
@@ -862,6 +1216,7 @@ function buildAppendedPlan() {
   const now = Date.now();
   const vid = selectedVehicle.value?.vid || `equipment:${selectedVehicleType.value.toLowerCase().replace(/_/g, '-').replace(/[^a-z0-9-]/g, '')}-${now}`;
   const actions = buildActionsForVid(vid, plan);
+  const carActionType = deriveCarActionType(actions);
 
   const teamId = plan.teams?.[0]?.team_id || 'TEAM_APPEND';
   const stageId = plan.stages?.[0]?.stage_id || `STAGE_${now}`;
@@ -898,20 +1253,20 @@ function buildAppendedPlan() {
     const entry = ta.find((e) => e.team_id === teamId);
     if (entry) {
       entry.car_actions = entry.car_actions || [];
-      entry.car_actions.push({ vid, state: 'SCHEDULED', action_type: '', actions });
+      entry.car_actions.push({ vid, state: 'SCHEDULED', action_type: carActionType, actions });
     } else {
-      ta.push({ team_id: teamId, car_actions: [{ vid, state: 'SCHEDULED', action_type: '', actions }] });
+      ta.push({ team_id: teamId, car_actions: [{ vid, state: 'SCHEDULED', action_type: carActionType, actions }] });
     }
   } else {
     // 旧 mock 格式：team_actions 为 { [teamId]: [...] }
     ta[teamId] = ta[teamId] || [];
-    ta[teamId].push({ vid, state: 'SCHEDULED', action_type: '', actions });
+    ta[teamId].push({ vid, state: 'SCHEDULED', action_type: carActionType, actions });
   }
   stage.team_actions = ta;
 
   // 追加 car_actions
   plan.car_actions = plan.car_actions || [];
-  plan.car_actions.push({ vid, state: 'SCHEDULED', action_type: '', actions });
+  plan.car_actions.push({ vid, state: 'SCHEDULED', action_type: carActionType, actions });
 
   // 追加 vehicle_summary
   plan.vehicle_summary = plan.vehicle_summary || [];
@@ -930,6 +1285,7 @@ function buildUpdatedPlan() {
   const plan = JSON.parse(JSON.stringify(props.editPlan));
   const vid = props.editVehicleVid;
   const actions = buildActionsForVid(vid);
+  const carActionType = deriveCarActionType(actions);
 
   // 更新 stages 中对应车辆的 actions
   for (const stage of plan.stages || []) {
@@ -939,14 +1295,20 @@ function buildUpdatedPlan() {
       for (const entry of ta) {
         const cars = entry.car_actions || [];
         for (const v of cars) {
-          if (v.vid === vid) v.actions = actions;
+          if (v.vid === vid) {
+            v.actions = actions;
+            v.action_type = carActionType;
+          }
         }
       }
     } else {
       // 旧 mock 格式：team_actions 为 { [teamId]: [...] }
       for (const key of Object.keys(ta)) {
         for (const v of ta[key]) {
-          if (v.vid === vid) v.actions = actions;
+          if (v.vid === vid) {
+            v.actions = actions;
+            v.action_type = carActionType;
+          }
         }
       }
     }
@@ -955,7 +1317,10 @@ function buildUpdatedPlan() {
   // 更新 car_actions（如果存在）
   if (plan.car_actions) {
     for (const ca of plan.car_actions) {
-      if (ca.vid === vid) ca.actions = actions;
+      if (ca.vid === vid) {
+        ca.actions = actions;
+        ca.action_type = carActionType;
+      }
     }
   }
 
@@ -999,16 +1364,19 @@ watch(
 function initFromProps() {
   if (props.editMode) {
     initEditMode();
+    loadFusionedTargets();
   } else if (props.presetVehicle) {
     // 从某车“新建”进入时，跳过车辆选择，直接进编辑界面
     selectedVehicle.value = props.presetVehicle;
     selectedVehicleType.value = props.presetVehicle.resource_type || props.presetVehicle.type || '';
     step.value = 'edit';
+    loadFusionedTargets();
   } else if (props.presetVehicleType) {
     // 兼容旧逻辑：只传入类型时，构造一个简化车辆对象
     selectedVehicle.value = { type: props.presetVehicleType, resource_type: props.presetVehicleType };
     selectedVehicleType.value = props.presetVehicleType;
     step.value = 'edit';
+    loadFusionedTargets();
   }
 }
 
@@ -1036,17 +1404,31 @@ function toPatchBody(plan) {
   return body;
 }
 
+async function ensureFusionedTargetsLoaded() {
+  if (fusionedLoaded.value) return;
+  loadFusionedTargets();
+  // 最多等待 5 秒，避免资源服务不可用时一直阻塞保存
+  const start = Date.now();
+  while (loadingFusioned.value && Date.now() - start < 5000) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
 async function savePlan() {
   if (nodes.value.length === 0) {
     alert('请至少添加一个元任务');
     return;
   }
 
+  // 保存前确保态势资源已加载，才能自动填充默认坐标
+  await ensureFusionedTargetsLoaded();
+
   if (props.editMode && props.editPlan && props.editVehicleVid) {
     // 编辑模式：只更新本地 task_pool，不同步数据服务器
     const updatedPlan = buildUpdatedPlan();
     try {
-      const result = await patchOperatorPlan(props.editPlan.plan_id, toPatchBody(updatedPlan));
+      const patchFn = props.isControlMode ? patchOperatorPlan : patchPlan;
+      const result = await patchFn(props.editPlan.plan_id, toPatchBody(updatedPlan));
       if (!result.ok) {
         alert(`保存失败：${result.data?.message || result.error || result.statusText || '未知错误'}`);
         return;
@@ -1062,7 +1444,8 @@ async function savePlan() {
     // 追加模式：把新车辆行动序列追加到已有方案
     const updatedPlan = buildAppendedPlan();
     try {
-      const result = await patchOperatorPlan(props.appendPlan.plan_id, toPatchBody(updatedPlan));
+      const patchFn = props.isControlMode ? patchOperatorPlan : patchPlan;
+      const result = await patchFn(props.appendPlan.plan_id, toPatchBody(updatedPlan));
       if (!result.ok) {
         alert(`保存失败：${result.data?.message || result.error || result.statusText || '未知错误'}`);
         return;

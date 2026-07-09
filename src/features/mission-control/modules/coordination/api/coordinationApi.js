@@ -444,7 +444,42 @@ export const fetchActionSequenceVehicles = async () => {
   return { ok: true, data: { items, total: result.data?.data?.total || 0 } };
 };
 
+/** 协同席 — 仅本地更新行动序列方案（不同步数据服务器） */
+export const patchPlan = async (planId, payload = {}) => {
+  const result = await patchJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}`), payload);
+  return result;
+};
+
+/** 协同席 — 删除方案中指定车辆的行动序列（会同步把数据服务器上 action/car_action 置 DELETED） */
+export const deleteVehicle = async (planId, vid) => {
+  const encodedVid = encodeURIComponent(String(vid));
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}/vehicles/${encodedVid}/delete`), {});
+  return result;
+};
+
+/** 协同席 — 将行动方案通过数据服务器 /ingestion/forward 下发到指定席位 */
+export const dispatchForwardPlan = async (planId, targetIps = [], timeoutSeconds = 30) => {
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}/dispatch-forward`), {
+    target_ips: targetIps,
+    timeout_seconds: timeoutSeconds,
+  });
+  return result;
+};
+
 /* ==================== 操控端行动序列 API ==================== */
+
+/** 操控端 — 获取车辆控制服务当前已连接车辆列表（用于选择实车） */
+export const fetchOperatorConnectedVehicles = async () => {
+  const result = await getJson(joinApiUrl('/api/v1/action-sequences/operator/connected-vehicles'));
+  if (!result.ok) return result;
+  return { ok: true, data: result.data?.data || { items: [], selected: null, total: 0 } };
+};
+
+/** 操控端 — 选中一辆车并订阅 zenoh 反馈 */
+export const selectOperatorVehicle = async (vehicleId) => {
+  const result = await postJson(joinApiUrl('/api/v1/action-sequences/operator/select-vehicle'), { vehicle_id: vehicleId });
+  return result;
+};
 
 /** 操控端 — 获取当前已连接的无人车列表 */
 export const fetchOperatorVehicles = async () => {
@@ -529,6 +564,56 @@ export const deleteOperatorVehicle = async (planId, vid) => {
   const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/vehicles/${encodedVid}/delete`), {});
   return result;
 };
+
+/* ==================== 态势池 API ==================== */
+
+const SITUATION_POOL_BASE_URL = 'http://25.11.1.178:28802';
+
+const joinSituationUrl = (path) => {
+  if (import.meta.env.DEV) {
+    return path;
+  }
+  const base = SITUATION_POOL_BASE_URL.replace(/\/+$/, '');
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  return `${base}/${normalizedPath}`;
+};
+
+/**
+ * 从态势池获取 FUSIONED_TARGET 列表
+ * 按 target_shape 区分：region / line / route / point
+ */
+export const fetchFusionedTargets = async (limit = 200) => {
+  const result = await getJson(
+    joinSituationUrl(`/api/v1/situation_pool/resources/simple/by_type/FUSIONED_TARGET?limit=${limit}`)
+  );
+  if (!result.ok) return result;
+  const items = (result.data || []).map(adaptFusionedTarget);
+  return { ok: true, data: { items, total: items.length } };
+};
+
+function adaptFusionedTarget(raw) {
+  const locArr = Array.isArray(raw?.target_location) ? raw.target_location : [];
+  const points = locArr
+    .filter((pt) => pt && typeof pt === 'object')
+    .map((pt) => ({
+      lon: Number(pt.lng ?? pt.longitude ?? 0),
+      lat: Number(pt.lat ?? pt.latitude ?? 0),
+      alt: Number(pt.alt ?? pt.altitude ?? 0),
+    }));
+
+  return {
+    resource_id: raw.resource_id,
+    resource_name: raw.target_name || raw.target_id || raw.resource_id,
+    title: raw.target_name || raw.target_id || raw.resource_id,
+    target_shape: raw.target_shape,
+    target_type: raw.target_type,
+    target_description: raw.target_description || '',
+    state: raw.state,
+    points,
+    // 保留原始数据供调试
+    _raw: raw,
+  };
+}
 
 /* ==================== 地图服务 API ==================== */
 
