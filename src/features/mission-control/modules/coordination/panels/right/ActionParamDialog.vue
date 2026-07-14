@@ -108,50 +108,7 @@
           </div>
         </template>
 
-        <!-- 6. 编队机动 -->
-        <template v-else-if="normalizedActionType === 'formation-move'">
-          <div class="apd-section">
-            <div class="apd-section-title">编队路径点</div>
-            <div class="apd-route-table-head">
-              <span>经度</span>
-              <span>纬度</span>
-              <span>高度</span>
-              <span>横向偏移</span>
-              <span>纵向偏移</span>
-            </div>
-            <div v-for="(pt, idx) in editedParam.points" :key="idx" class="apd-route-table-row">
-              <input v-model.number="pt.lon" type="number" step="0.000001" />
-              <input v-model.number="pt.lat" type="number" step="0.000001" />
-              <input v-model.number="pt.alt" type="number" step="0.1" />
-              <input v-model.number="pt.offsetX" type="number" />
-              <input v-model.number="pt.offsetY" type="number" />
-              <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removePoint('points', idx)">删除</button>
-            </div>
-            <button class="as-btn mini primary" type="button" @click="addPoint('points')">+ 添加路径点</button>
-          </div>
-          <div class="apd-section">
-            <div class="apd-section-title">编队参数</div>
-            <label class="apd-field compact"><span>限速 (km/h)</span><input v-model.number="editedParam.limited_speed" type="number" /></label>
-            <label class="apd-field">
-              <span>编队模式</span>
-              <select v-model.number="editedParam.formation_mode">
-                <option :value="0">跟头车模式</option>
-                <option :value="1">引导路径模式</option>
-                <option :value="2">队形变换</option>
-              </select>
-            </label>
-            <label class="apd-field">
-              <span>安全模式</span>
-              <div class="apd-radio-row">
-                <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="0" /><span>避障</span></label>
-                <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="1" /><span>突击</span></label>
-                <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="2" /><span>停障</span></label>
-              </div>
-            </label>
-          </div>
-        </template>
-
-        <!-- 7. 人工任务 -->
+        <!-- 6. 人工任务 -->
         <template v-else-if="normalizedActionType === 'manual-task'">
           <div class="apd-section">
             <div class="apd-section-title">人工任务类型</div>
@@ -246,7 +203,7 @@
           </div>
         </template>
 
-        <template v-else-if="normalizedActionType === 'lens-recon'">
+        <template v-else-if="isLensReconLike">
           <div class="apd-section">
             <div class="apd-section-title">侦察参数</div>
             <label class="apd-field">
@@ -295,60 +252,16 @@
           </div>
         </template>
 
-        <!-- 10. 侦察打击 -->
-        <template v-else-if="['recon-strike', 'search-and-shoot'].includes(normalizedActionType)">
-          <template v-if="isPatrolVehicle">
-            <div class="apd-section">
-              <div class="apd-section-title">打击参数</div>
-              <label class="apd-field compact"><span>目标类型</span><input v-model.number="editedParam.tarty" type="number" /></label>
-              <label class="apd-field compact"><span>运动属性</span>
-                <select v-model.number="editedParam.attr">
-                  <option :value="0">未定义</option>
-                  <option :value="1">静止</option>
-                  <option :value="2">运动</option>
-                </select>
-              </label>
-              <label class="apd-field compact"><span>威胁度</span><input v-model.number="editedParam.thr" type="number" min="0" max="100" /></label>
-              <label class="apd-field compact"><span>毁伤要求</span>
-                <select v-model.number="editedParam.dam">
-                  <option :value="0">未定义</option>
-                  <option :value="1">饱和攻击</option>
-                  <option :value="2">不饱和攻击</option>
-                </select>
-              </label>
-              <label class="apd-field compact"><span>遮蔽顶</span>
-                <select v-model.number="editedParam.blk">
-                  <option :value="0">未定义</option>
-                  <option :value="1">有遮蔽顶</option>
-                  <option :value="2">无遮蔽顶</option>
-                </select>
-              </label>
-              <label class="apd-field compact"><span>打击方式</span>
-                <select v-model.number="editedParam.figt">
-                  <option :value="0">未定义</option>
-                  <option :value="1">单发</option>
-                  <option :value="2">多发</option>
-                </select>
-              </label>
-              <label class="apd-field compact"><span>建议弹量</span><input v-model.number="editedParam.sug" type="number" /></label>
-              <label class="apd-field compact"><span>实际弹量</span><input v-model.number="editedParam.ammo" type="number" /></label>
-              <label class="apd-field compact"><span>策略</span><input v-model.number="editedParam.strategy" type="number" /></label>
-            </div>
-            <div class="apd-section">
-              <div class="apd-section-title">侦察区域</div>
-              <AreaEditor v-model="editedParam.area" :area-list="areaList" v-model:area-id="editedParam.area_id" />
-            </div>
-          </template>
-          <template v-else>
-            <div class="apd-section">
-              <div class="apd-section-title">侦察参数</div>
-              <label class="apd-field"><span>任务时间 (s)</span><input v-model.number="editedParam.time" type="number" /></label>
-            </div>
-            <div class="apd-section">
-              <div class="apd-section-title">侦察区域</div>
-              <AreaEditor v-model="editedParam.area" :area-list="areaList" v-model:area-id="editedParam.area_id" />
-            </div>
-          </template>
+        <!-- 10. 侦察打击（非巡逻车） -->
+        <template v-else-if="['recon-strike', 'search-and-shoot'].includes(normalizedActionType) && !isPatrolVehicle">
+          <div class="apd-section">
+            <div class="apd-section-title">侦察参数</div>
+            <label class="apd-field"><span>任务时间 (s)</span><input v-model.number="editedParam.time" type="number" /></label>
+          </div>
+          <div class="apd-section">
+            <div class="apd-section-title">侦察区域</div>
+            <AreaEditor v-model="editedParam.area" :area-list="areaList" v-model:area-id="editedParam.area_id" />
+          </div>
         </template>
 
         <!-- 11. 打击类（40mm / 红箭13 / 火箭弹 / 巡飞弹） -->
@@ -475,67 +388,22 @@
           </div>
         </template>
 
-        <!-- 13. 强声拒止 / 强光拒止 -->
-        <template v-else-if="isPatrolDeterrence">
-          <div class="apd-section">
-            <div class="apd-section-title">拒止参数</div>
-            <label class="apd-field compact"><span>目标类型</span><input v-model.number="editedParam.tarty" type="number" /></label>
-            <label class="apd-field compact"><span>运动属性</span>
-              <select v-model.number="editedParam.attr">
-                <option :value="0">未定义</option>
-                <option :value="1">静止</option>
-                <option :value="2">运动</option>
-              </select>
-            </label>
-            <label class="apd-field compact"><span>威胁度</span><input v-model.number="editedParam.thr" type="number" min="0" max="100" /></label>
-            <label class="apd-field compact"><span>毁伤要求</span>
-              <select v-model.number="editedParam.dam">
-                <option :value="0">未定义</option>
-                <option :value="1">饱和攻击</option>
-                <option :value="2">不饱和攻击</option>
-              </select>
-            </label>
-            <label class="apd-field compact"><span>遮蔽顶</span>
-              <select v-model.number="editedParam.blk">
-                <option :value="0">未定义</option>
-                <option :value="1">有遮蔽顶</option>
-                <option :value="2">无遮蔽顶</option>
-              </select>
-            </label>
-            <label class="apd-field compact"><span>打击方式</span>
-              <select v-model.number="editedParam.figt">
-                <option :value="0">未定义</option>
-                <option :value="1">单发</option>
-                <option :value="2">多发</option>
-              </select>
-            </label>
-            <label class="apd-field compact"><span>建议弹量</span><input v-model.number="editedParam.sug" type="number" /></label>
-            <label class="apd-field compact"><span>实际弹量</span><input v-model.number="editedParam.ammo" type="number" /></label>
-            <label class="apd-field compact"><span>策略</span><input v-model.number="editedParam.strategy" type="number" /></label>
-            <label class="apd-field compact"><span>任务时间 (s)</span><input v-model.number="editedParam.time" type="number" /></label>
-          </div>
-          <div class="apd-section">
-            <div class="apd-section-title">作用区域</div>
-            <AreaEditor v-model="editedParam.area" :area-list="areaList" v-model:area-id="editedParam.area_id" />
-          </div>
-        </template>
-
-        <!-- 14. 电磁侦察 / 电磁突击 -->
+        <!-- 14. 电磁侦察 / 电磁突击 / 电磁干扰 -->
         <template v-else-if="isElectronic">
           <div class="apd-section">
             <div class="apd-section-title">侦察/干扰参数</div>
-            <label class="apd-field">
-              <span>探测模式</span>
-              <select v-model.number="editedParam.mode">
-                <option :value="1">单点探测</option>
-                <option :value="3">四点区域探测</option>
-                <option :value="4">定向探测</option>
-              </select>
-            </label>
             <label class="apd-field compact"><span>任务时间 (s)</span><input v-model.number="editedParam.time" type="number" /></label>
-            <label v-if="normalizedActionType === 'electronic-jamming'" class="apd-field compact"><span>排序</span><input v-model.number="editedParam.sort" type="number" /></label>
-            <label class="apd-field compact"><span>数量</span><input v-model.number="editedParam.num" type="number" /></label>
-            <label class="apd-field compact"><span>频段类型 (bit)</span><input v-model.number="editedParam.freqtype" type="number" /></label>
+            <div class="apd-field">
+              <span>频段类型</span>
+              <div class="apd-check-row">
+                <label class="apd-check"><input type="checkbox" :checked="isFreqBitSet(0)" @change="toggleFreqBit(0, $event.target.checked)" /><span>全频段</span></label>
+                <label class="apd-check"><input type="checkbox" :checked="isFreqBitSet(1)" @change="toggleFreqBit(1, $event.target.checked)" /><span>通信</span></label>
+                <label class="apd-check"><input type="checkbox" :checked="isFreqBitSet(2)" @change="toggleFreqBit(2, $event.target.checked)" /><span>链路</span></label>
+                <label class="apd-check"><input type="checkbox" :checked="isFreqBitSet(3)" @change="toggleFreqBit(3, $event.target.checked)" /><span>雷达</span></label>
+                <label class="apd-check"><input type="checkbox" :checked="isFreqBitSet(4)" @change="toggleFreqBit(4, $event.target.checked)" /><span>导航</span></label>
+                <label class="apd-check"><input type="checkbox" :checked="isFreqBitSet(5)" @change="toggleFreqBit(5, $event.target.checked)" /><span>敌我识别</span></label>
+              </div>
+            </div>
           </div>
           <div class="apd-section">
             <div class="apd-section-title">工作频段</div>
@@ -550,39 +418,27 @@
             <div class="apd-section-title">侦察/干扰区域</div>
             <AreaEditor v-model="editedParam.area" :area-list="areaList" v-model:area-id="editedParam.area_id" />
           </div>
-          <div v-if="editedParam.mode === 4" class="apd-section">
-            <div class="apd-section-title">定向探测参数</div>
-            <label class="apd-field compact"><span>坐标系</span>
-              <select v-model.number="editedParam.direct.type">
-                <option :value="1">北天东</option>
-                <option :value="2">车体坐标系</option>
-              </select>
-            </label>
-            <label class="apd-field compact"><span>中心线角度 (×100)</span><input v-model.number="editedParam.direct.cent" type="number" /></label>
-            <label class="apd-field compact"><span>搜索范围 (×100)</span><input v-model.number="editedParam.direct.sear" type="number" /></label>
-            <label class="apd-field compact"><span>俯仰上边界 (×100)</span><input v-model.number="editedParam.direct.up" type="number" /></label>
-            <label class="apd-field compact"><span>俯仰下边界 (×100)</span><input v-model.number="editedParam.direct.down" type="number" /></label>
-            <label class="apd-field compact"><span>参考距离 (m)</span><input v-model.number="editedParam.direct.dist" type="number" /></label>
-            <label class="apd-field compact"><span>传感器</span>
-              <select v-model.number="editedParam.direct.sens">
-                <option :value="0">自适应</option>
-                <option :value="1">白光</option>
-                <option :value="2">红外</option>
-              </select>
-            </label>
-          </div>
-          <div v-if="normalizedActionType === 'electronic-jamming'" class="apd-section">
+          <div v-if="normalizedActionType === 'em-interference' || normalizedActionType === 'electronic-jamming' || normalizedActionType === 'em-assault' || normalizedActionType === 'electronic-assault'" class="apd-section">
             <div class="apd-section-title">保护频段</div>
-            <label class="apd-field compact"><span>测控链-定频</span><input v-model="editedParam.protect.ckl_dp" type="text" /></label>
-            <label class="apd-field compact"><span>测控链-跳频</span><input v-model="editedParam.protect.ckl_tp" type="text" /></label>
-            <label class="apd-field compact"><span>协同链-定频</span><input v-model="editedParam.protect.zzw_dp" type="text" /></label>
-            <label class="apd-field compact"><span>协同链-跳频</span><input v-model="editedParam.protect.zzw_tp" type="text" /></label>
-            <label class="apd-field compact"><span>自主网-跳频</span><input v-model="editedParam.protect.xtl_tp" type="text" /></label>
-            <label class="apd-field compact"><span>自主网-定频</span><input v-model="editedParam.protect.xtl_dp" type="text" /></label>
+            <div class="apd-protect-group">
+              <div class="apd-protect-group-title">测控链频段</div>
+              <label class="apd-field compact"><span>定频 (MHz)</span><input v-model="editedParam.protect.ckl_dp" type="text" /></label>
+              <label class="apd-field compact"><span>跳频 (表号)</span><input v-model="editedParam.protect.ckl_tp" type="text" /></label>
+            </div>
+            <div class="apd-protect-group">
+              <div class="apd-protect-group-title">协同链频段</div>
+              <label class="apd-field compact"><span>定频 (MHz)</span><input v-model="editedParam.protect.zzw_dp" type="text" /></label>
+              <label class="apd-field compact"><span>跳频 (表号)</span><input v-model="editedParam.protect.zzw_tp" type="text" /></label>
+            </div>
+            <div class="apd-protect-group">
+              <div class="apd-protect-group-title">自主网频段</div>
+              <label class="apd-field compact"><span>定频 (MHz)</span><input v-model="editedParam.protect.xtl_dp" type="text" /></label>
+              <label class="apd-field compact"><span>跳频 (表号)</span><input v-model="editedParam.protect.xtl_tp" type="text" /></label>
+            </div>
           </div>
         </template>
 
-        <!-- 15. 载荷静默 -->
+        <!-- 15. 载荷静默（旧数据兼容） -->
         <template v-else-if="normalizedActionType === 'payload-silent'">
           <div class="apd-section">
             <div class="apd-section-title">静默参数</div>
@@ -643,12 +499,14 @@ const loadingFusioned = ref(false);
 
 const STANDARD_ACTION_TYPES = new Set([
   'auto-move', 'follow-move', 'silent-guard', 'set-return-point', 'return-to-base',
-  'formation-move', 'manual-task', 'pose-adjust', 'air-recon', 'lens-recon',
+  'manual-task', 'pose-adjust', 'air-recon', 'lens-recon',
   'search-and-shoot', 'recon-strike', '40mm-gun-launch', 'at-missile-launch',
   'gun-shot', '7.62mm-gun-shot', 'rocket-launch', 'loitering-munition-launch',
   'laser-illumination', 'sound-expel', 'acoustic-deterrence', 'light-expel',
-  'light-deterrence', 'em-recon', 'electronic-recon', 'em-interference',
-  'electronic-jamming', 'payload-silent',
+  'light-deterrence', 'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault',
+  'em-interference', 'electronic-jamming',
+  // payload-silent 仅作旧数据兼容
+  'payload-silent',
 ]);
 
 function inferActionTypeFromId(actionId) {
@@ -659,7 +517,7 @@ function inferActionTypeFromId(actionId) {
     const mapping = {
       'auto-move': 'auto-move', 'follow-move': 'follow-move', 'silent-guard': 'silent-guard',
       'set-return-point': 'set-return-point', 'return-to-base': 'return-to-base',
-      'formation-move': 'formation-move', 'manual-task': 'manual-task', 'pose-adjust': 'pose-adjust',
+      'manual-task': 'manual-task', 'pose-adjust': 'pose-adjust',
       'air-recon': 'air-recon', 'lens-recon': 'lens-recon', 'search-and-shoot': 'search-and-shoot',
       'recon-strike': 'search-and-shoot', '40mm-gun-launch': '40mm-gun-launch',
       'at-missile-launch': 'at-missile-launch', 'gun-shot': '7.62mm-gun-shot',
@@ -667,13 +525,16 @@ function inferActionTypeFromId(actionId) {
       'loitering-munition-launch': 'loitering-munition-launch', 'laser-illumination': 'laser-illumination',
       'sound-expel': 'sound-expel', 'acoustic-deterrence': 'sound-expel', 'light-expel': 'light-expel',
       'light-deterrence': 'light-expel', 'em-recon': 'em-recon', 'electronic-recon': 'em-recon',
-      'em-interference': 'em-interference', 'electronic-jamming': 'em-interference', 'payload-silent': 'payload-silent',
+      'em-assault': 'em-assault', 'electronic-assault': 'em-assault',
+      'em-interference': 'em-interference', 'electronic-jamming': 'em-interference',
+      // payload-silent 仅作旧数据兼容
+      'payload-silent': 'payload-silent',
     };
     if (semanticMatch[1] in mapping) return mapping[semanticMatch[1]];
   }
   const projectMapping = {
     'ch-move': 'auto-move', 'ch-follow': 'follow-move', 'ch-silent': 'silent-guard',
-    'ch-set-return': 'set-return-point', 'ch-return': 'return-to-base', 'ch-formation': 'formation-move',
+    'ch-set-return': 'set-return-point', 'ch-return': 'return-to-base',
     'ch-manual': 'manual-task', 'ch-pose': 'pose-adjust',
     'fs-lens': 'lens-recon', 'fs-recon-strike': 'search-and-shoot', 'fs-gun': '7.62mm-gun-shot',
     'fs-rocket': 'rocket-launch', 'fs-loiter': 'loitering-munition-launch',
@@ -681,7 +542,10 @@ function inferActionTypeFromId(actionId) {
     'rs-at': 'at-missile-launch', 'rs-gun': '7.62mm-gun-shot', 'rs-laser': 'laser-illumination',
     'pt-lens': 'lens-recon', 'pt-recon-strike': 'search-and-shoot', 'pt-gun': '7.62mm-gun-shot',
     'pt-acoustic': 'sound-expel', 'pt-light': 'light-expel',
-    'ag-air-recon': 'air-recon', 'el-recon': 'em-recon', 'el-jam': 'em-interference', 'el-silent': 'payload-silent',
+    'ag-air-recon': 'air-recon', 'el-recon': 'em-recon',
+    'el-assault': 'em-assault', 'el-jam': 'em-interference',
+    // el-silent 映射到载荷静默（旧数据兼容）
+    'el-silent': 'payload-silent',
   };
   if (aid in projectMapping) return projectMapping[aid];
   return '';
@@ -691,7 +555,7 @@ function inferActionTypeFromName(name) {
   if (!name) return '';
   const map = {
     '自主机动': 'auto-move', '跟随机动': 'follow-move', '静默值守': 'silent-guard',
-    '设置返航点': 'set-return-point', '开启返航': 'return-to-base', '编队机动': 'formation-move',
+    '设置返航点': 'set-return-point', '开启返航': 'return-to-base',
     '人工任务': 'manual-task', '姿态调整': 'pose-adjust', '空中侦察': 'air-recon',
     '光电侦察': 'lens-recon', '侦察打击': 'search-and-shoot', '巡逻车侦察打击': 'search-and-shoot',
     '机枪打击': '7.62mm-gun-shot', '火箭弹打击': 'rocket-launch', '巡飞弹打击': 'loitering-munition-launch',
@@ -704,7 +568,7 @@ function inferActionTypeFromName(name) {
   const enMap = {
     'automove': 'auto-move', 'followmove': 'follow-move', 'silentguard': 'silent-guard',
     'setreturnpoint': 'set-return-point', 'setreturn': 'set-return-point', 'returntobase': 'return-to-base',
-    'return': 'return-to-base', 'formationmove': 'formation-move', 'manualtask': 'manual-task',
+    'return': 'return-to-base', 'manualtask': 'manual-task',
     'manual': 'manual-task', 'poseadjust': 'pose-adjust', 'airrecon': 'air-recon',
     'lensrecon': 'lens-recon', 'searchandshoot': 'search-and-shoot', 'reconstrike': 'search-and-shoot',
     '40mmgunlaunch': '40mm-gun-launch', '40mmgun': '40mm-gun-launch', 'atmissilelaunch': 'at-missile-launch',
@@ -717,6 +581,38 @@ function inferActionTypeFromName(name) {
     'payloadsilent': 'payload-silent',
   };
   return enMap[compact] || '';
+}
+
+function inferActionTypeFromParam(param) {
+  if (!param || typeof param !== 'object') return '';
+  const p = param;
+  const keys = Object.keys(p);
+  const businessKeys = keys.filter((k) => !['disconnect_strategy', 'mission_duration', 'enable_start_time', 'start_time', 'sid', 'id'].includes(k));
+  const businessHas = (k) => businessKeys.includes(k);
+
+  // 激光照射
+  if (['ene', 'freq', 'meat'].some((k) => businessHas(k))) return 'laser-illumination';
+  // 空中侦察
+  if (businessHas('points1') || businessHas('points2') || businessHas('points3')) return 'air-recon';
+  // 光电侦察：area + direct
+  if (businessHas('area') && businessHas('direct')) return 'lens-recon';
+  // 侦察打击：有 area 但没 direct
+  if (businessHas('area') && !businessHas('direct')) return 'search-and-shoot';
+  // 光电侦察：area + direct
+  if (businessHas('area') && businessHas('direct')) return 'lens-recon';
+  // 侦察打击：有 area 但没 direct
+  if (businessHas('area') && !businessHas('direct')) return 'search-and-shoot';
+  // 静默值守：只有 time
+  if (businessKeys.length === 1 && businessHas('time')) return 'silent-guard';
+  // 自主机动：points + limited_speed
+  if (businessHas('points') && businessHas('limited_speed')) return 'auto-move';
+  // 跟随机动
+  if (businessHas('distance') && businessHas('x') && businessHas('y')) return 'follow-move';
+  // 姿态调整
+  if (businessHas('pose')) return 'pose-adjust';
+  // 人工任务
+  if (businessKeys.length === 1 && businessHas('type')) return 'manual-task';
+  return '';
 }
 
 const routeList = computed(() =>
@@ -739,10 +635,13 @@ const normalizedActionType = computed(() => {
     console.log('[ActionParamDialog] standard action_type:', props.action?.action_type, 'normalized:', raw);
     return raw;
   }
-  // action_type 被脏数据污染（如 FS_LENS / Return-To-Base）时，按 action_id / name 推断
-  const inferred = inferActionTypeFromId(props.action?.action_id) || inferActionTypeFromName(props.action?.name);
+  // action_type 被脏数据污染（如 FS_LENS / Return-To-Base / Unknown_Action）时，
+  // 依次按 action_id / param 结构 / name 推断，与后端 _resolve_action_type 保持一致
+  const inferred = inferActionTypeFromId(props.action?.action_id)
+    || inferActionTypeFromParam(props.action?.param)
+    || inferActionTypeFromName(props.action?.name);
   if (inferred) {
-    console.log('[ActionParamDialog] inferred action_type from id/name:', inferred, 'original:', props.action?.action_type);
+    console.log('[ActionParamDialog] inferred action_type from id/param/name:', inferred, 'original:', props.action?.action_type);
     return inferred;
   }
   console.log('[ActionParamDialog] raw action_type:', props.action?.action_type, 'normalized:', raw);
@@ -764,6 +663,14 @@ const normalizedVehicleType = computed(() => {
 
 const isPatrolVehicle = computed(() => normalizedVehicleType.value === 'patrol');
 
+// 巡逻车的侦察打击 / 强声拒止 / 强光拒止使用与光电侦察完全相同的编辑界面与数据格式
+const isLensReconLike = computed(() => {
+  if (normalizedActionType.value === 'lens-recon') return true;
+  if (!isPatrolVehicle.value) return false;
+  return ['search-and-shoot', 'recon-strike', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence']
+    .includes(normalizedActionType.value);
+});
+
 const actionTypeLabel = computed(() => {
   const map = {
     'auto-move': '自主机动 / 循迹机动',
@@ -771,7 +678,6 @@ const actionTypeLabel = computed(() => {
     'silent-guard': '静默值守',
     'set-return-point': '设置返航点',
     'return-to-base': '开启返航',
-    'formation-move': '编队机动',
     'manual-task': '人工任务',
     'pose-adjust': '姿态调整 / 车姿调整',
     'lens-recon': '光电侦察',
@@ -790,8 +696,11 @@ const actionTypeLabel = computed(() => {
     'light-deterrence': '强光拒止',
     'em-recon': '电磁侦察',
     'electronic-recon': '电磁侦察',
+    'em-assault': '电磁突击',
+    'electronic-assault': '电磁突击',
     'em-interference': '电磁干扰',
     'electronic-jamming': '电磁干扰',
+    // payload-silent 仅作旧数据兼容
     'payload-silent': '载荷静默',
     'air-recon': '空中侦察',
   };
@@ -812,16 +721,17 @@ const isPatrolDeterrence = computed(() =>
 );
 
 const isElectronic = computed(() =>
-  ['em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)
+  ['em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)
 );
 
 const showCommonParams = computed(() =>
-  ['auto-move', 'follow-move', 'silent-guard', 'formation-move', 'manual-task', 'pose-adjust',
+  ['auto-move', 'follow-move', 'silent-guard', 'manual-task', 'pose-adjust',
    'set-return-point', 'return-to-base',
    'lens-recon', 'recon-strike', 'search-and-shoot', '40mm-gun-launch', 'gun-shot', '7.62mm-gun-shot',
    'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'laser-illumination',
    'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence',
-   'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming',
+   'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming',
+   // payload-silent 仅作旧数据兼容
    'payload-silent', 'air-recon']
     .includes(normalizedActionType.value)
 );
@@ -949,7 +859,7 @@ function onRouteChange() {
 function initFromRouteSelection() {
   // 只有底盘机动类元任务才需要从路线资源初始化 points
   const type = normalizedActionType.value;
-  if (!['auto-move', 'formation-move'].includes(type)) return;
+  if (type !== 'auto-move') return;
   if (!routeList.value.length) return;
 
   // 如果 action 自身已经保存了路径点数据，优先使用 action 的数据，
@@ -1012,7 +922,7 @@ function onAreaChange() {
 function initFromAreaSelection() {
   // 只有需要区域参数的元任务才从区域资源初始化 area
   const type = normalizedActionType.value;
-  const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
+  const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
   if (!needsArea.includes(type)) return;
   if (!areaList.value.length) return;
 
@@ -1162,6 +1072,21 @@ function removeFreq(idx) {
   editedParam.value.frequency.splice(idx, 1);
 }
 
+function isFreqBitSet(bit) {
+  const val = Number(editedParam.value.freqtype || 0);
+  return ((val >> bit) & 1) === 1;
+}
+
+function toggleFreqBit(bit, checked) {
+  let val = Number(editedParam.value.freqtype || 0);
+  if (checked) {
+    val |= 1 << bit;
+  } else {
+    val &= ~(1 << bit);
+  }
+  editedParam.value.freqtype = val;
+}
+
 function onClose() {
   // 取消时如果已经自动回填过数据，把回填后的参数回传，避免用户只打开看了一眼就下发导致为空
   if (hasAutoFilled.value) {
@@ -1169,6 +1094,11 @@ function onClose() {
     const cleaned = JSON.parse(JSON.stringify(editedParam.value));
     if (Array.isArray(cleaned.points)) {
       cleaned.points = cleaned.points.map(({ target_ref, ...rest }) => rest);
+    }
+    // 电磁侦察/电磁突击/电磁干扰：固定为区域探测（mode=4），数量固定为 1
+    if (['em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)) {
+      cleaned.mode = 4;
+      cleaned.num = 1;
     }
     const serialized = serializeActionParam(cleaned);
     emit('cancel', serialized);
@@ -1248,13 +1178,13 @@ function finalizeParam() {
   // 保存前兜底：只要列表数据为空或全 0，就从已选资源回填，
   // 避免异步加载/竞争导致编辑态有值但实际保存的是默认值 0。
   const type = normalizedActionType.value;
-  const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
+  const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
   if (needsArea.includes(type)) {
     if (!Array.isArray(editedParam.value.area) || editedParam.value.area.length === 0 || isAllZeroPoints(editedParam.value.area)) {
       fillAreaFromSelection();
     }
   }
-  if (['auto-move', 'formation-move'].includes(type)) {
+  if (type === 'auto-move') {
     if (!Array.isArray(editedParam.value.points) || editedParam.value.points.length === 0 || isAllZeroPoints(editedParam.value.points)) {
       fillRouteFromSelection();
     }
@@ -1299,6 +1229,17 @@ function onSave() {
   // 清理辅助字段：target_ref 仅用于 UI 选择，不下发
   if (Array.isArray(cleaned.points)) {
     cleaned.points = cleaned.points.map(({ target_ref, ...rest }) => rest);
+  }
+  // 电磁侦察/电磁突击/电磁干扰：固定为区域探测（mode=4），数量固定为 1
+  // 用 sort 区分电磁突击（0）和电磁干扰（1），电磁侦察不传 sort
+  if (['em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)) {
+    cleaned.mode = 4;
+    cleaned.num = 1;
+  }
+  if (normalizedActionType.value === 'em-assault' || normalizedActionType.value === 'electronic-assault') {
+    cleaned.sort = 0;
+  } else if (normalizedActionType.value === 'em-interference' || normalizedActionType.value === 'electronic-jamming') {
+    cleaned.sort = 1;
   }
   // 保存前把 UI 字符串格式转换为后端协议数字格式（如断连策略）
   const serialized = serializeActionParam(cleaned);
@@ -1576,6 +1517,21 @@ function onSave() {
 .apd-btn-group {
   display: flex;
   gap: 0.35rem;
+}
+
+.apd-protect-group {
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 222, 200, 0.1);
+  border-radius: 6px;
+  padding: 0.55rem;
+  margin-bottom: 0.55rem;
+}
+
+.apd-protect-group-title {
+  font-size: 0.78rem;
+  color: rgba(0, 222, 200, 0.85);
+  margin-bottom: 0.4rem;
+  font-weight: 600;
 }
 
 .apd-empty {

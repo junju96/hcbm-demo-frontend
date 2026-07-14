@@ -164,6 +164,10 @@ import VehicleIcon from './VehicleIcon.vue';
 import { createOperatorPlan, patchOperatorPlan, patchPlan, fetchFusionedTargets } from '../../api/coordinationApi.js';
 import { normalizeActionParam, serializeActionParam } from './actionParamNormalizer';
 
+function normalizeActionType(actionType) {
+  return String(actionType || '').toLowerCase().replace(/_/g, '-');
+}
+
 const props = defineProps({
   editMode: { type: Boolean, default: false },
   editPlan: { type: Object, default: null },
@@ -275,233 +279,26 @@ const chassisTasks = [
   { actionType: 'Silent-Guard', name: '静默值守', defaultParam: { time: 300 } },
   { actionType: 'Set-Return-Point', name: '设置返航点', defaultParam: {} },
   { actionType: 'Return-To-Base', name: '开启返航', defaultParam: {} },
-  { actionType: 'Formation-Move', name: '编队机动', defaultParam: { points: [], limited_speed: 20, formation_mode: 0, safe_mode: 0 } },
   { actionType: 'Manual-Task', name: '人工任务', defaultParam: { type: 1 } },
   { actionType: 'Pose-Adjust', name: '姿态调整', defaultParam: { pose: [9000, 0, 0], pose_deviation: [36100, 9100, 9100], limited_speed: 10, safe_mode: 0 } },
 ];
 
 function inferActionTypeFromId(actionId) {
-  if (!actionId) return '';
-  const aid = String(actionId).toLowerCase().replace(/_/g, '-');
-  // 针对语义化 action_id（如 action:return-to-base:plan-1017:5）先提取动作类型部分
-  const semanticMatch = aid.match(/^action:([a-z0-9\.\-]+):/);
-  if (semanticMatch) {
-    const semanticType = semanticMatch[1];
-    const mapping = {
-      'auto-move': 'auto-move',
-      'follow-move': 'follow-move',
-      'silent-guard': 'silent-guard',
-      'set-return-point': 'set-return-point',
-      'return-to-base': 'return-to-base',
-      'formation-move': 'formation-move',
-      'manual-task': 'manual-task',
-      'pose-adjust': 'pose-adjust',
-      'air-recon': 'air-recon',
-      'lens-recon': 'lens-recon',
-      'search-and-shoot': 'search-and-shoot',
-      'recon-strike': 'search-and-shoot',
-      '40mm-gun-launch': '40mm-gun-launch',
-      'at-missile-launch': 'at-missile-launch',
-      'gun-shot': '7.62mm-gun-shot',
-      '7.62mm-gun-shot': '7.62mm-gun-shot',
-      'rocket-launch': 'rocket-launch',
-      'loitering-munition-launch': 'loitering-munition-launch',
-      'laser-illumination': 'laser-illumination',
-      'sound-expel': 'sound-expel',
-      'acoustic-deterrence': 'sound-expel',
-      'light-expel': 'light-expel',
-      'light-deterrence': 'light-expel',
-      'em-recon': 'em-recon',
-      'electronic-recon': 'em-recon',
-      'em-interference': 'em-interference',
-      'electronic-jamming': 'em-interference',
-      'payload-silent': 'payload-silent',
-    };
-    if (semanticType in mapping) return mapping[semanticType];
-  }
-  // 针对通用 action_id（如 action:plan-1017:3:timestamp）无法推断时，返回空让 param 兜底
-  if (/^action:plan-\d+:\d+:\d+$/.test(aid)) return '';
-  // 项目实际数据服务器 action_id 前缀（如 CH_RETURN / FS_LENS / RS_40MM）
-  const projectMapping = {
-    // 底盘类
-    'ch-move': 'auto-move',
-    'ch-follow': 'follow-move',
-    'ch-silent': 'silent-guard',
-    'ch-set-return': 'set-return-point',
-    'ch-return': 'return-to-base',
-    'ch-formation': 'formation-move',
-    'ch-manual': 'manual-task',
-    'ch-pose': 'pose-adjust',
-    // 火力车
-    'fs-lens': 'lens-recon',
-    'fs-recon-strike': 'search-and-shoot',
-    'fs-gun': '7.62mm-gun-shot',
-    'fs-rocket': 'rocket-launch',
-    'fs-loiter': 'loitering-munition-launch',
-    // 侦打车
-    'rs-lens': 'lens-recon',
-    'rs-recon-strike': 'search-and-shoot',
-    'rs-40mm': '40mm-gun-launch',
-    'rs-at': 'at-missile-launch',
-    'rs-gun': '7.62mm-gun-shot',
-    'rs-laser': 'laser-illumination',
-    // 巡逻车
-    'pt-lens': 'lens-recon',
-    'pt-recon-strike': 'search-and-shoot',
-    'pt-gun': '7.62mm-gun-shot',
-    'pt-acoustic': 'sound-expel',
-    'pt-light': 'light-expel',
-    // 空地车 / 电磁车
-    'ag-air-recon': 'air-recon',
-    'el-recon': 'em-recon',
-    'el-jam': 'em-interference',
-    'el-silent': 'payload-silent',
-  };
-  if (aid in projectMapping) return projectMapping[aid];
-  const mapping = {
-    'auto-move': 'auto-move',
-    'follow-move': 'follow-move',
-    'silent-guard': 'silent-guard',
-    'set-return-point': 'set-return-point',
-    'return-to-base': 'return-to-base',
-    'formation-move': 'formation-move',
-    'manual-task': 'manual-task',
-    'pose-adjust': 'pose-adjust',
-    'air-recon': 'air-recon',
-    'lens-recon': 'lens-recon',
-    'search-and-shoot': 'search-and-shoot',
-    'recon-strike': 'search-and-shoot',
-    '40mm-gun-launch': '40mm-gun-launch',
-    'at-missile-launch': 'at-missile-launch',
-    'gun-shot': '7.62mm-gun-shot',
-    '7.62mm-gun-shot': '7.62mm-gun-shot',
-    'rocket-launch': 'rocket-launch',
-    'loitering-munition-launch': 'loitering-munition-launch',
-    'laser-illumination': 'laser-illumination',
-    'sound-expel': 'sound-expel',
-    'acoustic-deterrence': 'sound-expel',
-    'light-expel': 'light-expel',
-    'light-deterrence': 'light-expel',
-    'em-recon': 'em-recon',
-    'electronic-recon': 'em-recon',
-    'em-interference': 'em-interference',
-    'electronic-jamming': 'em-interference',
-    'payload-silent': 'payload-silent',
-  };
-  return mapping[aid] || '';
+  // 已废弃：类型判断统一使用 action_type，不再按 action_id 推断。
+  // 保留函数仅用于非关键路径的日志/提示，不参与任何业务决策。
+  return '';
 }
 
 function inferActionTypeFromParam(param) {
-  if (!param || typeof param !== 'object') return '';
-  const p = param;
-  const businessKeys = Object.keys(p).filter((k) => !COMMON_PARAM_FIELDS.has(k));
-  const has = (k) => k in p;
-  const businessHas = (k) => businessKeys.includes(k);
-
-  if (businessHas('ene') || businessHas('freq') || businessHas('meat')) return 'laser-illumination';
-  if (businessHas('points1') || businessHas('points2') || businessHas('points3')) return 'air-recon';
-  if (businessHas('frequency')) return (businessHas('protect') || p.sort === 1) ? 'em-interference' : 'em-recon';
-  if (businessHas('area') && businessHas('direct')) return 'lens-recon';
-  // 强声/强光拒止：area + attr + thr + dam===0（巡逻车特有）
-  if (businessHas('area') && businessHas('attr') && businessHas('thr') && p.dam === 0) {
-    return p.ammo === 0 ? 'sound-expel' : 'light-expel';
-  }
-  if (businessHas('area')) return 'search-and-shoot';
-  if (businessHas('points') && Array.isArray(p.points) && p.points.length > 0) {
-    const first = p.points[0];
-    if (first && typeof first === 'object') {
-      if (first.ammo_type === 2) return '40mm-gun-launch';
-      if (first.ammo_type === 1) return '7.62mm-gun-shot';
-      if ('ammo_type' in first) return 'at-missile-launch';
-      if ('r' in first || p.type === 2) return 'rocket-launch';
-      if ('loiter' in p || p.type === 3) return 'loitering-munition-launch';
-    }
-    // 编队机动：含 formation_mode 或路径点带 offsetX/offsetY
-    if (businessHas('formation_mode') || p.points.some((pt) => 'offsetX' in pt || 'offsetY' in pt)) return 'formation-move';
-    // 自主机动：points + limited_speed（且不是编队）
-    if (businessHas('limited_speed')) return 'auto-move';
-  }
-  if (businessHas('distance') && businessHas('x') && businessHas('y')) return 'follow-move';
-  if (businessHas('pose')) return 'pose-adjust';
-
-  // 兜底：仅含业务字段为空 / 仅 time / 仅 type 时
-  if (businessKeys.length === 0) return '';
-  if (businessKeys.length === 1 && businessHas('time')) return 'silent-guard';
-  if (businessKeys.length === 1 && businessHas('type')) return 'manual-task';
+  // 已废弃：类型判断统一使用 action_type，不再按 param 推断。
+  // 保留函数仅用于非关键路径的日志/提示，不参与任何业务决策。
   return '';
 }
 
 function inferActionTypeFromName(name) {
-  if (!name) return '';
-  const n = String(name).trim();
-  const map = {
-    '自主机动': 'auto-move',
-    '跟随机动': 'follow-move',
-    '静默值守': 'silent-guard',
-    '设置返航点': 'set-return-point',
-    '开启返航': 'return-to-base',
-    '编队机动': 'formation-move',
-    '人工任务': 'manual-task',
-    '姿态调整': 'pose-adjust',
-    '空中侦察': 'air-recon',
-    '光电侦察': 'lens-recon',
-    '侦察打击': 'search-and-shoot',
-    '巡逻车侦察打击': 'search-and-shoot',
-    '机枪打击': '7.62mm-gun-shot',
-    '火箭弹打击': 'rocket-launch',
-    '巡飞弹打击': 'loitering-munition-launch',
-    '40炮打击': '40mm-gun-launch',
-    '红箭13导弹打击': 'at-missile-launch',
-    '激光照射': 'laser-illumination',
-    '强声拒止': 'sound-expel',
-    '强光拒止': 'light-expel',
-    '电磁侦察': 'em-recon',
-    '电磁干扰': 'em-interference',
-    '载荷静默': 'payload-silent',
-  };
-  if (n in map) return map[n];
-  // 英文 / PascalCase / 无连字符兜底
-  const norm = n.toLowerCase().replace(/[-_.]/g, '');
-  const enMap = {
-    'automove': 'auto-move',
-    'followmove': 'follow-move',
-    'silentguard': 'silent-guard',
-    'setreturnpoint': 'set-return-point',
-    'setreturn': 'set-return-point',
-    'returntobase': 'return-to-base',
-    'return': 'return-to-base',
-    'formationmove': 'formation-move',
-    'formation': 'formation-move',
-    'manualtask': 'manual-task',
-    'manual': 'manual-task',
-    'poseadjust': 'pose-adjust',
-    'airrecon': 'air-recon',
-    'lensrecon': 'lens-recon',
-    'searchandshoot': 'search-and-shoot',
-    'reconstrike': 'search-and-shoot',
-    '40mmgunlaunch': '40mm-gun-launch',
-    '40mmgun': '40mm-gun-launch',
-    'atmissilelaunch': 'at-missile-launch',
-    'atmissile': 'at-missile-launch',
-    'gunshot': '7.62mm-gun-shot',
-    '762mmgunshot': '7.62mm-gun-shot',
-    '762mmgun': '7.62mm-gun-shot',
-    'rocketlaunch': 'rocket-launch',
-    'loiteringmunitionlaunch': 'loitering-munition-launch',
-    'loiteringmunition': 'loitering-munition-launch',
-    'laserillumination': 'laser-illumination',
-    'laser': 'laser-illumination',
-    'soundexpel': 'sound-expel',
-    'acousticdeterrence': 'sound-expel',
-    'lightexpel': 'light-expel',
-    'lightdeterrence': 'light-expel',
-    'emrecon': 'em-recon',
-    'electronicrecon': 'em-recon',
-    'eminterference': 'em-interference',
-    'electronicjamming': 'em-interference',
-    'payloadsilent': 'payload-silent',
-  };
-  return enMap[norm] || '';
+  // 已废弃：类型判断统一使用 action_type，不再按 name 推断。
+  // 保留函数仅用于非关键路径的日志/提示，不参与任何业务决策。
+  return '';
 }
 
 function getActionDisplayName(actionType, actionId = '') {
@@ -539,15 +336,15 @@ const payloadTaskMap = {
   ],
   'Patrol-UGV': [
     { actionType: 'Lens-Recon', name: '光电侦察', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
-    { actionType: 'Search-And-Shoot', name: '巡逻车侦察打击', defaultParam: { time: 180, tarty: 6, attr: 1, thr: 80, dam: 1, blk: 2, figt: 2, sug: 3, ammo: 10, strategy: 0, area: [] } },
+    { actionType: 'Search-And-Shoot', name: '巡逻车侦察打击', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
     { actionType: '7.62mm-Gun-Shot', name: '机枪打击', defaultParam: { time: 30, sort: 1, num: 1, points: [] } },
-    { actionType: 'Sound-Expel', name: '强声拒止', defaultParam: { time: 60, tarty: 1, attr: 2, thr: 50, dam: 0, blk: 0, figt: 0, sug: 0, ammo: 0, strategy: 0, area: [] } },
-    { actionType: 'Light-Expel', name: '强光拒止', defaultParam: { time: 60, tarty: 1, attr: 2, thr: 50, dam: 0, blk: 0, figt: 0, sug: 0, ammo: 0, strategy: 0, area: [] } },
+    { actionType: 'Sound-Expel', name: '强声拒止', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
+    { actionType: 'Light-Expel', name: '强光拒止', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
   ],
   'Electronic-UGV': [
-    { actionType: 'EM-Recon', name: '电磁侦察', defaultParam: { mode: 3, time: 300, num: 1, freqtype: 62, frequency: [], area: [] } },
-    { actionType: 'EM-Interference', name: '电磁干扰', defaultParam: { mode: 3, time: 300, sort: 1, num: 1, freqtype: 62, frequency: [], area: [], protect: {} } },
-    { actionType: 'Payload-Silent', name: '载荷静默', defaultParam: { time: 300 } },
+    { actionType: 'EM-Recon', name: '电磁侦察', defaultParam: { mode: 4, time: 300, num: 1, freqtype: 62, frequency: [], area: [] } },
+    { actionType: 'EM-Assault', name: '电磁突击', defaultParam: { mode: 4, time: 300, sort: 0, num: 1, freqtype: 62, frequency: [], area: [], protect: {} } },
+    { actionType: 'EM-Interference', name: '电磁干扰', defaultParam: { mode: 4, time: 300, sort: 1, num: 1, freqtype: 62, frequency: [], area: [], protect: {} } },
   ],
   'Air-Ground-UAV': [
     { actionType: 'Air-Recon', name: '空中侦察', defaultParam: { type: 2, mode: 1, time: 120, points1: [], points2: [], points3: [] } },
@@ -630,15 +427,12 @@ function initEditMode() {
     const id = `node_${a.action_id || a.action_seq || idx}_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
     seqToNodeId[String(a.action_seq)] = id;
     const rawActionType = a.action_type || '';
-    // name 是中文业务名称，最可靠；优先按 name 推断 action_type，可修复脏数据中
-    // action_type 与 name 不一致的问题（如开启返航被存成 set-return-point）
-    const nameInferred = inferActionTypeFromName(a.name);
+    // action_type 是前后端必须携带的字段，直接以 action_type 为准
     const isUnknown = !rawActionType || rawActionType.toLowerCase().includes('unknown');
-    let actionType = nameInferred || rawActionType;
+    let actionType = rawActionType;
     if (!actionType || String(actionType).toLowerCase().includes('unknown')) {
-      actionType = inferActionTypeFromId(a.action_id)
-        || inferActionTypeFromParam(a.param)
-        || actionType;
+      // 仅在 action_type 缺失时尝试标准化别名（如 PascalCase），不推断
+      actionType = normalizeActionType(actionType) || actionType;
     }
     const displayName = getActionDisplayName(actionType, a.action_id) || a.name || '';
     return {
@@ -691,9 +485,10 @@ function onDrop(event) {
   const rect = canvasRef.value.getBoundingClientRect();
   const x = event.clientX - rect.left - 60;
   const y = event.clientY - rect.top - 25;
+  const actionType = normalizeActionType(task.actionType);
   const node = {
     id: `node_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    actionType: task.actionType,
+    actionType,
     name: task.name,
     category: task.category || 'chassis',
     param: JSON.parse(JSON.stringify(task.defaultParam || {})),
@@ -1071,12 +866,12 @@ function fillAirReconFromFirst(param) {
 function autoFillCoordinates(param, actionType) {
   const type = String(actionType || '').toLowerCase().replace(/_/g, '-');
   // 需要区域的元任务
-  const areaTypes = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
+  const areaTypes = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
   if (areaTypes.includes(type)) {
     if (needsCoordinateFill(param.area)) fillAreaFromFirst(param);
   }
   // 需要路线的底盘机动类
-  if (['auto-move', 'formation-move'].includes(type)) {
+  if (type === 'auto-move') {
     if (needsCoordinateFill(param.points)) fillRouteFromFirst(param);
   }
   // 打击类：从目标资源取第一个点
@@ -1137,12 +932,10 @@ function buildActionsForVid(vid, planBase = null) {
       .filter((fromId) => idToSeq[fromId] !== undefined)
       .map((fromId) => String(idToSeq[fromId]));
     const displayName = n.name || getActionDisplayName(n.actionType);
-    // 推断最终 action_type：优先按显示名称（中文）推断，可修复节点 actionType 被脏数据污染的情况
-    let finalActionType = inferActionTypeFromName(displayName) || n.actionType;
+    // action_type 是前后端必须携带的字段，直接以节点 actionType 为准
+    let finalActionType = n.actionType;
     if (!finalActionType || String(finalActionType).toLowerCase().includes('unknown')) {
-      finalActionType = inferActionTypeFromId(n.originalActionId)
-        || inferActionTypeFromParam(n.param)
-        || finalActionType;
+      finalActionType = normalizeActionType(finalActionType) || finalActionType;
     }
     const normalizedParam = normalizeActionParam(n.param, finalActionType, vehicleType);
     autoFillCoordinates(normalizedParam, finalActionType);

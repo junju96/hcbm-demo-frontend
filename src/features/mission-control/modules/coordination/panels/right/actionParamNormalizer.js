@@ -175,12 +175,6 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     addCommonFields(p);
   } else if (type === 'set-return-point' || type === 'return-to-base') {
     addCommonFields(p);
-  } else if (type === 'formation-move') {
-    p.points = Array.isArray(p.points) && p.points.length ? p.points : [defaultPoint(), defaultPoint()];
-    p.limited_speed = p.limited_speed ?? 20;
-    p.formation_mode = p.formation_mode ?? 0;
-    p.safe_mode = p.safe_mode ?? 0;
-    addCommonFields(p);
   } else if (type === 'manual-task') {
     p.type = p.type ?? 1;
     addCommonFields(p);
@@ -207,20 +201,19 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     p.direct = p.direct && typeof p.direct === 'object' ? p.direct : defaultDirect();
     addCommonFields(p);
   } else if (type === 'search-and-shoot' || type === 'recon-strike') {
-    p.time = p.time ?? 180;
-    // 侦察打击区域点默认给两个占位点；如果 action 自身已保存区域点则保留原数量
-    p.area = Array.isArray(p.area) && p.area.length ? p.area : [defaultAreaPoint(), defaultAreaPoint()];
-    p.area_id = p.area_id ?? '';
     if (vt === 'patrol') {
-      p.tarty = p.tarty ?? 6;
-      p.attr = p.attr ?? 1;
-      p.thr = p.thr ?? 80;
-      p.dam = p.dam ?? 1;
-      p.blk = p.blk ?? 2;
-      p.figt = p.figt ?? 2;
-      p.sug = p.sug ?? 3;
-      p.ammo = p.ammo ?? 10;
-      p.strategy = p.strategy ?? 0;
+      // 巡逻车侦察打击与光电侦察数据格式保持一致
+      p.type = p.type ?? 2;
+      p.mode = p.mode ?? 3;
+      p.time = p.time ?? 120;
+      p.area = Array.isArray(p.area) && p.area.length ? p.area : [defaultAreaPoint(), defaultAreaPoint(), defaultAreaPoint(), defaultAreaPoint()];
+      p.area_id = p.area_id ?? '';
+      p.direct = p.direct && typeof p.direct === 'object' ? p.direct : defaultDirect();
+    } else {
+      p.time = p.time ?? 180;
+      // 侦察打击区域点默认给两个占位点；如果 action 自身已保存区域点则保留原数量
+      p.area = Array.isArray(p.area) && p.area.length ? p.area : [defaultAreaPoint(), defaultAreaPoint()];
+      p.area_id = p.area_id ?? '';
     }
     addCommonFields(p);
   } else if (type === 'rocket-launch' || type === 'loitering-munition-launch' || type === '40mm-gun-launch' || type === 'at-missile-launch') {
@@ -253,43 +246,52 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     p.alt = p.alt ?? 2100;
     addCommonFields(p);
   } else if (type === 'sound-expel' || type === 'acoustic-deterrence' || type === 'light-expel' || type === 'light-deterrence') {
-    p.time = p.time ?? 60;
-    p.tarty = p.tarty ?? 1;
-    p.attr = p.attr ?? 2;
-    p.thr = p.thr ?? 50;
-    p.dam = p.dam ?? 0;
-    p.blk = p.blk ?? 0;
-    p.figt = p.figt ?? 0;
-    p.sug = p.sug ?? 0;
-    p.ammo = p.ammo ?? 0;
-    p.strategy = p.strategy ?? 0;
-    p.area = Array.isArray(p.area) && p.area.length ? p.area : [defaultAreaPoint()];
-    p.area_id = p.area_id ?? '';
+    if (vt === 'patrol') {
+      // 巡逻车强声/强光拒止与光电侦察数据格式保持一致
+      p.type = p.type ?? 2;
+      p.mode = p.mode ?? 3;
+      p.time = p.time ?? 120;
+      p.area = Array.isArray(p.area) && p.area.length ? p.area : [defaultAreaPoint(), defaultAreaPoint(), defaultAreaPoint(), defaultAreaPoint()];
+      p.area_id = p.area_id ?? '';
+      p.direct = p.direct && typeof p.direct === 'object' ? p.direct : defaultDirect();
+    } else {
+      p.time = p.time ?? 60;
+      p.tarty = p.tarty ?? 1;
+      p.attr = p.attr ?? 2;
+      p.thr = p.thr ?? 50;
+      p.dam = p.dam ?? 0;
+      p.blk = p.blk ?? 0;
+      p.figt = p.figt ?? 0;
+      p.sug = p.sug ?? 0;
+      p.ammo = p.ammo ?? 0;
+      p.strategy = p.strategy ?? 0;
+      p.area = Array.isArray(p.area) && p.area.length ? p.area : [defaultAreaPoint()];
+      p.area_id = p.area_id ?? '';
+    }
     addCommonFields(p);
   } else if (type === 'em-recon' || type === 'electronic-recon') {
-    p.mode = p.mode ?? 3;
+    p.mode = 4;
     p.time = p.time ?? 300;
-    p.num = p.num ?? 1;
+    p.num = 1;
     p.freqtype = p.freqtype ?? 62;
     p.frequency = Array.isArray(p.frequency) && p.frequency.length ? p.frequency : defaultFrequency();
     p.area = Array.isArray(p.area) && p.area.length ? p.area : [defaultAreaPoint(), defaultAreaPoint(), defaultAreaPoint(), defaultAreaPoint()];
     p.area_id = p.area_id ?? '';
-    p.direct = p.direct && typeof p.direct === 'object' ? p.direct : defaultDirect();
     addCommonFields(p);
-  } else if (type === 'em-interference' || type === 'electronic-jamming') {
-    p.mode = p.mode ?? 3;
+  } else if (type === 'em-interference' || type === 'electronic-jamming' || type === 'em-assault' || type === 'electronic-assault') {
+    p.mode = 4;
     p.time = p.time ?? 300;
-    p.sort = p.sort ?? 1;
-    p.num = p.num ?? 1;
+    if (type === 'em-interference' || type === 'electronic-jamming') {
+      p.sort = p.sort ?? 1;
+    } else {
+      p.sort = p.sort ?? 0;
+    }
+    p.num = 1;
     p.freqtype = p.freqtype ?? 62;
     p.frequency = Array.isArray(p.frequency) && p.frequency.length ? p.frequency : defaultFrequency();
     p.area = Array.isArray(p.area) && p.area.length ? p.area : [defaultAreaPoint(), defaultAreaPoint(), defaultAreaPoint(), defaultAreaPoint()];
     p.area_id = p.area_id ?? '';
-    p.direct = p.direct && typeof p.direct === 'object' ? p.direct : defaultDirect();
     p.protect = p.protect && typeof p.protect === 'object' ? p.protect : defaultProtect();
-    addCommonFields(p);
-  } else if (type === 'payload-silent') {
-    p.time = p.time ?? 300;
     addCommonFields(p);
   }
 

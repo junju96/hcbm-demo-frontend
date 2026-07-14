@@ -152,6 +152,7 @@
                   :key="colIdx"
                   class="as-action-column"
                   :style="columnStyle(vehicle, column)"
+                  :class="{ 'single-row': isSingleRow(vehicle) }"
                 >
                   <template v-for="(action, rowIdx) in column" :key="action.action_id || `${action.stage_id}-${rowIdx}`">
                     <!-- 行动卡片 -->
@@ -159,7 +160,7 @@
                       class="as-action-card"
                       :class="`state-${(action.state || 'SCHEDULED').toLowerCase()}`"
                       :data-action-id="action.action_id"
-                      :style="cardStyle(vehicle, action)"
+                      :style="isSingleRow(vehicle) ? singleRowCardStyle(vehicle, action, colIdx) : cardStyle(vehicle, action)"
                       @dblclick="openParamDialog(action, vehicle)"
                     >
                       <div class="as-card-header" :title="getActionDisplayName(action)">
@@ -948,7 +949,6 @@ const actionTypeDisplayMap = {
   'silent-guard': '静默值守',
   'set-return-point': '设置返航点',
   'return-to-base': '开启返航',
-  'formation-move': '编队机动',
   'manual-task': '人工任务',
   'pose-adjust': '姿态调整',
   'air-recon': '空中侦察',
@@ -968,9 +968,10 @@ const actionTypeDisplayMap = {
   'light-deterrence': '强光拒止',
   'em-recon': '电磁侦察',
   'electronic-recon': '电磁侦察',
+  'em-assault': '电磁突击',
+  'electronic-assault': '电磁突击',
   'em-interference': '电磁干扰',
   'electronic-jamming': '电磁干扰',
-  'payload-silent': '载荷静默',
 };
 
 // 通用参数字段集合，推断 action_type 时应排除，避免误判
@@ -993,7 +994,6 @@ const inferActionTypeFromParam = (param) => {
 
   if (businessHas('ene') || businessHas('freq') || businessHas('meat')) return 'laser-illumination';
   if (businessHas('points1') || businessHas('points2') || businessHas('points3')) return 'air-recon';
-  if (businessHas('frequency')) return 'protect' in p || p.sort === 1 ? 'em-interference' : 'em-recon';
   if (businessHas('area') && businessHas('direct')) return 'lens-recon';
   // 强声/强光拒止：area + attr + thr + dam===0（巡逻车特有）
   if (businessHas('area') && businessHas('attr') && businessHas('thr') && p.dam === 0) {
@@ -1009,9 +1009,7 @@ const inferActionTypeFromParam = (param) => {
       if ('r' in first || p.type === 2) return 'rocket-launch';
       if ('loiter' in p || p.type === 3) return 'loitering-munition-launch';
     }
-    // 编队机动：含 formation_mode 或路径点带 offsetX/offsetY
-    if (businessHas('formation_mode') || p.points.some((pt) => 'offsetX' in pt || 'offsetY' in pt)) return 'formation-move';
-    // 自主机动：points + limited_speed（且不是编队）
+    // 自主机动：points + limited_speed
     if (businessHas('limited_speed')) return 'auto-move';
   }
   if (businessHas('distance') && businessHas('x') && businessHas('y')) return 'follow-move';
@@ -1061,7 +1059,6 @@ const inferActionTypeFromId = (actionId) => {
       'silent-guard': 'silent-guard',
       'set-return-point': 'set-return-point',
       'return-to-base': 'return-to-base',
-      'formation-move': 'formation-move',
       'manual-task': 'manual-task',
       'pose-adjust': 'pose-adjust',
       'air-recon': 'air-recon',
@@ -1081,9 +1078,10 @@ const inferActionTypeFromId = (actionId) => {
       'light-deterrence': 'light-expel',
       'em-recon': 'em-recon',
       'electronic-recon': 'em-recon',
+      'em-assault': 'em-assault',
+      'electronic-assault': 'em-assault',
       'em-interference': 'em-interference',
       'electronic-jamming': 'em-interference',
-      'payload-silent': 'payload-silent',
     };
     if (semanticType in mapping) return mapping[semanticType];
   }
@@ -1095,7 +1093,6 @@ const inferActionTypeFromId = (actionId) => {
     'ch-silent': 'silent-guard',
     'ch-set-return': 'set-return-point',
     'ch-return': 'return-to-base',
-    'ch-formation': 'formation-move',
     'ch-manual': 'manual-task',
     'ch-pose': 'pose-adjust',
     // 火力车
@@ -1120,8 +1117,8 @@ const inferActionTypeFromId = (actionId) => {
     // 空地车 / 电磁车
     'ag-air-recon': 'air-recon',
     'el-recon': 'em-recon',
+    'el-assault': 'em-assault',
     'el-jam': 'em-interference',
-    'el-silent': 'payload-silent',
   };
   if (aid in projectMapping) return projectMapping[aid];
   return '';
@@ -1136,7 +1133,6 @@ const inferActionTypeFromName = (name) => {
     '静默值守': 'silent-guard',
     '设置返航点': 'set-return-point',
     '开启返航': 'return-to-base',
-    '编队机动': 'formation-move',
     '人工任务': 'manual-task',
     '姿态调整': 'pose-adjust',
     '空中侦察': 'air-recon',
@@ -1152,8 +1148,8 @@ const inferActionTypeFromName = (name) => {
     '强声拒止': 'sound-expel',
     '强光拒止': 'light-expel',
     '电磁侦察': 'em-recon',
+    '电磁突击': 'em-assault',
     '电磁干扰': 'em-interference',
-    '载荷静默': 'payload-silent',
   };
   if (n in map) return map[n];
   // 英文 / PascalCase / 无连字符兜底
@@ -1166,8 +1162,6 @@ const inferActionTypeFromName = (name) => {
     'setreturn': 'set-return-point',
     'returntobase': 'return-to-base',
     'return': 'return-to-base',
-    'formationmove': 'formation-move',
-    'formation': 'formation-move',
     'manualtask': 'manual-task',
     'manual': 'manual-task',
     'poseadjust': 'pose-adjust',
@@ -1193,9 +1187,10 @@ const inferActionTypeFromName = (name) => {
     'lightdeterrence': 'light-expel',
     'emrecon': 'em-recon',
     'electronicrecon': 'em-recon',
+    'emassault': 'em-assault',
+    'electronicassault': 'em-assault',
     'eminterference': 'em-interference',
     'electronicjamming': 'em-interference',
-    'payloadsilent': 'payload-silent',
   };
   return enMap[norm] || '';
 };
@@ -1426,8 +1421,21 @@ const cardStyle = (vehicle, action) => {
   return { position: 'absolute', top: `${o.top}px`, left: '0', width: '100%' };
 };
 
+// 单列（只有一行 action）时横向顺排，避免卡片垂直错行
+const isSingleRow = (vehicle) => {
+  const columns = getActionColumns(vehicle);
+  return columns.length > 1 && columns.every((col) => col.length <= 1);
+};
+
+const singleRowCardStyle = (vehicle, action, colIdx) => {
+  return { position: 'relative', top: '0', left: '0', width: '100%' };
+};
+
 // 每列容器高度（取列内最靠下卡片的底部）
 const columnStyle = (vehicle, column) => {
+  if (isSingleRow(vehicle)) {
+    return { position: 'relative', height: undefined };
+  }
   const offsets = getCardOffsets(vehicle);
   let maxBottom = 0;
   column.forEach((action) => {
@@ -2181,11 +2189,10 @@ watch(
   { deep: true }
 );
 
-// 切换到操控端行动序列视图时，重新加载可用车辆列表，并检查是否已选择实车
+// 切换到操控端行动序列视图时，重新加载可用车辆列表，并强制弹出车辆选择弹窗
 watch(isControlMode, (newVal, oldVal) => {
   if (newVal && !oldVal) {
     loadOnlineVehicles();
-    // 调试：每次切到操控席行动序列都强制弹出车辆选择弹窗
     selectedConnectedVehicleId.value = '';
     ensureVehicleSelected(true);
   }
@@ -2221,9 +2228,10 @@ onMounted(() => {
   updateMarqueeStates();
   startAutoRefresh();
   window.addEventListener('resize', onWindowResize);
-  // 操控端行动序列视图：进入时检查并提示选择车辆
+  // 操控端行动序列视图：进入时强制弹出车辆选择框
   if (isControlMode.value) {
-    ensureVehicleSelected();
+    selectedConnectedVehicleId.value = '';
+    ensureVehicleSelected(true);
   }
 });
 
@@ -2236,7 +2244,7 @@ const ensureVehicleSelected = async (force = false) => {
     return;
   }
   connectedVehicles.value = result.data.items || [];
-  // 调试模式 force=true 时忽略后端已选状态，强制弹窗
+  // 默认行为：跟随后端已选状态；force=true 时忽略后端已选状态，强制弹窗
   if (!force) {
     selectedConnectedVehicleId.value = result.data.selected || '';
   }
@@ -2655,6 +2663,16 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.as-action-column.single-row {
+  height: auto !important;
+}
+
+.as-action-column.single-row .as-action-card {
+  position: relative !important;
+  top: 0 !important;
+  margin-bottom: 0;
 }
 
 /* 同列内垂直连接线 */
