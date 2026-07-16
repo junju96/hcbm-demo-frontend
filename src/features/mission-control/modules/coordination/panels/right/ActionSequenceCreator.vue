@@ -347,7 +347,7 @@ const payloadTaskMap = {
     { actionType: 'EM-Interference', name: '电磁干扰', defaultParam: { mode: 4, time: 300, sort: 1, num: 1, freqtype: 62, frequency: [], area: [], protect: {} } },
   ],
   'Air-Ground-UAV': [
-    { actionType: 'Air-Recon', name: '空中侦察', defaultParam: { type: 2, mode: 1, time: 120, points1: [], points2: [], points3: [] } },
+    { actionType: 'Air-Recon', name: '空中侦察', defaultParam: { type: 2, mode: 1, time: 120, points: [] } },
   ],
 };
 
@@ -843,7 +843,7 @@ function fillTargetFromFirst(param) {
 function fillAirReconFromFirst(param) {
   const first = areaList.value[0];
   if (!first || !Array.isArray(first.points) || first.points.length === 0) return;
-  param.points1 = first.points.map((pt) => ({
+  param.points = first.points.map((pt) => ({
     lon: Number(pt?.lon ?? pt?.longitude ?? 0),
     lat: Number(pt?.lat ?? pt?.latitude ?? 0),
     alt: Number(pt?.alt ?? pt?.altitude ?? 0),
@@ -881,7 +881,7 @@ function autoFillCoordinates(param, actionType) {
   }
   // 空中侦察：航路点默认用第一个区域
   if (type === 'air-recon') {
-    if (needsCoordinateFill(param.points1)) fillAirReconFromFirst(param);
+    if (needsCoordinateFill(param.points)) fillAirReconFromFirst(param);
   }
 }
 

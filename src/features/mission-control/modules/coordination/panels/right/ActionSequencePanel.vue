@@ -177,8 +177,8 @@
                         <span v-if="action.param?.waypoints" class="as-card-waypoints" :title="`${action.param.waypoints.length} 个航路点`">
                           <span class="marquee-text">{{ action.param.waypoints.length }} 个航路点</span>
                         </span>
-                        <span v-else-if="action.param?.points1?.length" class="as-card-waypoints" :title="`${action.param.points1.length} 个航路点`">
-                          <span class="marquee-text">{{ action.param.points1.length }} 个航路点</span>
+                        <span v-else-if="action.param?.points?.length" class="as-card-waypoints" :title="`${action.param.points.length} 个航路点`">
+                          <span class="marquee-text">{{ action.param.points.length }} 个航路点</span>
                         </span>
                         <span v-else-if="action.description" class="as-card-desc" :title="action.description">
                           <span class="marquee-text">{{ action.description }}</span>
@@ -993,7 +993,12 @@ const inferActionTypeFromParam = (param) => {
   const businessHas = (k) => businessKeys.includes(k);
 
   if (businessHas('ene') || businessHas('freq') || businessHas('meat')) return 'laser-illumination';
-  if (businessHas('points1') || businessHas('points2') || businessHas('points3')) return 'air-recon';
+  if (businessHas('points') && Array.isArray(p.points) && p.points.length > 0) {
+    const first = p.points[0];
+    if (first && typeof first === 'object' && ('camera' in first || 'speed' in first || 'gimpitch' in first)) {
+      return 'air-recon';
+    }
+  }
   if (businessHas('area') && businessHas('direct')) return 'lens-recon';
   // 强声/强光拒止：area + attr + thr + dam===0（巡逻车特有）
   if (businessHas('area') && businessHas('attr') && businessHas('thr') && p.dam === 0) {

@@ -188,9 +188,10 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     p.type = p.type ?? 2;
     p.mode = p.mode ?? 1;
     p.time = p.time ?? 120;
-    p.points1 = Array.isArray(p.points1) && p.points1.length ? p.points1 : [defaultAirReconPoint()];
-    p.points2 = Array.isArray(p.points2) ? p.points2 : [];
-    p.points3 = Array.isArray(p.points3) ? p.points3 : [];
+    p.points = Array.isArray(p.points) && p.points.length ? p.points : [defaultAirReconPoint()];
+    delete p.points1;
+    delete p.points2;
+    delete p.points3;
     addCommonFields(p);
   } else if (type === 'lens-recon') {
     p.type = p.type ?? 2;

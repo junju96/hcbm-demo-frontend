@@ -137,7 +137,7 @@
           </div>
         </template>
 
-        <!-- 9. 光电侦察（火力/侦打/巡逻） -->
+        <!-- 9. 空中侦察 -->
         <template v-else-if="normalizedActionType === 'air-recon'">
           <div class="apd-section">
             <div class="apd-section-title">侦察参数</div>
@@ -159,7 +159,7 @@
           </div>
           <div class="apd-section">
             <div class="apd-section-title">航路点列表</div>
-            <div v-for="(pt, idx) in editedParam.points1" :key="idx" class="apd-air-point">
+            <div v-for="(pt, idx) in editedParam.points" :key="idx" class="apd-air-point">
               <div class="apd-air-row">
                 <label class="apd-air-cell"><span>经度</span><input v-model.number="pt.lon" type="number" step="0.000001" /></label>
                 <label class="apd-air-cell"><span>纬度</span><input v-model.number="pt.lat" type="number" step="0.000001" /></label>
@@ -196,10 +196,10 @@
                 <label class="apd-air-cell"><span>朝向</span><input v-model.number="pt.playaw" type="number" /></label>
                 <label class="apd-air-cell"><span>倍率</span><input v-model.number="pt.zoom" type="number" /></label>
                 <label class="apd-air-cell"><span>悬停</span><input v-model.number="pt.loiter" type="number" /></label>
-                <button class="as-btn mini danger" type="button" :disabled="editedParam.points1.length <= 1" @click="removePoint('points1', idx)">删除</button>
+                <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removePoint('points', idx)">删除</button>
               </div>
             </div>
-            <button class="as-btn mini primary" type="button" @click="addPoint('points1')">+ 添加航路点</button>
+            <button class="as-btn mini primary" type="button" @click="addPoint('points')">+ 添加航路点</button>
           </div>
         </template>
 
@@ -595,7 +595,12 @@ function inferActionTypeFromParam(param) {
   // 激光照射
   if (['ene', 'freq', 'meat'].some((k) => businessHas(k))) return 'laser-illumination';
   // 空中侦察
-  if (businessHas('points1') || businessHas('points2') || businessHas('points3')) return 'air-recon';
+  if (businessHas('points') && Array.isArray(p.points) && p.points.length > 0) {
+    const first = p.points[0];
+    if (first && typeof first === 'object' && ('camera' in first || 'speed' in first || 'gimpitch' in first)) {
+      return 'air-recon';
+    }
+  }
   // 光电侦察：area + direct
   if (businessHas('area') && businessHas('direct')) return 'lens-recon';
   // 侦察打击：有 area 但没 direct
@@ -1022,7 +1027,7 @@ function defaultAirReconPoint() {
 }
 
 function addPoint(field) {
-  const defaults = { points: defaultPoint, area: defaultAreaPoint, points1: defaultAirReconPoint };
+  const defaults = { points: defaultAirReconPoint, area: defaultAreaPoint };
   editedParam.value[field].push(defaults[field] ? defaults[field]() : defaultPoint());
 }
 
@@ -1197,31 +1202,29 @@ function finalizeParam() {
       editedParam.value.num = editedParam.value.points.length;
     }
   }
-  // 空中侦察：points1/2/3 兜底回填
+  // 空中侦察：points 兜底回填
   if (type === 'air-recon') {
-    ['points1', 'points2', 'points3'].forEach((field) => {
-      const list = editedParam.value[field];
-      if (!Array.isArray(list) || list.length === 0 || isAllZeroPoints(list)) {
-        const first = areaList.value[0];
-        if (first && Array.isArray(first.points) && first.points.length > 0) {
-          editedParam.value[field] = first.points.map((pt) => ({
-            lon: Number(pt?.lon ?? pt?.longitude ?? 0),
-            lat: Number(pt?.lat ?? pt?.latitude ?? 0),
-            alt: Number(pt?.alt ?? pt?.altitude ?? 0),
-            type: 0,
-            speed: 0,
-            camera: 1,
-            gimpitch: 36100,
-            gimyaw: 36100,
-            action: 1,
-            playaw: 36100,
-            zoom: 0,
-            loiter: 0,
-          }));
-          hasAutoFilled.value = true;
-        }
+    const list = editedParam.value.points;
+    if (!Array.isArray(list) || list.length === 0 || isAllZeroPoints(list)) {
+      const first = areaList.value[0];
+      if (first && Array.isArray(first.points) && first.points.length > 0) {
+        editedParam.value.points = first.points.map((pt) => ({
+          lon: Number(pt?.lon ?? pt?.longitude ?? 0),
+          lat: Number(pt?.lat ?? pt?.latitude ?? 0),
+          alt: Number(pt?.alt ?? pt?.altitude ?? 0),
+          type: 0,
+          speed: 0,
+          camera: 1,
+          gimpitch: 36100,
+          gimyaw: 36100,
+          action: 1,
+          playaw: 36100,
+          zoom: 0,
+          loiter: 0,
+        }));
+        hasAutoFilled.value = true;
       }
-    });
+    }
   }
 }
 
