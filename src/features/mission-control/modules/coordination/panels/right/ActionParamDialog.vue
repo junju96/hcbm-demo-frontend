@@ -560,7 +560,8 @@ function inferActionTypeFromName(name) {
     '光电侦察': 'lens-recon', '侦察打击': 'search-and-shoot', '巡逻车侦察打击': 'search-and-shoot',
     '机枪打击': '7.62mm-gun-shot', '火箭弹打击': 'rocket-launch', '巡飞弹打击': 'loitering-munition-launch',
     '40炮打击': '40mm-gun-launch', '红箭13导弹打击': 'at-missile-launch', '激光照射': 'laser-illumination',
-    '强声拒止': 'sound-expel', '强光拒止': 'light-expel', '电磁侦察': 'em-recon', '电磁干扰': 'em-interference',
+    '强声拒止': 'sound-expel', '强光拒止': 'light-expel',
+    '电磁侦察': 'em-recon', '电磁突击': 'em-assault', '电磁干扰': 'em-interference',
     '载荷静默': 'payload-silent',
   };
   if (name in map) return map[name];
@@ -577,7 +578,8 @@ function inferActionTypeFromName(name) {
     'loiteringmunition': 'loitering-munition-launch', 'laserillumination': 'laser-illumination',
     'laser': 'laser-illumination', 'soundexpel': 'sound-expel', 'acousticdeterrence': 'sound-expel',
     'lightexpel': 'light-expel', 'lightdeterrence': 'light-expel', 'emrecon': 'em-recon',
-    'electronicrecon': 'em-recon', 'eminterference': 'em-interference', 'electronicjamming': 'em-interference',
+    'electronicrecon': 'em-recon', 'emassault': 'em-assault', 'electronicassault': 'em-assault',
+    'eminterference': 'em-interference', 'electronicjamming': 'em-interference',
     'payloadsilent': 'payload-silent',
   };
   return enMap[compact] || '';
