@@ -1027,8 +1027,16 @@ function defaultAirReconPoint() {
 }
 
 function addPoint(field) {
-  const defaults = { points: defaultAirReconPoint, area: defaultAreaPoint };
-  editedParam.value[field].push(defaults[field] ? defaults[field]() : defaultPoint());
+  if (field === 'area') {
+    editedParam.value[field].push(defaultAreaPoint());
+    return;
+  }
+  // 根据当前行动类型选择正确的默认点结构：air-recon 用侦察点，其他（auto-move 等）用普通航路点
+  if (normalizedActionType.value === 'air-recon') {
+    editedParam.value[field].push(defaultAirReconPoint());
+  } else {
+    editedParam.value[field].push(defaultPoint());
+  }
 }
 
 function removePoint(field, idx) {

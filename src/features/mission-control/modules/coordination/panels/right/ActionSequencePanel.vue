@@ -6,9 +6,10 @@
         <button class="as-btn primary" type="button" @click="onRefresh">
           刷新
         </button>
-        <button class="as-btn" type="button" @click="openCreator">
+        <!-- 暂不开放直接新建方案，仅支持对列表中已有方案进行 action 增删改 -->
+        <!-- <button class="as-btn" type="button" @click="openCreator">
           新建
-        </button>
+        </button> -->
       </div>
     </div>
 
@@ -386,7 +387,7 @@
         :vehicle-type="editingVehicleType"
         @close="closeParamDialog"
         @save="saveActionParam"
-        @cancel="saveActionParam"
+        @cancel="closeParamDialog"
       />
       <ActionSequenceCreator
         v-if="showCreator"
