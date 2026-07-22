@@ -279,9 +279,9 @@
       <div class="as-dialog">
         <div class="as-dialog-header">{{ isControlMode ? '选择要新建行动序列的车型' : '选择要追加行动序列的车型' }}</div>
         <div class="as-dialog-body">
-          <label v-for="v in missingVehicleTypes" :key="v.type" class="as-dialog-item">
+          <label v-for="v in missingVehicleTypes" :key="v.vid" class="as-dialog-item">
             <input type="radio" :value="v" v-model="selectedMissingVehicle" />
-            <span>{{ v.name }} {{ v.type ? '(' + v.type + ')' : '' }}</span>
+            <span>{{ v.resource_name || v.name }} {{ v.type ? '(' + v.type + ')' : '' }}</span>
           </label>
           <div v-if="missingVehicleTypes.length === 0" class="as-dialog-empty">
             暂无可新建的车型，请检查车辆在线状态或刷新后重试。
@@ -919,8 +919,8 @@ const supportedVehicleTypes = computed(() =>
 );
 
 const missingVehicleTypes = computed(() => {
-  const existingTypes = new Set((vehicleActions.value || []).map((v) => v.resource_type).filter(Boolean));
-  return supportedVehicleTypes.value.filter((v) => !existingTypes.has(v.type));
+  const existingVids = new Set((vehicleActions.value || []).map((v) => v.vid).filter(Boolean));
+  return supportedVehicleTypes.value.filter((v) => !existingVids.has(v.vid));
 });
 
 // 非操控席模式：详情页新增行动序列时可用的车型（允许已存在的车型再次追加）
