@@ -2211,18 +2211,61 @@ watch([isControlMode, selectedPlanId], ([control, planId]) => {
   }
 });
 
-/* ---------- 自动刷新 ---------- */
-let autoRefreshTimer = null;
+/* ---------- SSE 实时刷新（替代轮询） ---------- */
+let eventSource = null;
+const startPlanEventStream = () => {
+  if (eventSource) return;
+  eventSource = new EventSource('/api/v1/action-sequences/events');
+
+  eventSource.addEventListener('action_sequence.plan.updated', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      const planId = data.plan_id;
+      console.log('[ActionSequencePanel] plan updated via SSE:', planId);
+      // 如果当前选中该 plan，刷新详情；同时静默刷新列表保持状态一致
+      if (selectedPlanId.value === planId) {
+        refreshDetail(planId);
+      }
+      loadPlans(true);
+    } catch (err) {
+      console.warn('[ActionSequencePanel] parse SSE plan.updated failed:', err);
+    }
+  });
+
+  eventSource.addEventListener('action_sequence.plan.count_changed', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      console.log('[ActionSequencePanel] plan count changed via SSE:', data);
+      // 新增/删除 plan 时刷新列表；如果删除的是当前选中 plan，清空选中
+      loadPlans(true);
+      if (data.operation === 'delete' && selectedPlanId.value === data.plan_id) {
+        selectedPlanId.value = null;
+        selectedPlan.value = null;
+      }
+    } catch (err) {
+      console.warn('[ActionSequencePanel] parse SSE plan.count_changed failed:', err);
+    }
+  });
+
+  eventSource.onerror = (err) => {
+    console.warn('[ActionSequencePanel] SSE connection error:', err);
+    // EventSource 会自动重连，无需手动处理
+  };
+};
+
+const stopPlanEventStream = () => {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+};
+
+// 保留原轮询接口用于兼容（编辑弹窗等场景临时停止/恢复）
 const startAutoRefresh = () => {
-  autoRefreshTimer = setInterval(() => {
-    loadPlans(true); // silent: 自动刷新不显示 loading，避免闪烁
-  }, 5000);
+  startPlanEventStream();
 };
 const stopAutoRefresh = () => {
-  if (autoRefreshTimer) {
-    clearInterval(autoRefreshTimer);
-    autoRefreshTimer = null;
-  }
+  stopPlanEventStream();
 };
 
 /* ---------- 生命周期 ---------- */
@@ -2232,7 +2275,7 @@ onMounted(() => {
   loadOnlineVehicles();
   loadPlans();
   updateMarqueeStates();
-  startAutoRefresh();
+  startPlanEventStream();
   window.addEventListener('resize', onWindowResize);
   // 操控端行动序列视图：进入时强制弹出车辆选择框
   if (isControlMode.value) {
