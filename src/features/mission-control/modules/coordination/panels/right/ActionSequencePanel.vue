@@ -352,15 +352,23 @@
       <div class="as-dialog">
         <div class="as-dialog-header">选择操控车辆</div>
         <div class="as-dialog-body">
-          <p style="margin: 0 0 0.8rem; color: rgba(241,254,255,0.85);">请从当前已连接车辆中选择一辆，用于接收 MissionService 反馈：</p>
+          <p style="margin: 0 0 0.8rem; color: rgba(241,254,255,0.85);">请选择一辆用于接收 MissionService 反馈（绿色为在线，灰色为离线）：</p>
           <label
             v-for="v in connectedVehicles"
             :key="v.vid"
             class="as-dialog-item"
-            :class="{ active: selectedConnectedVehicleId === v.vid }"
+            :class="{ active: selectedConnectedVehicleId === v.vid, offline: v.online_status !== 'ONLINE' }"
           >
             <input v-model="selectedConnectedVehicleId" type="radio" :value="v.vid" />
             <span style="font-weight: 600;">{{ v.name || v.resource_name || v.vid }}</span>
+            <span
+              style="margin-left: 8px; font-size: 11px; padding: 1px 6px; border-radius: 4px;"
+              :style="v.online_status === 'ONLINE'
+                ? 'background: rgba(0,222,200,0.2); color: #00dec8;'
+                : 'background: rgba(255,100,100,0.2); color: #ff6464;'"
+            >
+              {{ v.online_status === 'ONLINE' ? '在线' : '离线' }}
+            </span>
             <span style="margin-left: auto; color: rgba(241,254,255,0.65); font-size: 12px;">{{ v.vmf ? `VMF: ${v.vmf}` : '' }} {{ v.ip ? `IP: ${v.ip}` : '' }}</span>
           </label>
         </div>
@@ -3013,6 +3021,10 @@ onUnmounted(() => {
 
 .as-dialog-item:hover {
   color: #fff;
+}
+
+.as-dialog-item.offline {
+  opacity: 0.6;
 }
 
 .as-dialog-item input[type='checkbox'],
