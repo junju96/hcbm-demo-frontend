@@ -5,3 +5,4 @@ dist/
 preview.log
 ._*
 frontend-5173-run.log
+frontend-5173.pid
