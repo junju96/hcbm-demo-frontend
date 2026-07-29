@@ -2441,7 +2441,22 @@ const onConfirmSelectVehicle = async () => {
   selectingVehicle.value = false;
   if (result.ok) {
     showVehicleSelectDialog.value = false;
-    appendSystemMessage(`已选择车辆 ${selectedConnectedVehicleId.value} 并订阅反馈`);
+    
+    // 更新 connectedVehicleId 和 connectedVehicleType，触发任务列表过滤
+    connectedVehicleId.value = selectedConnectedVehicleId.value;
+    const selectedVehicle = connectedVehicles.value.find(
+      (v) => v.vid === selectedConnectedVehicleId.value
+    );
+    if (selectedVehicle && selectedVehicle.resource_type) {
+      connectedVehicleType.value = selectedVehicle.resource_type;
+      isVehicleConnected.value = true;
+      appendSystemMessage(`已选择车辆 ${selectedConnectedVehicleId.value} 并订阅反馈`);
+      // 重新加载任务列表，应用过滤
+      loadPlans();
+    } else {
+      isVehicleConnected.value = false;
+      appendSystemMessage('无法获取车辆类型，无法显示行动序列');
+    }
   } else {
     console.warn('[ActionSequencePanel] select vehicle failed:', result.error);
     alert(`选择车辆失败: ${result.error || '未知错误'}`);
