@@ -482,12 +482,17 @@ export const fetchCurrentUser = async () => {
   return { ok: true, data: result.data };
 };
 
-/** 查询车辆信息 */
+/** 查询车辆信息（通过 /vehicle/info/all 按 ID 匹配） */
 export const fetchVehicleInfo = async (vehicleId) => {
   const cleanId = String(vehicleId || '').replace('equipment:', '');
-  const result = await getJson(joinApiUrl(`/vehicle/info/${cleanId}`));
+  const result = await getJson(joinApiUrl('/vehicle/info/all'));
   if (!result.ok) return result;
-  return { ok: true, data: result.data };
+  const items = result.data || [];
+  const vehicle = items.find(v => String(v.vehicle_id || '').replace('equipment:', '') === cleanId);
+  if (!vehicle) {
+    return { ok: false, error: `Vehicle not found: ${vehicleId}`, data: null };
+  }
+  return { ok: true, data: vehicle };
 };
 
 /** 操控端 — 选中一辆车并订阅 zenoh 反馈 */

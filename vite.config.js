@@ -17,6 +17,16 @@ export default defineConfig({
         target: 'http://25.11.1.178:28802',
         changeOrigin: true,
       },
+      // 用户服务代理（/user/current 等）
+      '/user': {
+        target: 'http://25.11.1.178:28009',
+        changeOrigin: true,
+      },
+      // 车辆信息服务代理（/vehicle/info/all 等）
+      '/vehicle': {
+        target: 'http://25.11.1.147:28410',
+        changeOrigin: true,
+      },
       // API 请求代理，解决开发环境跨域问题
       '/api': {
         target: 'http://localhost:28600',
