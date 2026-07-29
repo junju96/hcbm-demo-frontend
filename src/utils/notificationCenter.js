@@ -43,17 +43,19 @@ const normalizeCenterNotificationPayload = (payload = {}) => ({
 
 const getNotificationSettings = () => loadSystemSettings();
 
+import { API_BASE_URL, NOTIFICATION_BASE_URL } from '../config/serverConfig.js';
+
 const getNotificationBaseURL = () => {
   const settings = getNotificationSettings();
   if (settings.notificationBaseURL) {
     return settings.notificationBaseURL;
   }
   try {
-    const url = new URL(settings.apiBaseURL || 'http://25.11.1.178:28600');
+    const url = new URL(settings.apiBaseURL || API_BASE_URL);
     url.port = '28004';
     return url.origin;
   } catch {
-    return 'http://25.11.1.178:28004';
+    return NOTIFICATION_BASE_URL;
   }
 };
 

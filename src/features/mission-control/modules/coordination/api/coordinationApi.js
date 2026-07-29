@@ -1,7 +1,7 @@
 // coordinationApi.js — 协同指控模块后端 API 封装
 // 职责：统一 HTTP 请求 + 后端数据 → 前端数据模型适配
 
-const COORDINATION_BASE_URL = 'http://25.11.1.222:28600';
+import { COORDINATION_BASE_URL } from '../../../../config/serverConfig.js';
 
 const joinApiUrl = (path) => {
   // 开发环境通过 Vite proxy 走相对路径，避免跨域
@@ -567,7 +567,7 @@ export const deleteOperatorVehicle = async (planId, vid) => {
 
 /* ==================== 态势池 API ==================== */
 
-const SITUATION_POOL_BASE_URL = 'http://25.11.1.178:28802';
+import { SITUATION_POOL_BASE_URL } from '../../../../config/serverConfig.js';
 
 const joinSituationUrl = (path) => {
   if (import.meta.env.DEV) {
@@ -617,7 +617,7 @@ function adaptFusionedTarget(raw) {
 
 /* ==================== 地图服务 API ==================== */
 
-const MAP_SERVICE_BASE_URL = 'http://25.11.1.178:28001';
+import { MAP_SERVICE_BASE_URL } from '../../../../config/serverConfig.js';
 
 const joinMapUrl = (path) => {
   // 开发环境通过 Vite proxy 走相对路径，方便在终端查看代理日志

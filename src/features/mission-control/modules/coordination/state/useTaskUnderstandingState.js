@@ -13,7 +13,7 @@ import {
   saveTaskUnderstandingDb,
 } from './taskUnderstandingLocalDb';
 
-const COORDINATION_BASE_URL = 'http://25.11.1.178:28600';
+import { COORDINATION_BASE_URL } from '../../../../config/serverConfig.js';
 
 const joinApiUrl = (path) => {
   // 开发环境通过 Vite proxy 走相对路径，避免跨域

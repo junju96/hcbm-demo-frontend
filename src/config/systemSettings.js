@@ -9,9 +9,11 @@ export const DEFAULT_ENDPOINTS = Object.freeze({
   notificationStream: '/notifications/stream',
 });
 
+import { API_BASE_URL, NOTIFICATION_BASE_URL } from './serverConfig.js';
+
 export const DEFAULT_SETTINGS = Object.freeze({
-  apiBaseURL: 'http://25.11.1.178:28600',
-  notificationBaseURL: 'http://25.11.1.178:28004',
+  apiBaseURL: API_BASE_URL,
+  notificationBaseURL: NOTIFICATION_BASE_URL,
   endpoints: {
     ...DEFAULT_ENDPOINTS,
   },

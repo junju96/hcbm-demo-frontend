@@ -116,6 +116,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { joinURL, loadSystemSettings } from '../../../../config/systemSettings';
+import { API_BASE_URL, NOTIFICATION_BASE_URL } from '../../../../config/serverConfig.js';
 
 const emit = defineEmits(['navigate-target', 'history-visibility-change']);
 
@@ -139,11 +140,11 @@ const getNotificationBaseURL = () => {
     return settings.notificationBaseURL;
   }
   try {
-    const url = new URL(settings.apiBaseURL || 'http://25.11.1.178:28600');
+    const url = new URL(settings.apiBaseURL || API_BASE_URL);
     url.port = '28004';
     return url.origin;
   } catch {
-    return 'http://25.11.1.178:28004';
+    return NOTIFICATION_BASE_URL;
   }
 };
 
