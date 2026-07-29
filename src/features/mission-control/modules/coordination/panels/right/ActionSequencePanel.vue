@@ -101,24 +101,26 @@
                 <span class="as-vehicle-name">{{ getVehicleDisplayName(vehicle) }}</span>
                 <div class="as-vehicle-controls">
                   <template v-if="isControlMode">
-                    <template v-if="getVehicleRuntimeState(vehicle) === 'SCHEDULED'">
-                      <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('start', [vehicle.vid])">开始</button>
-                    </template>
-                    <template v-if="getVehicleRuntimeState(vehicle) === 'ACTIVE'">
-                      <button class="as-btn mini warn" type="button" :disabled="controlLoading" @click="executeControl('pause', [vehicle.vid])">暂停</button>
-                    </template>
-                    <template v-if="getVehicleRuntimeState(vehicle) === 'PAUSED'">
-                      <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('resume', [vehicle.vid])">继续</button>
-                    </template>
-                    <template v-if="getVehicleRuntimeState(vehicle) === 'DONE'">
-                      <span class="as-state-badge done">已完成</span>
-                    </template>
-                    <template v-if="['ACTIVE', 'PAUSED'].includes(getVehicleRuntimeState(vehicle))">
-                      <button class="as-btn mini danger" type="button" :disabled="controlLoading" @click="executeControl('stop', [vehicle.vid])">停止</button>
+                    <template v-if="canOperateVehicle(vehicle)">
+                      <template v-if="getVehicleRuntimeState(vehicle) === 'SCHEDULED'">
+                        <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('start', [vehicle.vid])">开始</button>
+                      </template>
+                      <template v-if="getVehicleRuntimeState(vehicle) === 'ACTIVE'">
+                        <button class="as-btn mini warn" type="button" :disabled="controlLoading" @click="executeControl('pause', [vehicle.vid])">暂停</button>
+                      </template>
+                      <template v-if="getVehicleRuntimeState(vehicle) === 'PAUSED'">
+                        <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('resume', [vehicle.vid])">继续</button>
+                      </template>
+                      <template v-if="getVehicleRuntimeState(vehicle) === 'DONE'">
+                        <span class="as-state-badge done">已完成</span>
+                      </template>
+                      <template v-if="['ACTIVE', 'PAUSED'].includes(getVehicleRuntimeState(vehicle))">
+                        <button class="as-btn mini danger" type="button" :disabled="controlLoading" @click="executeControl('stop', [vehicle.vid])">停止</button>
+                      </template>
                     </template>
                   </template>
-                  <button class="as-btn mini" type="button" @click="openCreatorForEdit(vehicle)">编辑</button>
-                  <button class="as-btn mini danger" type="button" @click="confirmDeleteVehicleActions(vehicle)">删除</button>
+                  <button v-if="canOperateVehicle(vehicle)" class="as-btn mini" type="button" @click="openCreatorForEdit(vehicle)">编辑</button>
+                  <button v-if="canOperateVehicle(vehicle)" class="as-btn mini danger" type="button" @click="confirmDeleteVehicleActions(vehicle)">删除</button>
                 </div>
               </div>
               <div class="as-action-cards" :data-vid="vehicle.vid">
@@ -931,6 +933,15 @@ const vehicleActions = computed(() => {
 
   return summary;
 });
+
+const canOperateVehicle = (vehicle) => {
+  if (!isControlMode.value || !isVehicleConnected.value) {
+    return true; // 非操控席或未连接车辆时，允许所有操作
+  }
+  const vid = String(vehicle.vid || '').replace('equipment:', '');
+  const connectedVid = String(connectedVehicleId.value || '').replace('equipment:', '');
+  return vid === connectedVid;
+};
 
 const supportedVehicleTypes = computed(() =>
   onlineVehicles.value.map((v) => ({
