@@ -923,6 +923,11 @@ const vehicleActions = computed(() => {
   if (!selectedPlan.value) return [];
   let summary = selectedPlan.value.vehicle_summary || [];
 
+  // 操控席但未连接车辆时，不显示任何行动序列
+  if (isControlMode.value && !isVehicleConnected.value) {
+    return [];
+  }
+
   // 如果已连接车辆，只显示对应车辆的行动序列
   if (isControlMode.value && isVehicleConnected.value && connectedVehicleId.value) {
     const connectedVid = String(connectedVehicleId.value).replace('equipment:', '');
@@ -935,8 +940,11 @@ const vehicleActions = computed(() => {
 });
 
 const canOperateVehicle = (vehicle) => {
-  if (!isControlMode.value || !isVehicleConnected.value) {
-    return true; // 非操控席或未连接车辆时，允许所有操作
+  if (!isControlMode.value) {
+    return true; // 非操控席时，允许所有操作
+  }
+  if (!isVehicleConnected.value) {
+    return false; // 操控席但未连接车辆时，禁用所有操作
   }
   const vid = String(vehicle.vid || '').replace('equipment:', '');
   const connectedVid = String(connectedVehicleId.value || '').replace('equipment:', '');
@@ -1856,6 +1864,16 @@ const loadPlans = async (silent = false) => {
 
     // 如果已连接车辆，只显示有对应车辆类型行动序列的任务
     // 注意：列表接口不返回 vehicle_summary，需要通过详情接口获取车辆类型
+    if (isControlMode.value && !isVehicleConnected.value) {
+      // 操控席但未连接车辆时，显示空列表
+      plans.value = [];
+      selectedPlanId.value = '';
+      selectedPlan.value = null;
+      if (!silent) {
+        appendSystemMessage('未连接车辆，无法显示行动序列');
+      }
+      return;
+    }
     if (isControlMode.value && isVehicleConnected.value && connectedVehicleType.value) {
       const filteredPlans = [];
       for (const plan of allPlans) {
