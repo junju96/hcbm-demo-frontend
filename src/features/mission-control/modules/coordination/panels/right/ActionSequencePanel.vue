@@ -450,6 +450,8 @@ import {
   batchAddRouteDisplay,
   batchDeleteRouteDisplay,
   addPolygon,
+  fetchCurrentUser,
+  fetchVehicleInfo,
 } from '../../api/coordinationApi';
 import ActionParamDialog from './ActionParamDialog.vue';
 import ActionSequenceCreator from './ActionSequenceCreator.vue';
@@ -504,6 +506,10 @@ const showVehicleSelectDialog = ref(false);
 const connectedVehicles = ref([]);
 const selectedConnectedVehicleId = ref('');
 const selectingVehicle = ref(false);
+// 车辆连接状态（启动时初始化）
+const connectedVehicleId = ref('');
+const connectedVehicleType = ref('');
+const isVehicleConnected = ref(false);
 
 /* ---------- 行动参数弹窗 ---------- */
 const showParamDialog = ref(false);
@@ -2279,7 +2285,39 @@ const stopAutoRefresh = () => {
 /* ---------- 生命周期 ---------- */
 const onWindowResize = () => recomputeLines();
 
-onMounted(() => {
+/* ---------- 车辆连接初始化 ---------- */
+const initConnectedVehicle = async () => {
+  if (!isControlMode.value) return;
+
+  try {
+    // 1. 查询当前登录用户
+    const userResult = await fetchCurrentUser();
+    if (!userResult.ok || !userResult.data?.connected_vehicle_id) {
+      isVehicleConnected.value = false;
+      appendSystemMessage('未连接车辆，无法显示行动序列');
+      return;
+    }
+
+    connectedVehicleId.value = userResult.data.connected_vehicle_id;
+
+    // 2. 查询车辆类型
+    const vehicleResult = await fetchVehicleInfo(connectedVehicleId.value);
+    if (vehicleResult.ok && vehicleResult.data?.resource_type) {
+      connectedVehicleType.value = vehicleResult.data.resource_type;
+      isVehicleConnected.value = true;
+      appendSystemMessage(`已连接车辆：${connectedVehicleId.value} (${connectedVehicleType.value})`);
+    } else {
+      isVehicleConnected.value = false;
+      appendSystemMessage('无法获取车辆类型，无法显示行动序列');
+    }
+  } catch (err) {
+    isVehicleConnected.value = false;
+    appendSystemMessage('初始化车辆连接失败：' + (err.message || err));
+  }
+};
+
+onMounted(async () => {
+  await initConnectedVehicle();
   loadOnlineVehicles();
   loadPlans();
   updateMarqueeStates();
