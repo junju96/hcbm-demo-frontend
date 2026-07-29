@@ -13,7 +13,7 @@ import {
   saveTaskUnderstandingDb,
 } from './taskUnderstandingLocalDb';
 
-import { COORDINATION_BASE_URL } from '../../../../config/serverConfig.js';
+import { COORDINATION_BASE_URL } from '../../../../../config/serverConfig.js';
 
 const joinApiUrl = (path) => {
   // 开发环境通过 Vite proxy 走相对路径，避免跨域
