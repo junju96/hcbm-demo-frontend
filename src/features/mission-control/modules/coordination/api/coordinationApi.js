@@ -475,6 +475,21 @@ export const fetchOperatorConnectedVehicles = async () => {
   return { ok: true, data: result.data?.data || { items: [], selected: null, total: 0 } };
 };
 
+/** 查询当前登录用户信息 */
+export const fetchCurrentUser = async () => {
+  const result = await getJson(joinApiUrl('/user/current'));
+  if (!result.ok) return result;
+  return { ok: true, data: result.data };
+};
+
+/** 查询车辆信息 */
+export const fetchVehicleInfo = async (vehicleId) => {
+  const cleanId = String(vehicleId || '').replace('equipment:', '');
+  const result = await getJson(joinApiUrl(`/vehicle/info/${cleanId}`));
+  if (!result.ok) return result;
+  return { ok: true, data: result.data };
+};
+
 /** 操控端 — 选中一辆车并订阅 zenoh 反馈 */
 export const selectOperatorVehicle = async (vehicleId) => {
   const result = await postJson(joinApiUrl('/api/v1/action-sequences/operator/select-vehicle'), { vehicle_id: vehicleId });
