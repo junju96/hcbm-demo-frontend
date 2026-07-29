@@ -2300,15 +2300,23 @@ const initConnectedVehicle = async () => {
 
     connectedVehicleId.value = userResult.data.connected_vehicle_id;
 
-    // 2. 查询车辆类型
-    const vehicleResult = await fetchVehicleInfo(connectedVehicleId.value);
-    if (vehicleResult.ok && vehicleResult.data?.resource_type) {
-      connectedVehicleType.value = vehicleResult.data.resource_type;
-      isVehicleConnected.value = true;
-      appendSystemMessage(`已连接车辆：${connectedVehicleId.value} (${connectedVehicleType.value})`);
+    // 2. 从操控席已连接车辆列表中查询车辆类型
+    const vehiclesResult = await fetchOperatorConnectedVehicles();
+    if (vehiclesResult.ok && vehiclesResult.data?.items) {
+      const vehicle = vehiclesResult.data.items.find(
+        (v) => String(v.vid || '').replace('equipment:', '') === String(connectedVehicleId.value).replace('equipment:', '')
+      );
+      if (vehicle && vehicle.resource_type) {
+        connectedVehicleType.value = vehicle.resource_type;
+        isVehicleConnected.value = true;
+        appendSystemMessage(`已连接车辆：${connectedVehicleId.value} (${connectedVehicleType.value})`);
+      } else {
+        isVehicleConnected.value = false;
+        appendSystemMessage('无法获取车辆类型，无法显示行动序列');
+      }
     } else {
       isVehicleConnected.value = false;
-      appendSystemMessage('无法获取车辆类型，无法显示行动序列');
+      appendSystemMessage('无法获取车辆列表，无法显示行动序列');
     }
   } catch (err) {
     isVehicleConnected.value = false;
