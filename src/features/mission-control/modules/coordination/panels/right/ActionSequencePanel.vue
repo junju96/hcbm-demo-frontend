@@ -453,7 +453,7 @@ import {
   batchDeleteRouteDisplay,
   addPolygon,
   fetchCurrentUser,
-  fetchVehicleInfo,
+
 } from '../../api/coordinationApi';
 import ActionParamDialog from './ActionParamDialog.vue';
 import ActionSequenceCreator from './ActionSequenceCreator.vue';
@@ -1875,23 +1875,32 @@ const loadPlans = async (silent = false) => {
       return;
     }
     if (isControlMode.value && isVehicleConnected.value && connectedVehicleType.value) {
-      const filteredPlans = [];
-      for (const plan of allPlans) {
+      // 并发获取所有 plan 详情，避免 N+1 串行查询
+      const detailPromises = allPlans.map(async (plan) => {
         try {
           const detailResult = await fetchOperatorPlanDetail(plan.plan_id);
           if (detailResult.ok && detailResult.data?.vehicle_summary) {
             const hasVehicleType = detailResult.data.vehicle_summary.some(
               (v) => v.resource_type === connectedVehicleType.value
             );
-            if (hasVehicleType) {
-              filteredPlans.push(plan);
-            }
+            return { plan, hasVehicleType, error: null };
           }
+          return { plan, hasVehicleType: false, error: null };
         } catch (err) {
           console.warn('[ActionSequencePanel] filter plan detail failed:', plan.plan_id, err);
+          return { plan, hasVehicleType: true, error: err }; // 失败时保守保留，避免任务消失
         }
+      });
+      const detailResults = await Promise.all(detailPromises);
+      allPlans = detailResults
+        .filter((r) => r.hasVehicleType)
+        .map((r) => r.plan);
+      
+      // 如果有失败的详情请求，提示用户
+      const failedCount = detailResults.filter((r) => r.error).length;
+      if (failedCount > 0 && !silent) {
+        appendSystemMessage(`有 ${failedCount} 个任务详情获取失败，已保留显示`);
       }
-      allPlans = filteredPlans;
     }
 
     plans.value = allPlans;
@@ -1906,9 +1915,11 @@ const loadPlans = async (silent = false) => {
     }
 
     // 如果之前有选中项，检查是否还存在；不存在则自动选中第一项
-    const exists = plans.value.some((p) => p.plan_id === prevId);
-    if (exists && prevId) {
-      refreshDetail(prevId);
+    // 重新读取最新的 selectedPlanId，避免覆盖用户在过滤期间的选择
+    const currentSelectedId = selectedPlanId.value;
+    const exists = plans.value.some((p) => p.plan_id === currentSelectedId);
+    if (exists && currentSelectedId) {
+      refreshDetail(currentSelectedId);
     } else {
       const withActions = plans.value.find((p) => (p.stages_count || 0) > 0);
       selectPlan((withActions || plans.value[0]).plan_id);
