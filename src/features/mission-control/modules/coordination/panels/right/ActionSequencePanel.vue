@@ -1831,11 +1831,25 @@ const loadPlans = async (silent = false) => {
   if (!silent) loadingPlans.value = false;
   if (result.ok) {
     const prevId = selectedPlanId.value;
-    plans.value = result.data.items || [];
+    let allPlans = result.data.items || [];
+
+    // 如果已连接车辆，只显示有对应车辆类型行动序列的任务
+    if (isControlMode.value && isVehicleConnected.value && connectedVehicleType.value) {
+      allPlans = allPlans.filter(plan => {
+        // 检查任务的 vehicle_summary 中是否有对应车辆类型的车辆
+        const vehicleSummary = plan.vehicle_summary || [];
+        return vehicleSummary.some(v => v.resource_type === connectedVehicleType.value);
+      });
+    }
+
+    plans.value = allPlans;
 
     if (plans.value.length === 0) {
       selectedPlanId.value = '';
       selectedPlan.value = null;
+      if (isControlMode.value && isVehicleConnected.value) {
+        appendSystemMessage(`没有找到包含 ${connectedVehicleType.value} 类型车辆行动序列的任务`);
+      }
       return;
     }
 
