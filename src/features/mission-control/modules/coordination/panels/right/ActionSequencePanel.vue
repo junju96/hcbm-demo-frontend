@@ -919,7 +919,17 @@ const runtimeStateLabel = computed(() => {
 
 const vehicleActions = computed(() => {
   if (!selectedPlan.value) return [];
-  return selectedPlan.value.vehicle_summary || [];
+  let summary = selectedPlan.value.vehicle_summary || [];
+
+  // 如果已连接车辆，只显示对应车辆的行动序列
+  if (isControlMode.value && isVehicleConnected.value && connectedVehicleId.value) {
+    const connectedVid = String(connectedVehicleId.value).replace('equipment:', '');
+    summary = summary.filter(
+      (v) => String(v.vid || '').replace('equipment:', '') === connectedVid
+    );
+  }
+
+  return summary;
 });
 
 const supportedVehicleTypes = computed(() =>
