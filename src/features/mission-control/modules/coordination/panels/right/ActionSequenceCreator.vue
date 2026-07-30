@@ -1117,14 +1117,13 @@ function buildUpdatedPlan() {
     }
   }
 
-  // 更新 vehicle_summary
+  // 更新 vehicle_summary（只更新 total_actions，stages 由后端根据 plan.stages 重新计算）
   if (plan.vehicle_summary) {
     for (const vs of plan.vehicle_summary) {
       if (vs.vid === vid) {
         vs.total_actions = actions.length;
-        for (const st of vs.stages || []) {
-          st.actions = actions;
-        }
+        // 不直接修改 stages，避免把当前编辑的 actions 错误地应用到所有 stage
+        // stages 由后端根据 plan.stages 重新计算
       }
     }
   }
