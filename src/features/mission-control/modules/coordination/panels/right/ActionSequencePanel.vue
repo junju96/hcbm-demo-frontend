@@ -936,7 +936,26 @@ const vehicleActions = computed(() => {
     );
   }
 
-  return summary;
+  // 按去掉 equipment: 前缀后的 vid 合并相同车辆，避免同一辆车显示两次
+  const merged = [];
+  const seen = new Map();
+  for (const vehicle of summary) {
+    const cleanVid = String(vehicle.vid || '').replace('equipment:', '');
+    if (!seen.has(cleanVid)) {
+      seen.set(cleanVid, {
+        ...vehicle,
+        vid: cleanVid, // 统一使用不带前缀的 vid
+      });
+    } else {
+      // 合并 stages 和 total_actions
+      const existing = seen.get(cleanVid);
+      existing.total_actions = (existing.total_actions || 0) + (vehicle.total_actions || 0);
+      existing.stages = [...(existing.stages || []), ...(vehicle.stages || [])];
+    }
+  }
+  merged.push(...seen.values());
+
+  return merged;
 });
 
 const canOperateVehicle = (vehicle) => {
