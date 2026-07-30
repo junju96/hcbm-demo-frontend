@@ -2097,8 +2097,11 @@ const executeControl = async (actionType, vids) => {
       appendSystemMessage(
         `${successMsg} (${cleanVids.length > 1 ? cleanVids.length + '辆车' : cleanVids[0]})`
       );
-      // 操作成功后立即刷新 plan 详情，同步后端 runtime_state
-      await selectPlan(planId);
+      // 控制指令执行后等待 2 秒，待后端/数据服务器状态稳定后再刷新列表和详情
+      setTimeout(() => {
+        loadPlans(true);
+        if (selectedPlanId.value) selectPlan(selectedPlanId.value);
+      }, 2000);
     } else {
       const errs = results
         .filter((r) => !r.ok)
