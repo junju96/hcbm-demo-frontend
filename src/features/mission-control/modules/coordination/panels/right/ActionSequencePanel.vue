@@ -494,11 +494,12 @@ const showDispatchVehicleDialog = ref(false);
 const selectedDispatchVids = ref([]);
 
 /* ---------- 协同席下发席位选择弹窗 ---------- */
+// 席位 id 由后端 config.SEAT_TARGET_IPS 映射为目标数据服务器 IP（调期间全部 → 操控席 .56）
+// 数据服务器当前注册席位只有 1/2/3，传入未注册 id（如 4）会整批 400，请勿添加
 const SEAT_OPTIONS = [
   { id: '1', label: '席位1' },
-  { id: '2', label: '席位2' },
+  { id: '2', label: '席位2（操控席）' },
   { id: '3', label: '席位3' },
-  { id: '4', label: '席位4' },
 ];
 const showDispatchSeatDialog = ref(false);
 const selectedDispatchSeats = ref([]);
@@ -837,7 +838,12 @@ const drawPlanOnMap = async (plan) => {
     for (const payload of polygonPayloads) {
       const result = await addPolygon(payload);
       if (result.ok) {
-        const uid = result.data?.data?.unique_id || result.data?.unique_id;
+        // 地图服务的 id 在 feature.id（feature_store.py），兼容 unique_id 层级
+        const uid =
+          result.data?.data?.feature?.id ||
+          result.data?.feature?.id ||
+          result.data?.data?.unique_id ||
+          result.data?.unique_id;
         if (uid) {
           mapObjectIds.push(uid);
           totalAdded += 1;
@@ -2091,7 +2097,9 @@ const executeControl = async (actionType, vids) => {
     }
     // 多车并行调用，单车直接调用（去掉 equipment: 前缀）
     const results = await Promise.all(vids.map((vid) => apiFn(planId, vid?.replace('equipment:', '') || vid)));
-    const allOk = results.every((r) => r.ok);
+    // result.data 是后端 ApiResponse 信封：HTTP 200 也可能业务失败（code !== 200）
+    const isBizOk = (r) => r.ok && ((r.data?.code) ?? 200) === 200;
+    const allOk = results.every(isBizOk);
     if (allOk) {
       const cleanVids = vids.map((v) => v?.replace('equipment:', '') || v);
       appendSystemMessage(
@@ -2104,7 +2112,7 @@ const executeControl = async (actionType, vids) => {
       }, 2000);
     } else {
       const errs = results
-        .filter((r) => !r.ok)
+        .filter((r) => !isBizOk(r))
         .map((r) => r.data?.message || r.error)
         .join(', ');
       appendSystemMessage(`${successMsg}失败: ${errs}`);
@@ -2164,10 +2172,12 @@ const confirmDispatchSeatSelection = async () => {
   controlLoading.value = true;
   try {
     const result = await dispatchForwardPlan(selectedPlanId.value, selectedDispatchSeats.value, 30);
-    if (result.ok) {
+    // result.data 是后端 ApiResponse 包装：HTTP 200 也可能业务失败（code !== 200），需看信封
+    const envelope = result.data || {};
+    if (result.ok && (envelope.code ?? 200) === 200) {
       appendSystemMessage(`行动方案已下发到席位 ${selectedDispatchSeats.value.join('、')}`);
     } else {
-      appendSystemMessage('下发到席位失败: ' + (result.data?.message || result.error || '未知错误'));
+      appendSystemMessage('下发到席位失败: ' + (envelope.message || result.error || '未知错误'));
     }
   } catch (err) {
     appendSystemMessage('下发到席位失败: ' + (err.message || err));
@@ -2260,6 +2270,17 @@ const recomputeLines = () => {
   });
 };
 
+/* ---------- 卡片尺寸观察：内容变高时让外框自适应 ---------- */
+// 卡片是绝对定位，内容变高（航路点/状态徽标出现、字体加载）不会撑开列容器，
+// 导致卡片超出车辆卡片边框。观察每个卡片的尺寸变化，触发偏移重算即可让外框适配。
+let cardsResizeObserver = null;
+const setupCardsResizeObserver = () => {
+  if (cardsResizeObserver) cardsResizeObserver.disconnect();
+  if (typeof ResizeObserver === 'undefined') return;
+  cardsResizeObserver = new ResizeObserver(() => { layoutTick.value++; });
+  document.querySelectorAll('.as-action-card').forEach((el) => cardsResizeObserver.observe(el));
+};
+
 /* ---------- 跑马灯溢出检测 ---------- */
 const updateMarqueeStates = () => {
   nextTick(() => {
@@ -2277,6 +2298,8 @@ const updateMarqueeStates = () => {
     });
     // 跑马灯测量会影响卡片宽度，测完后重算连线
     recomputeLines();
+    // 卡片重渲染后重新挂尺寸观察，外框随内容自适应
+    setupCardsResizeObserver();
   });
 };
 
@@ -2493,6 +2516,7 @@ onUnmounted(() => {
   stopAutoRefresh();
   clearPlanOnMap();
   window.removeEventListener('resize', onWindowResize);
+  if (cardsResizeObserver) cardsResizeObserver.disconnect();
 });
 </script>
 
