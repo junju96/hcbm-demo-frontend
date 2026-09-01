@@ -26,7 +26,7 @@
             :key="plan.plan_id"
             class="as-plan-item"
             :class="{ active: selectedPlanId === plan.plan_id }"
-            @click="selectPlan(plan.plan_id)"
+            @click="handlePlanItemClick(plan.plan_id)"
           >
             <div class="as-plan-name">{{ plan.title || plan.plan_id }}</div>
             <div class="as-plan-meta">
@@ -447,11 +447,8 @@ import {
   patchOperatorPlan,
   syncOperatorPlanToDataServer,
   deleteOperatorVehicle,
-  batchAddMapObjects,
-  batchDeleteMapObjects,
-  batchAddRouteDisplay,
-  batchDeleteRouteDisplay,
-  addPolygon,
+  notifyPlanMapClicked,
+  notifyOperatorPlanMapClicked,
   fetchCurrentUser,
 
 } from '../../api/coordinationApi';
@@ -540,375 +537,8 @@ const selectedMissingVehicle = ref(null);
 const showDeleteConfirmDialog = ref(false);
 const vehicleToDelete = ref(null);
 
-/* ---------- 地图上图 ---------- */
-const currentMapObjectIds = ref([]);   // area / circle 对象 id
-const currentRouteIds = ref([]);        // 路线临时显示 id
-
-// 色轮均匀分布，确保相邻车辆颜色差异足够大
-const VEHICLE_COLORS = [
-  '#ff3333', // 红
-  '#00e5ff', // 青  ← 与红相隔180°，对比最强
-  '#ff8800', // 橙
-  '#2979ff', // 蓝
-  '#ffea00', // 黄
-  '#aa00ff', // 紫
-  '#00e676', // 绿
-  '#ff4081', // 粉
-];
-
-const getVehicleColor = (vid, vehicleList) => {
-  const idx = vehicleList.findIndex((v) => v.vid === vid);
-  return VEHICLE_COLORS[idx % VEHICLE_COLORS.length];
-};
-
-const isValidWaypoints = (wps) => {
-  if (!Array.isArray(wps) || wps.length === 0) return false;
-  return wps.every((wp) => {
-    const lat = Number(wp?.latitude ?? wp?.lat);
-    const lon = Number(wp?.longitude ?? wp?.lon);
-    return !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0;
-  });
-};
-
-const isValidPoint = (pt) => {
-  if (!pt || typeof pt !== 'object') return false;
-  const lat = Number(pt?.latitude ?? pt?.lat);
-  const lon = Number(pt?.longitude ?? pt?.lon);
-  return !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0;
-};
-
-/**
- * 从 action.param 中提取坐标点列表
- * 兼容 waypoints(列表) / target.location(列表, Lens-Recon 多边形) /
- * recon_position / fire_position / target_position / position(单点)
- */
-const extractCoordinates = (param) => {
-  if (!param || typeof param !== 'object') return [];
-  // 1) 优先 waypoints 列表
-  const wps = param.waypoints;
-  if (Array.isArray(wps) && wps.length > 0) {
-    return wps.filter(isValidPoint).map((wp) => ({
-      lon: Number(wp.longitude ?? wp.lon),
-      lat: Number(wp.latitude ?? wp.lat),
-      alt: Number(wp.altitude ?? wp.alt ?? 0),
-    }));
-  }
-  // 2) 尝试 target.location 列表（Lens-Recon 类型的多边形点）
-  const targetLocation = param.target?.location;
-  if (Array.isArray(targetLocation) && targetLocation.length > 0) {
-    return targetLocation.filter(isValidPoint).map((pt) => ({
-      lon: Number(pt.longitude ?? pt.lon),
-      lat: Number(pt.latitude ?? pt.lat),
-      alt: Number(pt.altitude ?? pt.alt ?? 0),
-    }));
-  }
-  // 3) 尝试单点坐标字段
-  const keys = ['recon_position', 'fire_position', 'target_position', 'position'];
-  for (const key of keys) {
-    const pt = param[key];
-    if (isValidPoint(pt)) {
-      return [{
-        lon: Number(pt.longitude ?? pt.lon),
-        lat: Number(pt.latitude ?? pt.lat),
-        alt: Number(pt.altitude ?? pt.alt ?? 0),
-      }];
-    }
-  }
-  return [];
-};
-
-/**
- * 从整个 plan 中提取所有可绘制的坐标信息（用于比较是否变化）
- */
-const extractPlanCoordinates = (plan) => {
-  if (!plan) return [];
-  const vehicleList = plan.vehicle_summary || [];
-  const list = [];
-  for (const vehicle of vehicleList) {
-    const actions = (vehicle.stages || []).flatMap((s) => s.actions || []);
-    for (const action of actions) {
-      const coords = extractCoordinates(action.param);
-      if (coords.length > 0) {
-        list.push({
-          vid: vehicle.vid,
-          action_id: action.action_id || action.action_seq,
-          action_type: action.action_type,
-          points: coords.map((p) => ({ lon: p.lon, lat: p.lat, alt: p.alt })),
-        });
-      }
-    }
-  }
-  return list;
-};
-
-const coordinatesEqual = (a, b) => {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i].vid !== b[i].vid) return false;
-    if (a[i].action_id !== b[i].action_id) return false;
-    if (a[i].action_type !== b[i].action_type) return false;
-    if (a[i].points.length !== b[i].points.length) return false;
-    for (let j = 0; j < a[i].points.length; j++) {
-      const pa = a[i].points[j];
-      const pb = b[i].points[j];
-      if (pa.lon !== pb.lon || pa.lat !== pb.lat || pa.alt !== pb.alt) return false;
-    }
-  }
-  return true;
-};
-
+// SVG 箭头 marker id 消毒（模板 action-arrow-${sanitizeId(vehicle.vid)} 使用）
 const sanitizeId = (s) => String(s || '').replace(/[:\/\s#%&?]+/g, '-');
-
-const buildLineObject = (action, planId, vid, color) => {
-  const points = extractCoordinates(action.param);
-  if (points.length < 2) return null;
-  const coordinates = points.map((p) => [p.lon, p.lat, p.alt]);
-  const uid = `as-${sanitizeId(planId)}-${sanitizeId(vid)}-${sanitizeId(action.action_id || action.action_seq)}-line`;
-  return {
-    unique_id: uid,
-    object_type: 'line',
-    object_subtype: 'standard_line',
-    name: `${vid} - ${action.name || ''}`,
-    color,
-    geometry: {
-      type: 'LineString',
-      coordinates,
-    },
-  };
-};
-
-// 构建路线临时显示 item（用于 /map/route/display/batch/add）
-const buildRouteDisplayItem = (action, planId, vid, color) => {
-  const points = extractCoordinates(action.param);
-  if (points.length < 2) return null;
-  const uid = `as-${sanitizeId(planId)}-${sanitizeId(vid)}-${sanitizeId(action.action_id || action.action_seq)}-route`;
-  return {
-    unique_id: uid,
-    points: points.map((p) => ({ lat: p.lat, lng: p.lon, alt: p.alt })),
-    color,
-  };
-};
-
-const buildAreaObject = (action, planId, vid, color) => {
-  const points = extractCoordinates(action.param);
-  if (points.length < 3) return null;
-  const coordinates = points.map((p) => [p.lon, p.lat, p.alt]);
-  // Polygon 要求首尾闭合
-  if (
-    coordinates[0][0] !== coordinates[coordinates.length - 1][0] ||
-    coordinates[0][1] !== coordinates[coordinates.length - 1][1]
-  ) {
-    coordinates.push([...coordinates[0]]);
-  }
-  const uid = `as-${sanitizeId(planId)}-${sanitizeId(vid)}-${sanitizeId(action.action_id || action.action_seq)}-area`;
-  return {
-    unique_id: uid,
-    object_type: 'area',
-    object_subtype: 'polygon_area',
-    name: `${vid} - ${action.name || ''}`,
-    color,
-    geometry: {
-      type: 'Polygon',
-      coordinates: [coordinates],
-    },
-  };
-};
-
-// 构建 /map/add/polygon 接口需要的 payload
-const buildPolygonPayload = (action, vid) => {
-  const points = extractCoordinates(action.param);
-  if (points.length < 3) return null;
-  return {
-    label: `${vid} - ${action.name || ''}`,
-    points: points.map((p) => ({ lat: p.lat, lng: p.lon, alt: p.alt })),
-  };
-};
-
-const buildCircleObject = (action, planId, vid, color) => {
-  const points = extractCoordinates(action.param);
-  if (points.length !== 1) return null;
-  const p = points[0];
-  const uid = `as-${sanitizeId(planId)}-${sanitizeId(vid)}-${sanitizeId(action.action_id || action.action_seq)}-circle`;
-  // 从 param 中尝试读取半径，默认 100m
-  const radius = action.param?.radius_m || action.param?.radius || 100;
-  return {
-    unique_id: uid,
-    object_type: 'area',
-    object_subtype: 'circle_area',
-    name: `${vid} - ${action.name || ''}`,
-    color,
-    geometry: {
-      type: 'Point',
-      coordinates: [p.lon, p.lat, p.alt],
-    },
-    meta: {
-      radius_m: radius,
-    },
-  };
-};
-
-const drawPlanOnMap = async (plan) => {
-  if (!plan) {
-    console.log('[MapDraw] drawPlanOnMap skipped: plan is null');
-    return;
-  }
-  const vehicleList = plan.vehicle_summary || [];
-  const routeItems = [];
-  const routeIds = [];
-  const objectItems = [];
-  const objectIds = [];
-  const polygonPayloads = []; // Lens-Recon 多边形 → /map/add/polygon
-
-  console.log(`[MapDraw] start drawPlanOnMap, plan_id=${plan.plan_id}, vehicles=${vehicleList.length}`);
-
-  for (const vehicle of vehicleList) {
-    const color = getVehicleColor(vehicle.vid, vehicleList);
-    const actions = (vehicle.stages || []).flatMap((s) => s.actions || []);
-    console.log(`[MapDraw] vehicle=${vehicle.vid}, actions=${actions.length}`);
-
-    for (const action of actions) {
-      const atype = (action.action_type || '').toLowerCase();
-      const points = extractCoordinates(action.param);
-      console.log(`[MapDraw]   action=${action.name}, action_type=${action.action_type}, points=${points.length}`);
-
-      if (points.length >= 2 && atype === 'auto-move') {
-        // 路线 → /map/route/display/batch/add
-        const routeItem = buildRouteDisplayItem(action, plan.plan_id, vehicle.vid, color);
-        if (routeItem) {
-          routeItems.push(routeItem);
-          routeIds.push(routeItem.unique_id);
-          console.log(`[MapDraw]   -> route built, uid=${routeItem.unique_id}, points=${routeItem.points.length}`);
-        } else {
-          console.log(`[MapDraw]   -> route skipped (invalid waypoints)`);
-        }
-      } else if (points.length >= 3 && atype === 'lens-recon') {
-        // Lens-Recon 多边形 → /map/add/polygon
-        const payload = buildPolygonPayload(action, vehicle.vid);
-        if (payload) {
-          polygonPayloads.push(payload);
-          console.log(`[MapDraw]   -> polygon payload built, label=${payload.label}, points=${payload.points.length}`);
-        } else {
-          console.log(`[MapDraw]   -> polygon payload skipped (invalid waypoints, need >=3)`);
-        }
-      } else if (points.length >= 3) {
-        // 其他多边形区域 → /map/object/batch/add
-        const obj = buildAreaObject(action, plan.plan_id, vehicle.vid, color);
-        if (obj) {
-          objectItems.push(obj);
-          objectIds.push(obj.unique_id);
-          console.log(`[MapDraw]   -> polygon built, uid=${obj.unique_id}, coords=${obj.geometry.coordinates[0].length}`);
-        } else {
-          console.log(`[MapDraw]   -> polygon skipped (invalid waypoints, need >=3)`);
-        }
-      } else if (points.length === 1) {
-        // 圆形区域 → /map/object/batch/add
-        const obj = buildCircleObject(action, plan.plan_id, vehicle.vid, color);
-        if (obj) {
-          objectItems.push(obj);
-          objectIds.push(obj.unique_id);
-          console.log(`[MapDraw]   -> circle built, uid=${obj.unique_id}, radius=${obj.meta.radius_m}m`);
-        }
-      } else {
-        console.log(`[MapDraw]   -> ignored action_type=${atype}, points=${points.length}`);
-      }
-    }
-  }
-
-  let totalAdded = 0;
-  const mapObjectIds = []; // 统一收集所有成功上图的对象 id
-
-  // 1. 批量添加路线临时显示
-  if (routeItems.length > 0) {
-    console.log(`[MapDraw] calling batchAddRouteDisplay, routes=${routeItems.length}`);
-    const routeResult = await batchAddRouteDisplay(routeItems);
-    console.log('[MapDraw] batchAddRouteDisplay result:', routeResult);
-    if (routeResult.ok) {
-      currentRouteIds.value = routeIds;
-      totalAdded += routeItems.length;
-      console.log('[MapDraw] route success, stored ids:', routeIds);
-    } else {
-      appendSystemMessage('路线上图失败: ' + (routeResult.error || '未知错误'));
-      console.log('[MapDraw] route failed:', routeResult.error);
-    }
-  }
-
-  // 2. Lens-Recon 多边形逐个调用 /map/add/polygon
-  if (polygonPayloads.length > 0) {
-    console.log(`[MapDraw] calling addPolygon, count=${polygonPayloads.length}`);
-    for (const payload of polygonPayloads) {
-      const result = await addPolygon(payload);
-      if (result.ok) {
-        // 地图服务的 id 在 feature.id（feature_store.py），兼容 unique_id 层级
-        const uid =
-          result.data?.data?.feature?.id ||
-          result.data?.feature?.id ||
-          result.data?.data?.unique_id ||
-          result.data?.unique_id;
-        if (uid) {
-          mapObjectIds.push(uid);
-          totalAdded += 1;
-          console.log(`[MapDraw] polygon added, uid=${uid}`);
-        } else {
-          console.log('[MapDraw] polygon added but no unique_id returned');
-        }
-      } else {
-        appendSystemMessage('多边形上图失败: ' + (result.error || '未知错误'));
-        console.log('[MapDraw] addPolygon failed:', result.error);
-      }
-    }
-  }
-
-  // 3. 批量添加其他正式地图对象（area / circle）
-  if (objectItems.length > 0) {
-    console.log(`[MapDraw] calling batchAddMapObjects, objects=${objectItems.length}`);
-    const objResult = await batchAddMapObjects(objectItems);
-    console.log('[MapDraw] batchAddMapObjects result:', objResult);
-    if (objResult.ok) {
-      mapObjectIds.push(...objectIds);
-      totalAdded += objectItems.length;
-      console.log('[MapDraw] object success, stored ids:', objectIds);
-    } else {
-      appendSystemMessage('区域上图失败: ' + (objResult.error || '未知错误'));
-      console.log('[MapDraw] object failed:', objResult.error);
-    }
-  }
-
-  currentMapObjectIds.value = mapObjectIds;
-
-  if (totalAdded > 0) {
-    appendSystemMessage(`地图上图成功: ${totalAdded} 个对象`);
-  } else if (routeItems.length === 0 && polygonPayloads.length === 0 && objectItems.length === 0) {
-    console.log('[MapDraw] no drawable objects, skip batchAdd');
-  }
-};
-
-const clearPlanOnMap = async () => {
-  // 1. 清除路线临时显示
-  const routeIds = currentRouteIds.value;
-  if (routeIds.length > 0) {
-    console.log(`[MapDraw] clear routes, count=${routeIds.length}`, routeIds);
-    try {
-      const r = await batchDeleteRouteDisplay(routeIds);
-      console.log('[MapDraw] batchDeleteRouteDisplay result:', r);
-    } catch (e) {
-      console.log('[MapDraw] batchDeleteRouteDisplay error:', e);
-    }
-    currentRouteIds.value = [];
-  }
-
-  // 2. 批量清除正式地图对象（polygon / circle / area）
-  const objIds = currentMapObjectIds.value;
-  if (objIds.length > 0) {
-    console.log(`[MapDraw] clear objects, count=${objIds.length}`, objIds);
-    try {
-      const r = await batchDeleteMapObjects(objIds);
-      console.log('[MapDraw] batchDeleteMapObjects result:', r);
-    } catch (e) {
-      console.log('[MapDraw] batchDeleteMapObjects error:', e);
-    }
-    currentMapObjectIds.value = [];
-  }
-};
 
 /* ---------- 计算属性 ---------- */
 const runtimeStateLabel = computed(() => {
@@ -1648,10 +1278,6 @@ const saveActionParam = async (newParam) => {
     // 重新拉取后端最新 plan（本地 local_dirty 会优先使用本地缓存），
     // 确保 selectedPlan 与本地持久化数据一致，避免 points 等嵌套字段显示旧值
     await refreshDetail(planId);
-
-    // 参数变更可能影响地图显示，重新上图
-    await clearPlanOnMap();
-    await drawPlanOnMap(selectedPlan.value);
   } finally {
     savingParam.value = false;
   }
@@ -1781,12 +1407,6 @@ const executeDeleteVehicleActions = async () => {
     appendSystemMessage(
       `已删除该车辆行动序列并同步到数据服务器（actions: ${(detail.deleted_actions || []).length}, car_actions: ${(detail.deleted_car_actions || []).length}）`
     );
-
-    // 删除后刷新地图显示
-    await clearPlanOnMap();
-    if ((selectedPlan.value?.vehicle_summary || []).length > 0) {
-      await drawPlanOnMap(selectedPlan.value);
-    }
   } catch (err) {
     appendSystemMessage(`删除车辆行动序列失败：${err.message || err}`);
   } finally {
@@ -1957,8 +1577,6 @@ const loadPlans = async (silent = false) => {
 const refreshDetail = async (planId) => {
   if (!planId) return;
   try {
-    const oldCoords = extractPlanCoordinates(selectedPlan.value);
-    // 协同席 / 操控端区分数据源
     const result = isControlMode.value
       ? await fetchOperatorPlanDetail(planId)
       : await fetchActionSequencePlanDetail(planId);
@@ -1966,35 +1584,27 @@ const refreshDetail = async (planId) => {
       console.warn('[ActionSequencePanel] refreshDetail failed:', result.error);
       return;
     }
-    const newPlan = result.data;
-    const newCoords = extractPlanCoordinates(newPlan);
-    // 坐标未变化则跳过清空重绘，只更新数据
-    if (coordinatesEqual(oldCoords, newCoords)) {
-      selectedPlan.value = newPlan;
-      console.log('[MapDraw] coordinates unchanged, skip redraw');
-      return;
-    }
-    // 有变化时先清空，再根据新坐标决定是否重画
-    await clearPlanOnMap();
-    selectedPlan.value = newPlan;
-    if (newCoords.length > 0) {
-      await drawPlanOnMap(selectedPlan.value);
-    } else {
-      console.log('[MapDraw] no coordinates in refreshed data, cleared only');
-    }
+    selectedPlan.value = result.data;
   } catch (e) {
     console.error('[ActionSequencePanel] refreshDetail error:', e);
   }
 };
 
-const selectPlan = async (planId) => {
-  console.log(`[MapDraw] selectPlan called, planId=${planId}, isControlMode=${isControlMode.value}`);
-  // 切换 plan 时先清除旧地图对象
+/* ---------- 方案点击：通知数据服务器上图（上图处理由服务器负责） ---------- */
+const handlePlanItemClick = async (planId) => {
+  const notifyFn = isControlMode.value ? notifyOperatorPlanMapClicked : notifyPlanMapClicked;
   try {
-    await clearPlanOnMap();
+    const result = await notifyFn(planId);
+    if (!result.ok || ((result.data?.code) ?? 200) !== 200) {
+      appendSystemMessage('通知服务器上图失败: ' + (result.data?.message || result.error || '未知错误'));
+    }
   } catch (e) {
-    console.warn('[MapDraw] clearPlanOnMap error:', e);
+    console.warn('[MapNotify] notify failed:', e);
   }
+  await selectPlan(planId);
+};
+
+const selectPlan = async (planId) => {
   selectedPlanId.value = planId;
   loadingDetail.value = true;
   try {
@@ -2002,19 +1612,8 @@ const selectPlan = async (planId) => {
     const result = isControlMode.value
       ? await fetchOperatorPlanDetail(planId)
       : await fetchActionSequencePlanDetail(planId);
-    console.log(`[MapDraw] selectPlan result.ok=${result.ok}, error=${result.error || 'none'}`);
     if (result.ok) {
       selectedPlan.value = result.data;
-      const vs = result.data.vehicle_summary || [];
-      const firstAction = (vs[0]?.stages || [{}])[0]?.actions?.[0];
-      console.log('[MapDraw] selectPlan firstAction keys:', firstAction ? Object.keys(firstAction) : 'no actions');
-      console.log('[MapDraw] selectPlan firstAction action_type:', firstAction?.action_type);
-      // 新 plan 加载成功后自动上图
-      try {
-        await drawPlanOnMap(selectedPlan.value);
-      } catch (e) {
-        console.warn('[MapDraw] drawPlanOnMap error:', e);
-      }
     } else {
       selectedPlan.value = null;
       appendSystemMessage('获取方案详情失败: ' + (result.error || '未知错误'));
@@ -2307,13 +1906,6 @@ watch(selectedPlan, () => {
   updateMarqueeStates();
 });
 
-// 当无选中方案时，清空地图对象
-watch(selectedPlanId, async (newId) => {
-  if (!newId) {
-    await clearPlanOnMap();
-  }
-});
-
 // 全部行动完成后，自动重置控制按钮状态
 watch(
   selectedPlan,
@@ -2514,7 +2106,6 @@ const onCancelSelectVehicle = () => {
 
 onUnmounted(() => {
   stopAutoRefresh();
-  clearPlanOnMap();
   window.removeEventListener('resize', onWindowResize);
   if (cardsResizeObserver) cardsResizeObserver.disconnect();
 });
