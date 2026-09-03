@@ -6,6 +6,10 @@
         <button class="as-btn primary" type="button" @click="onRefresh">
           刷新
         </button>
+        <!-- 操控席：新建空方案（仅输入名称，其它字段为空） -->
+        <button v-if="isControlMode" class="as-btn" type="button" @click="openCreatePlanDialog">
+          新建
+        </button>
         <!-- 暂不开放直接新建方案，仅支持对列表中已有方案进行 action 增删改 -->
         <!-- <button class="as-btn" type="button" @click="openCreator">
           新建
@@ -213,6 +217,34 @@
     </div>
 
     <!-- 车辆选择弹窗（多车控制用：开始/暂停/继续/停止） -->
+    <!-- 新建空方案弹窗（操控席）：仅输入方案名称，其它字段为空 -->
+    <div v-if="showCreatePlanDialog" class="as-dialog-overlay" @click.self="cancelCreatePlan">
+      <div class="as-dialog">
+        <div class="as-dialog-header">新建行动方案</div>
+        <div class="as-dialog-body">
+          <input
+            v-model="newPlanTitle"
+            class="as-dialog-input"
+            type="text"
+            placeholder="请输入方案名称"
+            @keyup.enter="confirmCreatePlan"
+          />
+        </div>
+        <div class="as-dialog-footer">
+          <button class="as-btn" type="button" @click="cancelCreatePlan">取消</button>
+          <button
+            class="as-btn primary"
+            type="button"
+            :disabled="!newPlanTitle.trim() || creatingPlan"
+            @click="confirmCreatePlan"
+          >
+            确认
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 多车控制选择弹窗 -->
     <div v-if="showVehicleDialog" class="as-dialog-overlay" @click.self="showVehicleDialog = false">
       <div class="as-dialog">
         <div class="as-dialog-header">选择控制车辆</div>
@@ -446,6 +478,7 @@ import {
   dispatchOperatorPlan,
   patchOperatorPlan,
   syncOperatorPlanToDataServer,
+  createOperatorPlan,
   deleteOperatorVehicle,
   notifyPlanMapClicked,
   notifyOperatorPlanMapClicked,
@@ -480,6 +513,11 @@ const loadingDetail = ref(false);
 const controlLoading = ref(false);
 // 当前已连接（online）的无人车列表，从资源池接口获取
 const onlineVehicles = ref([]);
+
+/* ---------- 新建空方案弹窗（操控席） ---------- */
+const showCreatePlanDialog = ref(false);
+const newPlanTitle = ref('');
+const creatingPlan = ref(false);
 
 /* ---------- 多车控制弹窗 ---------- */
 const showVehicleDialog = ref(false);
@@ -1632,6 +1670,39 @@ const onRefresh = () => {
   loadPlans();
   if (selectedPlanId.value) selectPlan(selectedPlanId.value);
   appendSystemMessage('已刷新');
+};
+
+/* ---------- 新建空方案（操控席）：仅名称，其它字段为空，由后端补默认值并写入操控席数据服务器 ---------- */
+const openCreatePlanDialog = () => {
+  newPlanTitle.value = '';
+  showCreatePlanDialog.value = true;
+};
+
+const cancelCreatePlan = () => {
+  showCreatePlanDialog.value = false;
+  newPlanTitle.value = '';
+};
+
+const confirmCreatePlan = async () => {
+  const title = newPlanTitle.value.trim();
+  if (!title || creatingPlan.value) return;
+  creatingPlan.value = true;
+  try {
+    const result = await createOperatorPlan({ title });
+    if (result.ok && ((result.data?.code) ?? 200) === 200) {
+      const newPlanId = result.data?.data?.plan_id;
+      appendSystemMessage(`空方案「${title}」已创建`);
+      cancelCreatePlan();
+      await loadPlans();
+      if (newPlanId) selectPlan(newPlanId);
+    } else {
+      appendSystemMessage('新建方案失败: ' + (result.data?.message || result.error || '未知错误'));
+    }
+  } catch (err) {
+    appendSystemMessage('新建方案异常: ' + (err?.message || '未知错误'));
+  } finally {
+    creatingPlan.value = false;
+  }
 };
 
 const onStart = async () => { handleControlAction('start'); };
@@ -2824,6 +2895,22 @@ onUnmounted(() => {
   font-size: 0.9rem;
   padding: 0.6rem 0;
   text-align: center;
+}
+
+.as-dialog-input {
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(0, 222, 200, 0.06);
+  border: 1px solid rgba(0, 222, 200, 0.35);
+  border-radius: 4px;
+  color: var(--as-text);
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.as-dialog-input:focus {
+  border-color: rgba(0, 222, 200, 0.7);
 }
 
 @media (max-width: 900px) {
