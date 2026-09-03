@@ -6,8 +6,15 @@
         <button class="as-btn primary" type="button" @click="onRefresh">
           刷新
         </button>
-        <!-- 操控席：新建空方案（仅输入名称，其它字段为空） -->
-        <button v-if="isControlMode" class="as-btn" type="button" @click="openCreatePlanDialog">
+        <!-- 操控席：新建空方案（关联当前操控车辆，其它字段为空；未连接车辆时禁用） -->
+        <button
+          v-if="isControlMode"
+          class="as-btn"
+          type="button"
+          :disabled="!isVehicleConnected"
+          :title="isVehicleConnected ? '' : '请先连接操控车辆'"
+          @click="openCreatePlanDialog"
+        >
           新建
         </button>
         <!-- 暂不开放直接新建方案，仅支持对列表中已有方案进行 action 增删改 -->
@@ -1562,8 +1569,10 @@ const loadPlans = async (silent = false) => {
       const detailPromises = allPlans.map(async (plan) => {
         try {
           const detailResult = await fetchOperatorPlanDetail(plan.plan_id);
-          if (detailResult.ok && detailResult.data?.vehicle_summary) {
-            const hasVehicleType = detailResult.data.vehicle_summary.some(
+          if (detailResult.ok) {
+            const vs = detailResult.data?.vehicle_summary || [];
+            // vehicle_summary 为空 = 尚未分配车辆的方案（如新建的空方案），不参与车型过滤
+            const hasVehicleType = vs.length === 0 || vs.some(
               (v) => v.resource_type === connectedVehicleType.value
             );
             return { plan, hasVehicleType, error: null };
@@ -1688,9 +1697,49 @@ const confirmCreatePlan = async () => {
   if (!title || creatingPlan.value) return;
   creatingPlan.value = true;
   try {
-    const result = await createOperatorPlan({ title });
+    // 关联当前操控车辆：带上该车的空行动序列骨架（结构对齐 ActionSequenceCreator/DS 标准格式）
+    // 所有 id 带时间戳命名空间，避免与 DS 中已有资源（team/stage/car_actions）撞名后被吸附出幻影行动
+    const rawVid = String(connectedVehicleId.value || '');
+    const vid = rawVid.startsWith('equipment:') ? rawVid : `equipment:${rawVid}`;
+    const ts = Date.now();
+    const planId = `PLAN_${ts}`;
+    const teamId = `TEAM_${ts}`;
+    const stageId = `STAGE_${ts}`;
+    const payload = {
+      plan_id: planId,
+      title,
+      teams: [
+        {
+          team_id: teamId,
+          name: '新建编组',
+          state: 'READY',
+          vehicles: [{ vid, resource_type: connectedVehicleType.value }],
+        },
+      ],
+      stages: [
+        {
+          stage_id: stageId,
+          title: '新建阶段',
+          stage_seq: 1,
+          team_ids: [teamId],
+          target_ids: [],
+          state: 'SCHEDULED',
+          team_actions: [
+            {
+              team_id: teamId,
+              car_actions: [
+                // car_actions_id 与后端合成规则（ca:{plan_id}:{stage_id}:{vid}）一致，
+                // 显式唯一 id 防止 DS 把匿名项匹配到已有 CAR_ACTIONS 资源
+                { car_actions_id: `ca:${planId}:${stageId}:${vid}`, vid, state: 'SCHEDULED', actions: [] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const result = await createOperatorPlan(payload);
     if (result.ok && ((result.data?.code) ?? 200) === 200) {
-      const newPlanId = result.data?.data?.plan_id;
+      const newPlanId = result.data?.data?.plan_id || planId;
       appendSystemMessage(`空方案「${title}」已创建`);
       cancelCreatePlan();
       await loadPlans();
