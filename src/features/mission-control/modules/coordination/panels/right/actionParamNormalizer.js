@@ -78,6 +78,22 @@ function defaultProtect() {
   };
 }
 
+/**
+ * 把后端返回的 start_time（带时区 ISO、"YYYY-MM-DD HH:MM:SS" 等）
+ * 统一转为 datetime-local 输入框要求的本地格式 "YYYY-MM-DDTHH:MM"；
+ * 已是该格式或无法解析时原样返回。
+ */
+function toDatetimeLocalString(value) {
+  if (value === undefined || value === null) return '';
+  const text = String(value).trim();
+  if (!text) return '';
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) return text;
+  const d = new Date(text.replace(' ', 'T'));
+  if (Number.isNaN(d.getTime())) return text;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function addCommonFields(p) {
   // 兼容协调卡协议中的数字格式：0-停车；1-一键返航；2-继续任务
   const numericStrategy = { 0: 'stop', 1: 'return', 2: 'continue' };
@@ -91,7 +107,27 @@ function addCommonFields(p) {
   // 旧数据可能保存为空字符串，用 || 兜底确保有合法默认值
   p.mission_duration = p.mission_duration || '00:00:00';
   p.enable_start_time = p.enable_start_time ?? false;
-  p.start_time = p.start_time ?? '';
+  p.start_time = toDatetimeLocalString(p.start_time ?? '');
+}
+
+/**
+ * 把 datetime-local 的本地时间（"YYYY-MM-DDTHH:MM"，无时区）转为带本地时区偏移的
+ * ISO 字符串（如 "2026-09-04T12:05:00+08:00"）。后端把无时区时间串一律当 UTC 解析，
+ * 直接发送本地时间会差出时区偏移；空值/无法解析时原样返回。
+ */
+function toIsoWithLocalOffset(value) {
+  if (value === undefined || value === null) return '';
+  const text = String(value).trim();
+  if (!text) return '';
+  // 已带时区信息（Z 或 ±HH:MM 结尾）的保持原样
+  if (/([zZ]|[+-]\d{2}:?\d{2})$/.test(text)) return text;
+  const d = new Date(text.replace(' ', 'T'));
+  if (Number.isNaN(d.getTime())) return text;
+  const pad = (n) => String(n).padStart(2, '0');
+  const offsetMin = -d.getTimezoneOffset();
+  const sign = offsetMin >= 0 ? '+' : '-';
+  const absMin = Math.abs(offsetMin);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${pad(Math.floor(absMin / 60))}:${pad(absMin % 60)}`;
 }
 
 /**
@@ -114,7 +150,7 @@ export function serializeActionParam(param) {
   // 确保通用参数字段始终存在，避免后端因字段缺失而使用旧值
   p.mission_duration = p.mission_duration || '00:00:00';
   p.enable_start_time = p.enable_start_time ?? false;
-  p.start_time = p.start_time ?? '';
+  p.start_time = toIsoWithLocalOffset(p.start_time ?? '');
 
   return p;
 }

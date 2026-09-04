@@ -486,12 +486,22 @@ function onDrop(event) {
   const x = event.clientX - rect.left - 60;
   const y = event.clientY - rect.top - 25;
   const actionType = normalizeActionType(task.actionType);
+  // 新建卡片的通用参数默认值：任务时长 10 秒，默认勾选“设置开始时间”并取当前系统时间
+  // （start_time 用 datetime-local 输入框要求的本地格式 YYYY-MM-DDTHH:MM）
+  const now = new Date();
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const nowLocal = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}T${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
   const node = {
     id: `node_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     actionType,
     name: task.name,
     category: task.category || 'chassis',
-    param: JSON.parse(JSON.stringify(task.defaultParam || {})),
+    param: {
+      ...JSON.parse(JSON.stringify(task.defaultParam || {})),
+      mission_duration: '00:00:10',
+      enable_start_time: true,
+      start_time: nowLocal,
+    },
     x: Math.max(10, x),
     y: Math.max(10, y),
   };
