@@ -942,6 +942,9 @@ function buildActionsForVid(vid, planBase = null) {
     return {
       // 新建时 action_id / resource_id 由数据服务器分配，前端不预置
       name: displayName,
+      // DS 以 action_name/action_description 为准，缺失时会生成“行动-<id>”默认名导致名称丢失
+      action_name: displayName,
+      action_description: displayName,
       vid,
       action_seq: idx + 1,
       action_type: finalActionType,
@@ -997,7 +1000,8 @@ function buildPlan() {
         target_ids: [],
         state: 'SCHEDULED',
         team_actions: {
-          [teamId]: [{ vid, state: 'SCHEDULED', action_type: carActionType, actions }],
+          // car_actions 项带唯一 id，防止 DS import 时按 vid 吸附到已有资源
+          [teamId]: [{ car_actions_id: `ca:${planId}:${stageId}:${vid}`, vid, state: 'SCHEDULED', action_type: carActionType, actions }],
         },
       },
     ],
@@ -1040,26 +1044,29 @@ function buildAppendedPlan() {
     plan.stages = plan.stages || [];
     plan.stages.push(stage);
   }
+  // car_actions 项必须带唯一 car_actions_id，否则 DS import 时会按 vid 吸附到已有
+  // CAR_ACTIONS 资源，新加的行动被旧资源数据顶掉（保存"未生效"且引入幻影行动）
+  const caId = `ca:${plan.plan_id}:${stageId}:${vid}`;
   const ta = stage.team_actions || {};
   if (Array.isArray(ta)) {
     // 数据服务器标准格式：team_actions 为 [{ team_id, car_actions: [...] }]
     const entry = ta.find((e) => e.team_id === teamId);
     if (entry) {
       entry.car_actions = entry.car_actions || [];
-      entry.car_actions.push({ vid, state: 'SCHEDULED', action_type: carActionType, actions });
+      entry.car_actions.push({ car_actions_id: caId, vid, state: 'SCHEDULED', action_type: carActionType, actions });
     } else {
-      ta.push({ team_id: teamId, car_actions: [{ vid, state: 'SCHEDULED', action_type: carActionType, actions }] });
+      ta.push({ team_id: teamId, car_actions: [{ car_actions_id: caId, vid, state: 'SCHEDULED', action_type: carActionType, actions }] });
     }
   } else {
     // 旧 mock 格式：team_actions 为 { [teamId]: [...] }
     ta[teamId] = ta[teamId] || [];
-    ta[teamId].push({ vid, state: 'SCHEDULED', action_type: carActionType, actions });
+    ta[teamId].push({ car_actions_id: caId, vid, state: 'SCHEDULED', action_type: carActionType, actions });
   }
   stage.team_actions = ta;
 
   // 追加 car_actions
   plan.car_actions = plan.car_actions || [];
-  plan.car_actions.push({ vid, state: 'SCHEDULED', action_type: carActionType, actions });
+  plan.car_actions.push({ car_actions_id: caId, vid, state: 'SCHEDULED', action_type: carActionType, actions });
 
   // 追加 vehicle_summary
   plan.vehicle_summary = plan.vehicle_summary || [];
