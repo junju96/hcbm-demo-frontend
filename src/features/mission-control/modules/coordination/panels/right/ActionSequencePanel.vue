@@ -91,7 +91,7 @@
         <!-- 按车辆组织的行动序列 — 卡片串联式 -->
         <div v-if="vehicleActions.length > 0" class="as-vehicle-sequences">
           <div class="as-vehicle-seq-title">
-            <span>各车行动序列</span>
+            <span>车辆行动序列</span>
             <button
               class="as-btn mini primary"
               type="button"
@@ -114,7 +114,7 @@
                   <template v-if="isControlMode">
                     <template v-if="canOperateVehicle(vehicle)">
                       <template v-if="getVehicleRuntimeState(vehicle) === 'SCHEDULED'">
-                        <button class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('start', [vehicle.vid])">开始</button>
+                        <button v-if="hasVehicleActions(vehicle)" class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('start', [vehicle.vid])">开始</button>
                       </template>
                       <template v-if="getVehicleRuntimeState(vehicle) === 'ACTIVE'">
                         <button class="as-btn mini warn" type="button" :disabled="controlLoading" @click="executeControl('pause', [vehicle.vid])">暂停</button>
@@ -135,6 +135,8 @@
                 </div>
               </div>
               <div class="as-action-cards" :data-vid="vehicle.vid">
+                <!-- 空行动序列（如新建空方案只关联了车辆骨架）：给出引导提示 -->
+                <div v-if="!hasVehicleActions(vehicle)" class="as-empty-actions">暂无行动，点击「编辑」添加</div>
                 <!-- 跨层依赖连线（按真实卡片位置绘制平滑曲线） -->
                 <svg class="as-action-lines" v-if="getActionLines(vehicle).length">
                   <defs>
@@ -1258,6 +1260,9 @@ const getVehicleRuntimeState = (vehicle) => {
   if (actions.some((a) => a.state === 'PAUSED')) return 'PAUSED';
   return 'SCHEDULED';
 };
+
+// 车辆是否已有行动（新建空方案只关联了车辆骨架，stages 为空）
+const hasVehicleActions = (vehicle) => flattenActions(vehicle).length > 0;
 
 /* ---------- 行动参数弹窗 ---------- */
 const openParamDialog = (action, vehicle) => {
@@ -2586,6 +2591,15 @@ onUnmounted(() => {
   padding: 0.8rem;
   min-height: 120px;
   width: max-content;
+}
+
+/* 空行动序列占位提示（新建空方案只关联了车辆、尚无行动时） */
+.as-empty-actions {
+  align-self: center;
+  color: rgba(180, 200, 200, 0.55);
+  font-size: 0.85rem;
+  padding: 0 0.4rem;
+  white-space: nowrap;
 }
 
 .as-action-lines {

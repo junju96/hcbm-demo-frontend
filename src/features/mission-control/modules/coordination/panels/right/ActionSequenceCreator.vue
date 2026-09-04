@@ -179,7 +179,7 @@ const props = defineProps({
   appendPlan: { type: Object, default: null },
   // 当前可选的车辆列表（从资源池获取的实际已连接无人车）
   availableVehicles: { type: Array, default: () => [] },
-  // 预选中车辆完整对象（含 vid），用于从“各车行动序列”新建时直接指定具体车辆
+  // 预选中车辆完整对象（含 vid），用于从“车辆行动序列”新建时直接指定具体车辆
   presetVehicle: { type: Object, default: null },
   // 当前模式：true=操控席，false=协同席；影响保存时调用的 API
   isControlMode: { type: Boolean, default: true },
