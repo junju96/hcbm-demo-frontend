@@ -170,7 +170,8 @@
                   :style="columnStyle(vehicle, column)"
                   :class="{ 'single-row': isSingleRow(vehicle) }"
                 >
-                  <template v-for="(action, rowIdx) in column" :key="action.action_id || `${action.stage_id}-${rowIdx}`">
+                  <!-- key 必须全局唯一：DS 脏数据可能返回重复 action_id，仅靠 action_id 会导致渲染错乱 -->
+                  <template v-for="(action, rowIdx) in column" :key="`${action.stage_id}-${action.action_id || 'noid'}-${colIdx}-${rowIdx}`">
                     <!-- 行动卡片 -->
                     <div
                       class="as-action-card"
@@ -1481,37 +1482,19 @@ const closeCreator = () => {
 
 const onCreatorSaved = async (plan) => {
   if (creatorEditMode.value) {
-    // 编辑模式：同步到数据服务器后刷新当前选中方案详情
+    // 编辑模式：PATCH 已在后端直接 import 落盘到数据服务器，无需再调 /sync
+    // （历史上 PATCH 只写本地缓存才需要 sync 补偿；重复 import 会因 action 无 id 而新建出重复 ACTION）
     selectedPlan.value = plan;
-    if (isControlMode.value) {
-      const syncResult = await syncOperatorPlanToDataServer(plan.plan_id);
-      if (!syncResult.ok) {
-        appendSystemMessage(`编辑已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
-      } else {
-        appendSystemMessage('已编辑车辆行动序列并同步到数据服务器');
-      }
-    } else {
-      appendSystemMessage('已编辑车辆行动序列');
-    }
+    appendSystemMessage('已编辑车辆行动序列并保存到数据服务器');
     await refreshDetail(plan.plan_id);
     closeCreator();
     return;
   }
 
   if (creatorAppendMode.value) {
-    // 追加模式：刷新当前方案详情，不新增方案条目
+    // 追加模式：PATCH 已落盘，同样不需要再 sync；刷新当前方案详情，不新增方案条目
     selectedPlan.value = plan;
-    if (isControlMode.value) {
-      // 同步到数据服务器，避免轮询时旧数据覆盖本地追加结果
-      const syncResult = await syncOperatorPlanToDataServer(plan.plan_id);
-      if (!syncResult.ok) {
-        appendSystemMessage(`追加已本地保存，但同步到数据服务器失败：${syncResult.data?.message || syncResult.error || '未知错误'}`);
-      } else {
-        appendSystemMessage('已追加车辆行动序列到当前方案并同步到数据服务器');
-      }
-    } else {
-      appendSystemMessage('已追加车辆行动序列到当前方案');
-    }
+    appendSystemMessage('已追加车辆行动序列到当前方案并保存到数据服务器');
     await refreshDetail(plan.plan_id);
     closeCreator();
     return;

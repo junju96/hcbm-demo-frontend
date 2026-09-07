@@ -950,7 +950,9 @@ function buildActionsForVid(vid, planBase = null) {
     const normalizedParam = normalizeActionParam(n.param, finalActionType, vehicleType);
     autoFillCoordinates(normalizedParam, finalActionType);
     return {
-      // 新建时 action_id / resource_id 由数据服务器分配，前端不预置
+      // 编辑模式沿用原 action_id，re-import 时 DS 原位更新；
+      // 仅全新节点不带 action_id，由数据服务器分配
+      action_id: n.originalActionId || undefined,
       name: displayName,
       // DS 以 action_name/action_description 为准，缺失时会生成“行动-<id>”默认名导致名称丢失
       action_name: displayName,
@@ -1097,27 +1099,42 @@ function buildUpdatedPlan() {
   const actions = buildActionsForVid(vid);
   const carActionType = deriveCarActionType(actions);
 
-  // 更新 stages 中对应车辆的 actions
+  // 更新 stages 中对应车辆的 actions。
+  // 编辑视图是"该车全部行动"的单层视图（无 stage 概念），写回时把该车行动合并到
+  // 其出现的第一个 stage，其余 stage 中该车的 car_actions 条目移除——否则同一份
+  // actions 会被复制到多个 stage，经 DS 累加后前端显示重复
+  let stageWritten = false;
   for (const stage of plan.stages || []) {
     const ta = stage.team_actions || {};
     if (Array.isArray(ta)) {
       // 数据服务器标准格式：team_actions 为 [{ team_id, car_actions: [...] }]
       for (const entry of ta) {
         const cars = entry.car_actions || [];
-        for (const v of cars) {
-          if (v.vid === vid) {
+        for (let i = cars.length - 1; i >= 0; i--) {
+          const v = cars[i];
+          if (v.vid !== vid) continue;
+          if (!stageWritten) {
             v.actions = actions;
             v.action_type = carActionType;
+            stageWritten = true;
+          } else {
+            cars.splice(i, 1);
           }
         }
       }
     } else {
       // 旧 mock 格式：team_actions 为 { [teamId]: [...] }
       for (const key of Object.keys(ta)) {
-        for (const v of ta[key]) {
-          if (v.vid === vid) {
+        const list = ta[key];
+        for (let i = list.length - 1; i >= 0; i--) {
+          const v = list[i];
+          if (v.vid !== vid) continue;
+          if (!stageWritten) {
             v.actions = actions;
             v.action_type = carActionType;
+            stageWritten = true;
+          } else {
+            list.splice(i, 1);
           }
         }
       }
@@ -1233,7 +1250,7 @@ async function savePlan() {
   await ensureFusionedTargetsLoaded();
 
   if (props.editMode && props.editPlan && props.editVehicleVid) {
-    // 编辑模式：只更新本地 task_pool，不同步数据服务器
+    // 编辑模式：PATCH 由后端直接 import 全量落盘到数据服务器（勿再调 /sync 重复写入）
     const updatedPlan = buildUpdatedPlan();
     try {
       const patchFn = props.isControlMode ? patchOperatorPlan : patchPlan;
