@@ -253,7 +253,7 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
       p.area_id = p.area_id ?? '';
     }
     addCommonFields(p);
-  } else if (type === 'rocket-launch' || type === 'loitering-munition-launch' || type === '40mm-gun-launch' || type === 'at-missile-launch') {
+  } else if (type === 'rocket-launch' || type === 'loitering-munition-launch' || type === '30mm-gun-launch' || type === 'at-missile-launch') {
     p.points = Array.isArray(p.points) && p.points.length ? p.points.map((pt) => ({ ...pt, target_ref: pt.target_ref || '' })) : [defaultStrikePoint()];
     p.time = p.time ?? 60;
     p.sort = p.sort ?? 0;

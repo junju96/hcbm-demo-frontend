@@ -161,7 +161,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import VehicleIcon from './VehicleIcon.vue';
-import { createOperatorPlan, patchOperatorPlan, patchPlan, fetchFusionedTargets } from '../../api/coordinationApi.js';
+import { createOperatorPlan, patchOperatorPlan, patchPlan, fetchFusionedTargets, fetchOperatorPlans, nextSequentialPlanId } from '../../api/coordinationApi.js';
 import { normalizeActionParam, serializeActionParam } from './actionParamNormalizer';
 
 function normalizeActionType(actionType) {
@@ -330,7 +330,7 @@ const payloadTaskMap = {
   'Recon-Strike-UGV': [
     { actionType: 'Lens-Recon', name: '光电侦察', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
     { actionType: 'Search-And-Shoot', name: '侦察打击', defaultParam: { time: 180, area: [] } },
-    { actionType: '40mm-Gun-Launch', name: '40炮打击', defaultParam: { time: 45, sort: 1, num: 1, points: [] } },
+    { actionType: '30mm-Gun-Launch', name: '30炮打击', defaultParam: { time: 45, sort: 1, num: 1, points: [] } },
     { actionType: 'AT-Missile-Launch', name: '红箭13导弹打击', defaultParam: { time: 60, sort: 1, num: 1, points: [] } },
     { actionType: '7.62mm-Gun-Shot', name: '机枪打击', defaultParam: { time: 30, sort: 1, num: 1, points: [] } },
   ],
@@ -885,7 +885,7 @@ function autoFillCoordinates(param, actionType) {
     if (needsCoordinateFill(param.points)) fillRouteFromFirst(param);
   }
   // 打击类：从目标资源取第一个点
-  if (['40mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'].includes(type)) {
+  if (['30mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'].includes(type)) {
     if (needsCoordinateFill(param.points)) fillTargetFromFirst(param);
     param.num = Array.isArray(param.points) ? param.points.length : 0;
   }
@@ -978,12 +978,12 @@ function deriveCarActionType(actions) {
   return actions?.[0]?.action_type || '';
 }
 
-function buildPlan() {
-  const planId = `PLAN_${Date.now()}`;
+function buildPlan(planId) {
   const stageId = `STAGE_${Date.now()}`;
   const teamId = 'TEAM_NEW';
   const vid = selectedVehicle.value?.vid || `equipment:new-${Date.now()}`;
-  const actions = buildActionsForVid(vid);
+  // 传入 planBase 让 action 的 plan_id/stage_id/team_id 与 plan 本体一致
+  const actions = buildActionsForVid(vid, { plan_id: planId, stages: [{ stage_id: stageId }], teams: [{ team_id: teamId }] });
   const carActionType = deriveCarActionType(actions);
 
   return {
@@ -1283,7 +1283,9 @@ async function savePlan() {
     return;
   }
 
-  const plan = buildPlan();
+  const plansRes = await fetchOperatorPlans();
+  const existingPlans = plansRes?.data?.items || [];
+  const plan = buildPlan(nextSequentialPlanId(existingPlans));
   try {
     const result = await createOperatorPlan(plan);
     if (!result.ok) {

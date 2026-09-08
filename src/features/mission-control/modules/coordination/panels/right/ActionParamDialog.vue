@@ -264,7 +264,7 @@
           </div>
         </template>
 
-        <!-- 11. 打击类（40mm / 红箭13 / 火箭弹 / 巡飞弹） -->
+        <!-- 11. 打击类（30mm / 红箭13 / 火箭弹 / 巡飞弹） -->
         <template v-else-if="isTargetListStrike">
           <div class="apd-section">
             <div class="apd-section-title">
@@ -500,7 +500,7 @@ const loadingFusioned = ref(false);
 const STANDARD_ACTION_TYPES = new Set([
   'auto-move', 'follow-move', 'silent-guard', 'set-return-point', 'return-to-base',
   'manual-task', 'pose-adjust', 'air-recon', 'lens-recon',
-  'search-and-shoot', 'recon-strike', '40mm-gun-launch', 'at-missile-launch',
+  'search-and-shoot', 'recon-strike', '30mm-gun-launch', 'at-missile-launch',
   'gun-shot', '7.62mm-gun-shot', 'rocket-launch', 'loitering-munition-launch',
   'laser-illumination', 'sound-expel', 'acoustic-deterrence', 'light-expel',
   'light-deterrence', 'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault',
@@ -519,7 +519,7 @@ function inferActionTypeFromId(actionId) {
       'set-return-point': 'set-return-point', 'return-to-base': 'return-to-base',
       'manual-task': 'manual-task', 'pose-adjust': 'pose-adjust',
       'air-recon': 'air-recon', 'lens-recon': 'lens-recon', 'search-and-shoot': 'search-and-shoot',
-      'recon-strike': 'search-and-shoot', '40mm-gun-launch': '40mm-gun-launch',
+      'recon-strike': 'search-and-shoot', '30mm-gun-launch': '30mm-gun-launch',
       'at-missile-launch': 'at-missile-launch', 'gun-shot': '7.62mm-gun-shot',
       '7.62mm-gun-shot': '7.62mm-gun-shot', 'rocket-launch': 'rocket-launch',
       'loitering-munition-launch': 'loitering-munition-launch', 'laser-illumination': 'laser-illumination',
@@ -538,7 +538,8 @@ function inferActionTypeFromId(actionId) {
     'ch-manual': 'manual-task', 'ch-pose': 'pose-adjust',
     'fs-lens': 'lens-recon', 'fs-recon-strike': 'search-and-shoot', 'fs-gun': '7.62mm-gun-shot',
     'fs-rocket': 'rocket-launch', 'fs-loiter': 'loitering-munition-launch',
-    'rs-lens': 'lens-recon', 'rs-recon-strike': 'search-and-shoot', 'rs-40mm': '40mm-gun-launch',
+    'rs-lens': 'lens-recon', 'rs-recon-strike': 'search-and-shoot', 'rs-30mm': '30mm-gun-launch',
+    'rs-40mm': '30mm-gun-launch',
     'rs-at': 'at-missile-launch', 'rs-gun': '7.62mm-gun-shot', 'rs-laser': 'laser-illumination',
     'pt-lens': 'lens-recon', 'pt-recon-strike': 'search-and-shoot', 'pt-gun': '7.62mm-gun-shot',
     'pt-acoustic': 'sound-expel', 'pt-light': 'light-expel',
@@ -559,7 +560,7 @@ function inferActionTypeFromName(name) {
     '人工任务': 'manual-task', '姿态调整': 'pose-adjust', '空中侦察': 'air-recon',
     '光电侦察': 'lens-recon', '侦察打击': 'search-and-shoot', '巡逻车侦察打击': 'search-and-shoot',
     '机枪打击': '7.62mm-gun-shot', '火箭弹打击': 'rocket-launch', '巡飞弹打击': 'loitering-munition-launch',
-    '40炮打击': '40mm-gun-launch', '红箭13导弹打击': 'at-missile-launch', '激光照射': 'laser-illumination',
+    '30炮打击': '30mm-gun-launch', '40炮打击': '30mm-gun-launch', '红箭13导弹打击': 'at-missile-launch', '激光照射': 'laser-illumination',
     '强声拒止': 'sound-expel', '强光拒止': 'light-expel',
     '电磁侦察': 'em-recon', '电磁突击': 'em-assault', '电磁干扰': 'em-interference',
     '载荷静默': 'payload-silent',
@@ -572,7 +573,8 @@ function inferActionTypeFromName(name) {
     'return': 'return-to-base', 'manualtask': 'manual-task',
     'manual': 'manual-task', 'poseadjust': 'pose-adjust', 'airrecon': 'air-recon',
     'lensrecon': 'lens-recon', 'searchandshoot': 'search-and-shoot', 'reconstrike': 'search-and-shoot',
-    '40mmgunlaunch': '40mm-gun-launch', '40mmgun': '40mm-gun-launch', 'atmissilelaunch': 'at-missile-launch',
+    '30mmgunlaunch': '30mm-gun-launch', '30mmgun': '30mm-gun-launch',
+    '40mmgunlaunch': '30mm-gun-launch', '40mmgun': '30mm-gun-launch', 'atmissilelaunch': 'at-missile-launch',
     'atmissile': 'at-missile-launch', 'gunshot': '7.62mm-gun-shot', '762mmgunshot': '7.62mm-gun-shot',
     '762mmgun': '7.62mm-gun-shot', 'rocketlaunch': 'rocket-launch', 'loiteringmunitionlaunch': 'loitering-munition-launch',
     'loiteringmunition': 'loitering-munition-launch', 'laserillumination': 'laser-illumination',
@@ -690,7 +692,7 @@ const actionTypeLabel = computed(() => {
     'lens-recon': '光电侦察',
     'search-and-shoot': isPatrolVehicle.value ? '巡逻车侦察打击' : '侦察打击',
     'recon-strike': isPatrolVehicle.value ? '巡逻车侦察打击' : '侦察打击',
-    '40mm-gun-launch': '40炮打击',
+    '30mm-gun-launch': '30炮打击',
     'at-missile-launch': '红箭13导弹打击',
     '7.62mm-gun-shot': '机枪打击',
     'gun-shot': '机枪打击',
@@ -719,7 +721,7 @@ const vehicleName = computed(() =>
 );
 
 const isTargetListStrike = computed(() =>
-  ['40mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch']
+  ['30mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch']
     .includes(normalizedActionType.value)
 );
 
@@ -734,7 +736,7 @@ const isElectronic = computed(() =>
 const showCommonParams = computed(() =>
   ['auto-move', 'follow-move', 'silent-guard', 'manual-task', 'pose-adjust',
    'set-return-point', 'return-to-base',
-   'lens-recon', 'recon-strike', 'search-and-shoot', '40mm-gun-launch', 'gun-shot', '7.62mm-gun-shot',
+   'lens-recon', 'recon-strike', 'search-and-shoot', '30mm-gun-launch', 'gun-shot', '7.62mm-gun-shot',
    'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'laser-illumination',
    'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence',
    'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming',
@@ -1204,7 +1206,7 @@ function finalizeParam() {
       fillRouteFromSelection();
     }
   }
-  if (['40mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'].includes(type)) {
+  if (['30mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'].includes(type)) {
     fillStrikeTargets();
     if (Array.isArray(editedParam.value.points)) {
       editedParam.value.num = editedParam.value.points.length;

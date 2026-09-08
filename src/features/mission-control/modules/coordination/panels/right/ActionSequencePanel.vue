@@ -17,10 +17,15 @@
         >
           新建
         </button>
-        <!-- 暂不开放直接新建方案，仅支持对列表中已有方案进行 action 增删改 -->
-        <!-- <button class="as-btn" type="button" @click="openCreator">
+        <!-- 协同席：新建空方案（仅标题，不带行动序列数据） -->
+        <button
+          v-else
+          class="as-btn"
+          type="button"
+          @click="openCreatePlanDialog"
+        >
           新建
-        </button> -->
+        </button>
       </div>
     </div>
 
@@ -227,7 +232,7 @@
     </div>
 
     <!-- 车辆选择弹窗（多车控制用：开始/暂停/继续/停止） -->
-    <!-- 新建空方案弹窗（操控席）：仅输入方案名称，其它字段为空 -->
+    <!-- 新建空方案弹窗（操控席/协同席共用）：仅输入方案名称，其它字段为空 -->
     <div v-if="showCreatePlanDialog" class="as-dialog-overlay" @click.self="cancelCreatePlan">
       <div class="as-dialog">
         <div class="as-dialog-header">新建行动方案</div>
@@ -489,6 +494,8 @@ import {
   patchOperatorPlan,
   syncOperatorPlanToDataServer,
   createOperatorPlan,
+  createPlan,
+  nextSequentialPlanId,
   deleteOperatorVehicle,
   notifyPlanMapClicked,
   notifyOperatorPlanMapClicked,
@@ -702,7 +709,7 @@ const actionTypeDisplayMap = {
   'lens-recon': '光电侦察',
   'search-and-shoot': '侦察打击',
   'recon-strike': '侦察打击',
-  '40mm-gun-launch': '40炮打击',
+  '30mm-gun-launch': '30炮打击',
   'at-missile-launch': '红箭13导弹打击',
   'gun-shot': '机枪打击',
   '7.62mm-gun-shot': '机枪打击',
@@ -755,7 +762,7 @@ const inferActionTypeFromParam = (param) => {
   if (businessHas('points') && Array.isArray(p.points) && p.points.length > 0) {
     const first = p.points[0];
     if (first && typeof first === 'object') {
-      if (first.ammo_type === 2) return '40mm-gun-launch';
+      if (first.ammo_type === 2) return '30mm-gun-launch';
       if (first.ammo_type === 1) return '7.62mm-gun-shot';
       if ('ammo_type' in first) return 'at-missile-launch';
       if ('r' in first || p.type === 2) return 'rocket-launch';
@@ -817,7 +824,7 @@ const inferActionTypeFromId = (actionId) => {
       'lens-recon': 'lens-recon',
       'search-and-shoot': 'search-and-shoot',
       'recon-strike': 'search-and-shoot',
-      '40mm-gun-launch': '40mm-gun-launch',
+      '30mm-gun-launch': '30mm-gun-launch',
       'at-missile-launch': 'at-missile-launch',
       'gun-shot': '7.62mm-gun-shot',
       '7.62mm-gun-shot': '7.62mm-gun-shot',
@@ -856,7 +863,8 @@ const inferActionTypeFromId = (actionId) => {
     // 侦打车
     'rs-lens': 'lens-recon',
     'rs-recon-strike': 'search-and-shoot',
-    'rs-40mm': '40mm-gun-launch',
+    'rs-30mm': '30mm-gun-launch',
+    'rs-40mm': '30mm-gun-launch',
     'rs-at': 'at-missile-launch',
     'rs-gun': '7.62mm-gun-shot',
     'rs-laser': 'laser-illumination',
@@ -894,7 +902,8 @@ const inferActionTypeFromName = (name) => {
     '机枪打击': '7.62mm-gun-shot',
     '火箭弹打击': 'rocket-launch',
     '巡飞弹打击': 'loitering-munition-launch',
-    '40炮打击': '40mm-gun-launch',
+    '30炮打击': '30mm-gun-launch',
+    '40炮打击': '30mm-gun-launch',
     '红箭13导弹打击': 'at-missile-launch',
     '激光照射': 'laser-illumination',
     '强声拒止': 'sound-expel',
@@ -921,8 +930,10 @@ const inferActionTypeFromName = (name) => {
     'lensrecon': 'lens-recon',
     'searchandshoot': 'search-and-shoot',
     'reconstrike': 'search-and-shoot',
-    '40mmgunlaunch': '40mm-gun-launch',
-    '40mmgun': '40mm-gun-launch',
+    '30mmgunlaunch': '30mm-gun-launch',
+    '30mmgun': '30mm-gun-launch',
+    '40mmgunlaunch': '30mm-gun-launch',
+    '40mmgun': '30mm-gun-launch',
     'atmissilelaunch': 'at-missile-launch',
     'atmissile': 'at-missile-launch',
     'gunshot': '7.62mm-gun-shot',
@@ -1669,7 +1680,7 @@ const onRefresh = () => {
   appendSystemMessage('已刷新');
 };
 
-/* ---------- 新建空方案（操控席）：仅名称，其它字段为空，由后端补默认值并写入操控席数据服务器 ---------- */
+/* ---------- 新建空方案：仅名称，其它字段为空；操控席由后端补默认值并写入操控席数据服务器，协同席仅标题不带行动序列 ---------- */
 const openCreatePlanDialog = () => {
   newPlanTitle.value = '';
   showCreatePlanDialog.value = true;
@@ -1685,12 +1696,28 @@ const confirmCreatePlan = async () => {
   if (!title || creatingPlan.value) return;
   creatingPlan.value = true;
   try {
+    if (!isControlMode.value) {
+      // 协同席：仅标题创建空方案，不带任何行动序列数据（详情区显示"暂无行动序列数据"）
+      const planId = nextSequentialPlanId(plans.value);
+      const result = await createPlan({ plan_id: planId, title });
+      if (result.ok && ((result.data?.code) ?? 200) === 200) {
+        const newPlanId = result.data?.data?.plan_id || planId;
+        appendSystemMessage(`空方案「${title}」已创建`);
+        cancelCreatePlan();
+        await loadPlans();
+        if (newPlanId) selectPlan(newPlanId);
+      } else {
+        appendSystemMessage('新建方案失败: ' + (result.data?.message || result.error || '未知错误'));
+      }
+      return;
+    }
     // 关联当前操控车辆：带上该车的空行动序列骨架（结构对齐 ActionSequenceCreator/DS 标准格式）
-    // 所有 id 带时间戳命名空间，避免与 DS 中已有资源（team/stage/car_actions）撞名后被吸附出幻影行动
+    // plan id 用顺序号 plan-六位数字（现有数字后缀最大值 +1）；team/stage id 仍带时间戳命名空间，
+    // 避免与 DS 中已有资源（team/stage/car_actions）撞名后被吸附出幻影行动
     const rawVid = String(connectedVehicleId.value || '');
     const vid = rawVid.startsWith('equipment:') ? rawVid : `equipment:${rawVid}`;
     const ts = Date.now();
-    const planId = `PLAN_${ts}`;
+    const planId = nextSequentialPlanId(plans.value);
     const teamId = `TEAM_${ts}`;
     const stageId = `STAGE_${ts}`;
     const payload = {

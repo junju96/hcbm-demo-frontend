@@ -444,6 +444,12 @@ export const fetchActionSequenceVehicles = async () => {
   return { ok: true, data: { items, total: result.data?.data?.total || 0 } };
 };
 
+/** 协同席 — 新建空行动方案（仅标题，无行动序列数据） */
+export const createPlan = async (payload = {}) => {
+  const result = await postJson(joinApiUrl('/api/v1/action-sequences/plans'), payload);
+  return result;
+};
+
 /** 协同席 — 仅本地更新行动序列方案（不同步数据服务器） */
 export const patchPlan = async (planId, payload = {}) => {
   const result = await patchJson(joinApiUrl(`/api/v1/action-sequences/plans/${planId}`), payload);
@@ -512,6 +518,20 @@ export const fetchOperatorPlanDetail = async (planId) => {
   if (!result.ok) return result;
   const raw = result.data?.data || {};
   return { ok: true, data: raw };
+};
+
+/**
+ * 生成下一个顺序 plan id：plan-六位数字
+ * 取现有 plan 中 `plan-<数字>` 形式 id 的数字后缀最大值 +1，不足 6 位补零（超出 6 位继续递增）。
+ * 旧格式 PLAN_<时间戳> 不参与编号。
+ */
+export const nextSequentialPlanId = (plans = []) => {
+  let max = 0;
+  for (const p of plans || []) {
+    const m = /^plan-(\d+)$/i.exec(String(p?.plan_id || ''));
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `plan-${String(max + 1).padStart(6, '0')}`;
 };
 
 /** 操控端 — 开始执行 */
