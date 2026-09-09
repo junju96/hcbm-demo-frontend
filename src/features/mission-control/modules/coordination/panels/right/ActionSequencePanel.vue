@@ -26,6 +26,26 @@
         >
           新建
         </button>
+        <!-- 协同席：新建编队机动方案（头车 + 跟随车辆 + 路线参数，自动生成各车编队机动态作） -->
+        <button
+          v-if="!isControlMode"
+          class="as-btn"
+          type="button"
+          @click="openFormationPlanDialog"
+        >
+          新建编队机动
+        </button>
+        <!-- 操控席：协同任务授权（默认"下发授权"，授权成功后变为"解除授权"） -->
+        <button
+          v-if="isControlMode"
+          class="as-btn as-coop-btn"
+          type="button"
+          :disabled="!isVehicleConnected || controlLoading"
+          :title="isVehicleConnected ? '' : '请先连接操控车辆'"
+          @click="onCoopButtonClick"
+        >
+          {{ coopAuthorized ? '解除授权' : '下发授权' }}
+        </button>
       </div>
     </div>
 
@@ -139,7 +159,7 @@
                   <button v-if="canOperateVehicle(vehicle)" class="as-btn mini danger" type="button" @click="confirmDeleteVehicleActions(vehicle)">删除</button>
                 </div>
               </div>
-              <div class="as-action-cards" :data-vid="vehicle.vid">
+              <div class="as-action-cards" :class="{ 'as-action-cards-empty': !hasVehicleActions(vehicle) }" :data-vid="vehicle.vid">
                 <!-- 空行动序列（如新建空方案只关联了车辆骨架）：给出引导提示 -->
                 <div v-if="!hasVehicleActions(vehicle)" class="as-empty-actions">暂无行动，点击「编辑」添加</div>
                 <!-- 跨层依赖连线（按真实卡片位置绘制平滑曲线） -->
@@ -259,6 +279,73 @@
       </div>
     </div>
 
+    <!-- 协同任务授权弹窗（操控席）：首要监视目标单选 + 重点目标类型复选 + 协同车辆复选 -->
+    <div v-if="showCoopDialog" class="as-dialog-overlay" @click.self="cancelCoopDialog">
+      <div class="as-dialog as-coop-dialog">
+        <div class="as-dialog-header">任务协同指令</div>
+        <div class="as-dialog-body">
+          <div class="as-coop-section">
+            <div class="as-coop-label">首要监视目标</div>
+            <select v-model="coopTargetType" class="as-coop-select">
+              <option :value="null" disabled>请选择</option>
+              <option
+                v-for="t in COOP_TARGET_TYPES"
+                :key="t.value"
+                :value="t.value"
+              >
+                {{ t.label }}
+              </option>
+            </select>
+          </div>
+          <div class="as-coop-section">
+            <div class="as-coop-label">重点目标类型</div>
+            <div class="as-coop-options">
+              <label
+                v-for="t in COOP_TARGET_TYPES"
+                :key="t.value"
+                class="as-dialog-item as-coop-option"
+              >
+                <input v-model="coopPriorities" type="checkbox" :value="t.value" />
+                <span>{{ t.label }}</span>
+              </label>
+            </div>
+          </div>
+          <div class="as-coop-section">
+            <div class="as-coop-label">协同车辆（除本车外的在线车辆）</div>
+            <div v-if="coopVehicleOptions.length === 0" class="as-dialog-empty">
+              没有其它车辆在线
+            </div>
+            <label
+              v-for="v in coopVehicleOptions"
+              :key="v.vid"
+              class="as-dialog-item"
+              :class="{ offline: v.vmf == null }"
+              :title="v.vmf == null ? '该车辆缺少 VMF 编号，无法授权' : ''"
+            >
+              <input
+                v-model="coopSelectedVmfs"
+                type="checkbox"
+                :value="v.vmf"
+                :disabled="v.vmf == null"
+              />
+              <span>{{ v.display_name || v.resource_name || v.vid }}（{{ String(v.vid).replace('equipment:', '') }}）</span>
+            </label>
+          </div>
+        </div>
+        <div class="as-dialog-footer">
+          <button class="as-btn" type="button" @click="cancelCoopDialog">取消</button>
+          <button
+            class="as-btn primary"
+            type="button"
+            :disabled="!canConfirmCoop || coopSending"
+            @click="confirmCoopGrant"
+          >
+            {{ coopSending ? '下发中…' : '下发' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 多车控制选择弹窗 -->
     <div v-if="showVehicleDialog" class="as-dialog-overlay" @click.self="showVehicleDialog = false">
       <div class="as-dialog">
@@ -322,6 +409,17 @@
         </div>
       </div>
     </div>
+
+    <!-- 协同席：新建编队机动方案弹窗（teleport 到 body，避免被右侧面板裁切） -->
+    <Teleport to="body">
+      <FormationPlanDialog
+        v-if="showFormationPlanDialog"
+        :vehicles="onlineVehicles"
+        :format-vehicle="getVehicleDisplayName"
+        @close="showFormationPlanDialog = false"
+        @confirm="confirmFormationPlan"
+      />
+    </Teleport>
 
     <!-- 缺失/追加车型选择弹窗 -->
     <div v-if="showMissingVehicleDialog" class="as-dialog-overlay" @click.self="showMissingVehicleDialog = false">
@@ -495,6 +593,7 @@ import {
   syncOperatorPlanToDataServer,
   createOperatorPlan,
   createPlan,
+  setCooperativeAuthorization,
   nextSequentialPlanId,
   deleteOperatorVehicle,
   notifyPlanMapClicked,
@@ -504,6 +603,7 @@ import {
 } from '../../api/coordinationApi';
 import ActionParamDialog from './ActionParamDialog.vue';
 import ActionSequenceCreator from './ActionSequenceCreator.vue';
+import FormationPlanDialog from './FormationPlanDialog.vue';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
@@ -536,6 +636,7 @@ const showCreatePlanDialog = ref(false);
 const newPlanTitle = ref('');
 const creatingPlan = ref(false);
 
+
 /* ---------- 多车控制弹窗 ---------- */
 const showVehicleDialog = ref(false);
 const pendingControlAction = ref('');
@@ -565,6 +666,116 @@ const selectingVehicle = ref(false);
 const connectedVehicleId = ref('');
 const connectedVehicleType = ref('');
 const isVehicleConnected = ref(false);
+
+/* ---------- 协同任务授权（操控席）：set_cooperative_authorization ---------- */
+// 目标类型选项（协议编号不连续，保持文档给定顺序）
+const COOP_TARGET_TYPES = [
+  { value: 1, label: '人员' },
+  { value: 2, label: '汽车' },
+  { value: 4, label: '装甲车' },
+  { value: 8, label: '工事' },
+  { value: 13, label: '武装人员' },
+  { value: 14, label: '工事火力点' },
+  { value: 15, label: '敌指挥节点' },
+  { value: 16, label: '通信枢纽' },
+  { value: 7, label: '炮兵阵地' },
+  { value: 17, label: '地下空间' },
+  { value: 18, label: '火力阵地' },
+  { value: 19, label: '导弹发射基地' },
+  { value: 20, label: '其他' },
+];
+const showCoopDialog = ref(false);
+const coopAuthorized = ref(false);
+const coopSending = ref(false);
+const coopTargetType = ref(null);
+const coopPriorities = ref([]);
+const coopSelectedVmfs = ref([]);
+// 除本车外的在线车辆；vmf 缺失的车辆不可选（授权参数要 VMF 编号）
+const coopVehicleOptions = computed(() => {
+  const self = String(connectedVehicleId.value || '').replace('equipment:', '');
+  return onlineVehicles.value.filter(
+    (v) => String(v.vid || '').replace('equipment:', '') !== self
+  );
+});
+const canConfirmCoop = computed(() => (
+  coopTargetType.value != null && coopSelectedVmfs.value.length > 0
+));
+
+const onCoopButtonClick = async () => {
+  if (coopAuthorized.value) {
+    // 解除授权：不弹窗，只携带 source=1、command=2
+    await sendCoopRelease();
+    return;
+  }
+  coopTargetType.value = null;
+  coopPriorities.value = [];
+  coopSelectedVmfs.value = [];
+  showCoopDialog.value = true;
+  // 弹窗打开时确保车辆列表是最新的
+  if (onlineVehicles.value.length === 0) {
+    await loadOnlineVehicles();
+  }
+};
+
+const cancelCoopDialog = () => {
+  showCoopDialog.value = false;
+};
+
+const confirmCoopGrant = async () => {
+  if (!canConfirmCoop.value || coopSending.value) return;
+  coopSending.value = true;
+  try {
+    const result = await setCooperativeAuthorization({
+      vehicle_vid: connectedVehicleId.value,
+      source: 1,
+      command: 1,
+      vehicles: coopSelectedVmfs.value,
+      target_type: coopTargetType.value,
+      priorities: coopPriorities.value,
+    });
+    const envelope = result.data || {};
+    if (result.ok && (envelope.code ?? 200) === 200) {
+      coopAuthorized.value = true;
+      showCoopDialog.value = false;
+      appendSystemMessage(`协同授权已下发 | 车辆数=${coopSelectedVmfs.value.length} | target_type=${coopTargetType.value}`);
+    } else {
+      appendSystemMessage('协同授权下发失败: ' + (envelope.message || result.error || '未知错误'));
+    }
+  } catch (err) {
+    appendSystemMessage('协同授权下发异常: ' + (err?.message || '未知错误'));
+  } finally {
+    coopSending.value = false;
+  }
+};
+
+const sendCoopRelease = async () => {
+  if (coopSending.value) return;
+  coopSending.value = true;
+  try {
+    const result = await setCooperativeAuthorization({
+      vehicle_vid: connectedVehicleId.value,
+      source: 1,
+      command: 2,
+    });
+    const envelope = result.data || {};
+    if (result.ok && (envelope.code ?? 200) === 200) {
+      coopAuthorized.value = false;
+      appendSystemMessage('协同授权已解除');
+    } else {
+      appendSystemMessage('解除授权失败: ' + (envelope.message || result.error || '未知错误'));
+    }
+  } catch (err) {
+    appendSystemMessage('解除授权异常: ' + (err?.message || '未知错误'));
+  } finally {
+    coopSending.value = false;
+  }
+};
+
+// 切换操控车辆后授权状态不可信，重置为未授权
+watch(connectedVehicleId, () => {
+  coopAuthorized.value = false;
+});
+
 
 /* ---------- 行动参数弹窗 ---------- */
 const showParamDialog = ref(false);
@@ -705,6 +916,7 @@ const actionTypeDisplayMap = {
   'return-to-base': '开启返航',
   'manual-task': '人工任务',
   'pose-adjust': '姿态调整',
+  'formation-move': '编队机动',
   'air-recon': '空中侦察',
   'lens-recon': '光电侦察',
   'search-and-shoot': '侦察打击',
@@ -722,8 +934,8 @@ const actionTypeDisplayMap = {
   'light-deterrence': '强光拒止',
   'em-recon': '电磁侦察',
   'electronic-recon': '电磁侦察',
-  'em-assault': '电磁突击',
-  'electronic-assault': '电磁突击',
+  'em-assault': '侦察干扰',
+  'electronic-assault': '侦察干扰',
   'em-interference': '电磁干扰',
   'electronic-jamming': '电磁干扰',
 };
@@ -768,7 +980,12 @@ const inferActionTypeFromParam = (param) => {
       if ('r' in first || p.type === 2) return 'rocket-launch';
       if ('loiter' in p || p.type === 3) return 'loitering-munition-launch';
     }
-    // 自主机动：points + limited_speed
+    // 编队机动：points + formation_mode，或路径点带 offsetX/offsetY
+    if (businessHas('formation_mode')) return 'formation-move';
+    if (first && typeof first === 'object' && ('offsetX' in first || 'offsetY' in first)) {
+      return 'formation-move';
+    }
+    // 自主机动：points + limited_speed（且不含 formation_mode，避免与编队机动混淆）
     if (businessHas('limited_speed')) return 'auto-move';
   }
   if (businessHas('distance') && businessHas('x') && businessHas('y')) return 'follow-move';
@@ -820,6 +1037,7 @@ const inferActionTypeFromId = (actionId) => {
       'return-to-base': 'return-to-base',
       'manual-task': 'manual-task',
       'pose-adjust': 'pose-adjust',
+      'formation-move': 'formation-move',
       'air-recon': 'air-recon',
       'lens-recon': 'lens-recon',
       'search-and-shoot': 'search-and-shoot',
@@ -854,6 +1072,7 @@ const inferActionTypeFromId = (actionId) => {
     'ch-return': 'return-to-base',
     'ch-manual': 'manual-task',
     'ch-pose': 'pose-adjust',
+    'ch-formation': 'formation-move',
     // 火力车
     'fs-lens': 'lens-recon',
     'fs-recon-strike': 'search-and-shoot',
@@ -895,6 +1114,7 @@ const inferActionTypeFromName = (name) => {
     '开启返航': 'return-to-base',
     '人工任务': 'manual-task',
     '姿态调整': 'pose-adjust',
+    '编队机动': 'formation-move',
     '空中侦察': 'air-recon',
     '光电侦察': 'lens-recon',
     '侦察打击': 'search-and-shoot',
@@ -910,6 +1130,7 @@ const inferActionTypeFromName = (name) => {
     '强光拒止': 'light-expel',
     '电磁侦察': 'em-recon',
     '电磁突击': 'em-assault',
+    '侦察干扰': 'em-assault',
     '电磁干扰': 'em-interference',
   };
   if (n in map) return map[n];
@@ -926,6 +1147,8 @@ const inferActionTypeFromName = (name) => {
     'manualtask': 'manual-task',
     'manual': 'manual-task',
     'poseadjust': 'pose-adjust',
+    'formationmove': 'formation-move',
+    'formation': 'formation-move',
     'airrecon': 'air-recon',
     'lensrecon': 'lens-recon',
     'searchandshoot': 'search-and-shoot',
@@ -1564,34 +1787,13 @@ const loadPlans = async (silent = false) => {
       return;
     }
     if (isControlMode.value && isVehicleConnected.value && connectedVehicleType.value) {
-      // 并发获取所有 plan 详情，避免 N+1 串行查询
-      const detailPromises = allPlans.map(async (plan) => {
-        try {
-          const detailResult = await fetchOperatorPlanDetail(plan.plan_id);
-          if (detailResult.ok) {
-            const vs = detailResult.data?.vehicle_summary || [];
-            // vehicle_summary 为空 = 尚未分配车辆的方案（如新建的空方案），不参与车型过滤
-            const hasVehicleType = vs.length === 0 || vs.some(
-              (v) => v.resource_type === connectedVehicleType.value
-            );
-            return { plan, hasVehicleType, error: null };
-          }
-          return { plan, hasVehicleType: false, error: null };
-        } catch (err) {
-          console.warn('[ActionSequencePanel] filter plan detail failed:', plan.plan_id, err);
-          return { plan, hasVehicleType: true, error: err }; // 失败时保守保留，避免任务消失
-        }
+      // 列表接口已返回轻量 vehicle_summary（vid + resource_type），直接按车型过滤，
+      // 不再对每个 plan 拉详情（原 N+1 查询已移除）
+      allPlans = allPlans.filter((plan) => {
+        const vs = plan.vehicle_summary || [];
+        // vehicle_summary 为空 = 尚未分配车辆的方案（如新建的空方案），不参与车型过滤
+        return vs.length === 0 || vs.some((v) => v.resource_type === connectedVehicleType.value);
       });
-      const detailResults = await Promise.all(detailPromises);
-      allPlans = detailResults
-        .filter((r) => r.hasVehicleType)
-        .map((r) => r.plan);
-      
-      // 如果有失败的详情请求，提示用户
-      const failedCount = detailResults.filter((r) => r.error).length;
-      if (failedCount > 0 && !silent) {
-        appendSystemMessage(`有 ${failedCount} 个任务详情获取失败，已保留显示`);
-      }
     }
 
     plans.value = allPlans;
@@ -1637,8 +1839,13 @@ const refreshDetail = async (planId) => {
 };
 
 /* ---------- 方案点击：通知数据服务器上图（上图处理由服务器负责） ---------- */
+// map-notify 回弹去抖：自己点击触发的 last_click 写回会经 Zenoh/SSE 原样推回，
+// 而 selectPlan 已拉过最新详情，短窗口内跳过该 SSE 事件，避免重复请求
+let lastMapNotify = { planId: '', at: 0 };
+
 const handlePlanItemClick = async (planId) => {
   const notifyFn = isControlMode.value ? notifyOperatorPlanMapClicked : notifyPlanMapClicked;
+  lastMapNotify = { planId, at: Date.now() };
   try {
     const result = await notifyFn(planId);
     if (!result.ok || ((result.data?.code) ?? 200) !== 200) {
@@ -1675,8 +1882,8 @@ const selectPlan = async (planId) => {
 
 const onRefresh = () => {
   loadOnlineVehicles();
+  // loadPlans 会刷新列表并对选中 plan 补一次详情刷新，无需再单独 selectPlan
   loadPlans();
-  if (selectedPlanId.value) selectPlan(selectedPlanId.value);
   appendSystemMessage('已刷新');
 };
 
@@ -1766,6 +1973,116 @@ const confirmCreatePlan = async () => {
     appendSystemMessage('新建方案异常: ' + (err?.message || '未知错误'));
   } finally {
     creatingPlan.value = false;
+  }
+};
+
+/* ---------- 协同席：新建编队机动方案（头车 + 跟随车辆，共用同一套编队机动参数） ---------- */
+const showFormationPlanDialog = ref(false);
+
+const openFormationPlanDialog = async () => {
+  showFormationPlanDialog.value = true;
+  // 弹窗打开时确保在线车辆列表是最新的
+  if (onlineVehicles.value.length === 0) {
+    await loadOnlineVehicles();
+  }
+};
+
+const confirmFormationPlan = async ({ title, leaderVid, followerVids, param }) => {
+  // 头车排在第一行：car_actions 与 teams.vehicles 均按 头车 -> 跟随车辆 顺序
+  const orderedVids = [leaderVid, ...followerVids];
+  const vehicles = orderedVids
+    .map((vid) => onlineVehicles.value.find((v) => v.vid === vid))
+    .filter(Boolean);
+  if (!vehicles.length) {
+    appendSystemMessage('新建编队机动失败：未找到所选车辆');
+    return;
+  }
+  const ts = Date.now();
+  const planId = nextSequentialPlanId(plans.value);
+  const teamId = `TEAM_${ts}`;
+  const stageId = `STAGE_${ts}`;
+  // 通用参数默认值：任务时长 60 秒，默认勾选“设置开始时间”并取当前系统时间
+  // （start_time 用 datetime-local 输入框要求的本地格式 YYYY-MM-DDTHH:MM，与拖拽建卡一致）
+  const now = new Date();
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const nowLocal = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}T${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  const commonParamDefaults = {
+    mission_duration: '00:01:00',
+    enable_start_time: true,
+    start_time: nowLocal,
+  };
+  const payload = {
+    plan_id: planId,
+    title,
+    description: `编队机动：头车 ${getVehicleDisplayName(vehicles[0])}`,
+    state: 'DRAFT',
+    teams: [
+      {
+        team_id: teamId,
+        name: '编队编组',
+        state: 'READY',
+        vehicles: vehicles.map((v) => ({ vid: v.vid, resource_type: v.resource_type || '' })),
+      },
+    ],
+    stages: [
+      {
+        stage_id: stageId,
+        title: '编队机动',
+        stage_seq: 1,
+        team_ids: [teamId],
+        target_ids: [],
+        state: 'SCHEDULED',
+        team_actions: [
+          {
+            team_id: teamId,
+            car_actions: vehicles.map((v, idx) => ({
+              // car_actions_id 与后端合成规则（ca:{plan_id}:{stage_id}:{vid}）一致，
+              // 显式唯一 id 防止 DS 把匿名项匹配到已有 CAR_ACTIONS 资源
+              car_actions_id: `ca:${planId}:${stageId}:${v.vid}`,
+              vid: v.vid,
+              state: 'SCHEDULED',
+              actions: [
+                {
+                  name: '编队机动',
+                  action_name: '编队机动',
+                  action_description: '编队机动',
+                  vid: v.vid,
+                  action_seq: 1,
+                  action_type: 'formation-move',
+                  description: '编队机动',
+                  // 头车带 is_leader 标记：DS 投影会按资源 id 重排 car_actions，
+                  // 头车第一行的顺序信息只能靠业务字段携带
+                  param: {
+                    ...JSON.parse(JSON.stringify(param)),
+                    ...commonParamDefaults,
+                    ...(idx === 0 ? { is_leader: true } : {}),
+                  },
+                  state: 'SCHEDULED',
+                  task_type: 'ACTION',
+                  plan_id: planId,
+                  stage_id: stageId,
+                  team_id: teamId,
+                },
+              ],
+            })),
+          },
+        ],
+      },
+    ],
+  };
+  try {
+    const result = await createPlan(payload);
+    if (result.ok && ((result.data?.code) ?? 200) === 200) {
+      const newPlanId = result.data?.data?.plan_id || planId;
+      appendSystemMessage(`编队机动方案「${title}」已创建（${vehicles.length} 车）`);
+      showFormationPlanDialog.value = false;
+      await loadPlans();
+      if (newPlanId) selectPlan(newPlanId);
+    } else {
+      appendSystemMessage('新建编队机动失败: ' + (result.data?.message || result.error || '未知错误'));
+    }
+  } catch (err) {
+    appendSystemMessage('新建编队机动异常: ' + (err?.message || '未知错误'));
   }
 };
 
@@ -1910,6 +2227,15 @@ const confirmDispatchSeatSelection = async () => {
     const envelope = result.data || {};
     if (result.ok && (envelope.code ?? 200) === 200) {
       appendSystemMessage(`行动方案已下发到席位 ${selectedDispatchSeats.value.join('、')}`);
+      // 方案含编队机动元任务时，后端会附加 Zenoh send_formation_mission，这里提示其结果
+      const fm = envelope.data?.formation_mission;
+      if (fm?.sent) {
+        appendSystemMessage(
+          fm.ok
+            ? `编队机动任务已通过 Zenoh 下发（send_formation_mission，共 ${fm.vehicle_count} 车，头车 ${fm.leader_vid || '未知'} 排在首位）`
+            : `编队机动 Zenoh 下发失败: ${fm.error || '部分车辆发送失败'}`
+        );
+      }
     } else {
       appendSystemMessage('下发到席位失败: ' + (envelope.message || result.error || '未知错误'));
     }
@@ -2084,11 +2410,12 @@ const startPlanEventStream = () => {
     try {
       const data = JSON.parse(e.data);
       const planId = data.plan_id;
-      console.log('[ActionSequencePanel] plan updated via SSE:', planId);
-      // 如果当前选中该 plan，刷新详情；同时静默刷新列表保持状态一致
-      if (selectedPlanId.value === planId) {
-        refreshDetail(planId);
+      // 自己点击 map-notify 引发的回弹：仅 last_click 字段变化，selectPlan 已拉过详情，跳过
+      if (planId && planId === lastMapNotify.planId && Date.now() - lastMapNotify.at < 3000) {
+        return;
       }
+      console.log('[ActionSequencePanel] plan updated via SSE:', planId);
+      // loadPlans 刷新列表后会对选中 plan 补一次详情刷新，这里不再重复 refreshDetail
       loadPlans(true);
     } catch (err) {
       console.warn('[ActionSequencePanel] parse SSE plan.updated failed:', err);
@@ -2603,9 +2930,15 @@ onUnmounted(() => {
   width: max-content;
 }
 
+/* 空行动序列：容器撑满卡片宽度，引导提示水平垂直居中 */
+.as-action-cards-empty {
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
 /* 空行动序列占位提示（新建空方案只关联了车辆、尚无行动时） */
 .as-empty-actions {
-  align-self: center;
   color: rgba(180, 200, 200, 0.55);
   font-size: 0.85rem;
   padding: 0 0.4rem;
@@ -2984,6 +3317,62 @@ onUnmounted(() => {
 
 .as-dialog-input:focus {
   border-color: rgba(0, 222, 200, 0.7);
+}
+
+/* 协同授权按钮：与刷新/新建同行，靠右 */
+.as-coop-btn {
+  margin-left: auto;
+}
+
+/* 协同授权弹窗：加宽容纳选项网格 */
+.as-coop-dialog {
+  max-width: 560px;
+  width: 560px;
+}
+
+.as-coop-dialog .as-dialog-body {
+  max-height: 420px;
+  gap: 0.8rem;
+}
+
+.as-coop-label {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #f7fdff;
+  margin-bottom: 0.3rem;
+}
+
+.as-coop-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  column-gap: 0.8rem;
+}
+
+.as-coop-option {
+  padding: 0.25rem 0;
+  font-size: 0.86rem;
+}
+
+.as-coop-select {
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(0, 222, 200, 0.06);
+  border: 1px solid rgba(0, 222, 200, 0.35);
+  border-radius: 4px;
+  color: var(--as-text);
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.as-coop-select:focus {
+  border-color: rgba(0, 222, 200, 0.7);
+}
+
+.as-coop-select option {
+  background: #02161c;
+  color: var(--as-text);
 }
 
 @media (max-width: 900px) {

@@ -17,6 +17,11 @@ function defaultAreaPoint() {
   return { lon: 0, lat: 0, alt: 0 };
 }
 
+function defaultFormationPoint() {
+  // 编队机动路径点：经纬高 + 相对头车的横/纵向偏移
+  return { lon: 0, lat: 0, alt: 0, offsetX: 0, offsetY: 0 };
+}
+
 function defaultAirReconPoint() {
   return {
     lon: 0,
@@ -194,6 +199,14 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     p.limited_speed = p.limited_speed ?? 20;
     p.safe_mode = p.safe_mode ?? 0;
     p.loop_mode = p.loop_mode ?? 0;
+    p.route_id = p.route_id ?? '';
+    addCommonFields(p);
+  } else if (type === 'formation-move') {
+    // 编队机动（协议 sid=7）：路线 + 限速/编队模式/安全模式
+    p.points = Array.isArray(p.points) && p.points.length ? p.points : [defaultFormationPoint(), defaultFormationPoint()];
+    p.limited_speed = p.limited_speed ?? 20;
+    p.formation_mode = p.formation_mode ?? 0;
+    p.safe_mode = p.safe_mode ?? 0;
     p.route_id = p.route_id ?? '';
     addCommonFields(p);
   } else if (type === 'follow-move') {

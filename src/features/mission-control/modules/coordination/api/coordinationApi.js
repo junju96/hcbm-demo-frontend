@@ -568,6 +568,12 @@ export const dispatchOperatorPlan = async (planId, payload = {}) => {
   return result;
 };
 
+/** 操控端 — 协同任务授权下发/解除（MissionService set_cooperative_authorization） */
+export const setCooperativeAuthorization = async (payload = {}) => {
+  const result = await postJson(joinApiUrl('/api/v1/action-sequences/operator/cooperative-authorization'), payload);
+  return result;
+};
+
 /** 操控端 — 新建行动序列方案 */
 export const createOperatorPlan = async (payload = {}) => {
   const result = await postJson(joinApiUrl('/api/v1/action-sequences/operator/plans'), payload);

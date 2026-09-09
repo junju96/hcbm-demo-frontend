@@ -65,6 +65,63 @@
           </div>
         </template>
 
+        <!-- 1b. 编队机动 -->
+        <template v-else-if="normalizedActionType === 'formation-move'">
+          <div class="apd-section">
+            <div class="apd-section-title">路线参数</div>
+            <label class="apd-field">
+              <span>路线选择</span>
+              <select v-model="editedParam.route_id" @change="onRouteChange">
+                <option value="">-- 请选择路线 --</option>
+                <option v-for="route in routeList" :key="route.resource_id" :value="route.resource_id">
+                  {{ route.title || route.resource_id }}
+                </option>
+              </select>
+            </label>
+            <div class="apd-section-title sub">路径点列表</div>
+            <div class="apd-route-table-head">
+              <span>经度</span>
+              <span>纬度</span>
+              <span>高度</span>
+              <span>横向偏移 (m)</span>
+              <span>纵向偏移 (m)</span>
+            </div>
+            <div v-for="(pt, idx) in editedParam.points" :key="idx" class="apd-route-table-row">
+              <input v-model.number="pt.lon" type="number" step="0.000001" placeholder="经度" />
+              <input v-model.number="pt.lat" type="number" step="0.000001" placeholder="纬度" />
+              <input v-model.number="pt.alt" type="number" step="0.1" placeholder="高度" />
+              <input v-model.number="pt.offsetX" type="number" placeholder="左正右负" />
+              <input v-model.number="pt.offsetY" type="number" placeholder="前正后负" />
+              <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removePoint('points', idx)">删除</button>
+            </div>
+            <button class="as-btn mini primary" type="button" @click="addPoint('points')">+ 添加路径点</button>
+          </div>
+
+          <div class="apd-section">
+            <div class="apd-section-title">车辆参数</div>
+            <label class="apd-field">
+              <span>限速 (km/h)</span>
+              <input v-model.number="editedParam.limited_speed" type="number" min="0" max="80" />
+            </label>
+            <label class="apd-field">
+              <span>编队模式</span>
+              <select v-model.number="editedParam.formation_mode">
+                <option :value="0">跟头车模式</option>
+                <option :value="1">引导路径模式</option>
+                <option :value="2">队形变换</option>
+              </select>
+            </label>
+            <label class="apd-field">
+              <span>安全模式</span>
+              <div class="apd-radio-row">
+                <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="0" /><span>避障</span></label>
+                <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="1" /><span>突击</span></label>
+                <label class="apd-radio"><input v-model.number="editedParam.safe_mode" type="radio" :value="2" /><span>停障</span></label>
+              </div>
+            </label>
+          </div>
+        </template>
+
         <!-- 2. 跟随机动 -->
         <template v-else-if="normalizedActionType === 'follow-move'">
           <div class="apd-section">
@@ -499,7 +556,7 @@ const loadingFusioned = ref(false);
 
 const STANDARD_ACTION_TYPES = new Set([
   'auto-move', 'follow-move', 'silent-guard', 'set-return-point', 'return-to-base',
-  'manual-task', 'pose-adjust', 'air-recon', 'lens-recon',
+  'formation-move', 'manual-task', 'pose-adjust', 'air-recon', 'lens-recon',
   'search-and-shoot', 'recon-strike', '30mm-gun-launch', 'at-missile-launch',
   'gun-shot', '7.62mm-gun-shot', 'rocket-launch', 'loitering-munition-launch',
   'laser-illumination', 'sound-expel', 'acoustic-deterrence', 'light-expel',
@@ -518,6 +575,7 @@ function inferActionTypeFromId(actionId) {
       'auto-move': 'auto-move', 'follow-move': 'follow-move', 'silent-guard': 'silent-guard',
       'set-return-point': 'set-return-point', 'return-to-base': 'return-to-base',
       'manual-task': 'manual-task', 'pose-adjust': 'pose-adjust',
+      'formation-move': 'formation-move',
       'air-recon': 'air-recon', 'lens-recon': 'lens-recon', 'search-and-shoot': 'search-and-shoot',
       'recon-strike': 'search-and-shoot', '30mm-gun-launch': '30mm-gun-launch',
       'at-missile-launch': 'at-missile-launch', 'gun-shot': '7.62mm-gun-shot',
@@ -536,6 +594,7 @@ function inferActionTypeFromId(actionId) {
     'ch-move': 'auto-move', 'ch-follow': 'follow-move', 'ch-silent': 'silent-guard',
     'ch-set-return': 'set-return-point', 'ch-return': 'return-to-base',
     'ch-manual': 'manual-task', 'ch-pose': 'pose-adjust',
+    'ch-formation': 'formation-move',
     'fs-lens': 'lens-recon', 'fs-recon-strike': 'search-and-shoot', 'fs-gun': '7.62mm-gun-shot',
     'fs-rocket': 'rocket-launch', 'fs-loiter': 'loitering-munition-launch',
     'rs-lens': 'lens-recon', 'rs-recon-strike': 'search-and-shoot', 'rs-30mm': '30mm-gun-launch',
@@ -558,11 +617,12 @@ function inferActionTypeFromName(name) {
     '自主机动': 'auto-move', '跟随机动': 'follow-move', '静默值守': 'silent-guard',
     '设置返航点': 'set-return-point', '开启返航': 'return-to-base',
     '人工任务': 'manual-task', '姿态调整': 'pose-adjust', '空中侦察': 'air-recon',
+    '编队机动': 'formation-move',
     '光电侦察': 'lens-recon', '侦察打击': 'search-and-shoot', '巡逻车侦察打击': 'search-and-shoot',
     '机枪打击': '7.62mm-gun-shot', '火箭弹打击': 'rocket-launch', '巡飞弹打击': 'loitering-munition-launch',
     '30炮打击': '30mm-gun-launch', '40炮打击': '30mm-gun-launch', '红箭13导弹打击': 'at-missile-launch', '激光照射': 'laser-illumination',
     '强声拒止': 'sound-expel', '强光拒止': 'light-expel',
-    '电磁侦察': 'em-recon', '电磁突击': 'em-assault', '电磁干扰': 'em-interference',
+    '电磁侦察': 'em-recon', '电磁突击': 'em-assault', '侦察干扰': 'em-assault', '电磁干扰': 'em-interference',
     '载荷静默': 'payload-silent',
   };
   if (name in map) return map[name];
@@ -572,6 +632,7 @@ function inferActionTypeFromName(name) {
     'setreturnpoint': 'set-return-point', 'setreturn': 'set-return-point', 'returntobase': 'return-to-base',
     'return': 'return-to-base', 'manualtask': 'manual-task',
     'manual': 'manual-task', 'poseadjust': 'pose-adjust', 'airrecon': 'air-recon',
+    'formationmove': 'formation-move', 'formation': 'formation-move',
     'lensrecon': 'lens-recon', 'searchandshoot': 'search-and-shoot', 'reconstrike': 'search-and-shoot',
     '30mmgunlaunch': '30mm-gun-launch', '30mmgun': '30mm-gun-launch',
     '40mmgunlaunch': '30mm-gun-launch', '40mmgun': '30mm-gun-launch', 'atmissilelaunch': 'at-missile-launch',
@@ -613,8 +674,16 @@ function inferActionTypeFromParam(param) {
   if (businessHas('area') && !businessHas('direct')) return 'search-and-shoot';
   // 静默值守：只有 time
   if (businessKeys.length === 1 && businessHas('time')) return 'silent-guard';
-  // 自主机动：points + limited_speed
-  if (businessHas('points') && businessHas('limited_speed')) return 'auto-move';
+  // 编队机动：points + formation_mode，或路径点带 offsetX/offsetY
+  if (businessHas('points') && businessHas('formation_mode')) return 'formation-move';
+  if (businessHas('points') && Array.isArray(p.points) && p.points.length > 0) {
+    const first = p.points[0];
+    if (first && typeof first === 'object' && ('offsetX' in first || 'offsetY' in first)) {
+      return 'formation-move';
+    }
+  }
+  // 自主机动：points + limited_speed（且不含 formation_mode，避免与编队机动混淆）
+  if (businessHas('points') && businessHas('limited_speed') && !businessHas('formation_mode')) return 'auto-move';
   // 跟随机动
   if (businessHas('distance') && businessHas('x') && businessHas('y')) return 'follow-move';
   // 姿态调整
@@ -689,6 +758,7 @@ const actionTypeLabel = computed(() => {
     'return-to-base': '开启返航',
     'manual-task': '人工任务',
     'pose-adjust': '姿态调整 / 车姿调整',
+    'formation-move': '编队机动',
     'lens-recon': '光电侦察',
     'search-and-shoot': isPatrolVehicle.value ? '巡逻车侦察打击' : '侦察打击',
     'recon-strike': isPatrolVehicle.value ? '巡逻车侦察打击' : '侦察打击',
@@ -705,8 +775,8 @@ const actionTypeLabel = computed(() => {
     'light-deterrence': '强光拒止',
     'em-recon': '电磁侦察',
     'electronic-recon': '电磁侦察',
-    'em-assault': '电磁突击',
-    'electronic-assault': '电磁突击',
+    'em-assault': '侦察干扰',
+    'electronic-assault': '侦察干扰',
     'em-interference': '电磁干扰',
     'electronic-jamming': '电磁干扰',
     // payload-silent 仅作旧数据兼容
@@ -735,7 +805,7 @@ const isElectronic = computed(() =>
 
 const showCommonParams = computed(() =>
   ['auto-move', 'follow-move', 'silent-guard', 'manual-task', 'pose-adjust',
-   'set-return-point', 'return-to-base',
+   'set-return-point', 'return-to-base', 'formation-move',
    'lens-recon', 'recon-strike', 'search-and-shoot', '30mm-gun-launch', 'gun-shot', '7.62mm-gun-shot',
    'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'laser-illumination',
    'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence',
@@ -852,23 +922,34 @@ async function loadTargets() {
   await loadFusionedTargets();
 }
 
+function mapRoutePoints(route, formation = false, existing = []) {
+  // formation=true 时输出编队机动路径点结构（offsetX/offsetY 尽量保留用户已编辑的偏移值）
+  return route.points.map((pt, idx) => {
+    const base = {
+      lon: Number(pt?.lon ?? pt?.longitude ?? 0),
+      lat: Number(pt?.lat ?? pt?.latitude ?? 0),
+      alt: Number(pt?.alt ?? pt?.altitude ?? 0),
+    };
+    if (formation) {
+      const prev = existing[idx] || {};
+      return { ...base, offsetX: Number(prev.offsetX ?? 0), offsetY: Number(prev.offsetY ?? 0) };
+    }
+    return { ...base, radius: Number(pt?.radius ?? -1), type: Number(pt?.type ?? 1) };
+  });
+}
+
 function onRouteChange() {
   const route = routeList.value.find((r) => r.resource_id === editedParam.value.route_id);
   if (route && Array.isArray(route.points)) {
-    editedParam.value.points = route.points.map((pt) => ({
-      lon: pt?.lon ?? 0,
-      lat: pt?.lat ?? 0,
-      alt: pt?.alt ?? 0,
-      radius: pt?.radius ?? -1,
-      type: pt?.type ?? 1,
-    }));
+    const formation = normalizedActionType.value === 'formation-move';
+    editedParam.value.points = mapRoutePoints(route, formation, editedParam.value.points);
   }
 }
 
 function initFromRouteSelection() {
-  // 只有底盘机动类元任务才需要从路线资源初始化 points
+  // 只有底盘机动 / 编队机动类元任务才需要从路线资源初始化 points
   const type = normalizedActionType.value;
-  if (type !== 'auto-move') return;
+  if (type !== 'auto-move' && type !== 'formation-move') return;
   if (!routeList.value.length) return;
 
   // 如果 action 自身已经保存了路径点数据，优先使用 action 的数据，
@@ -1028,14 +1109,21 @@ function defaultAirReconPoint() {
   };
 }
 
+function defaultFormationPoint() {
+  // 编队机动路径点：经纬高 + 相对头车的横/纵向偏移（offsetX 左正右负，offsetY 头车在前为正）
+  return { lon: 0, lat: 0, alt: 0, offsetX: 0, offsetY: 0 };
+}
+
 function addPoint(field) {
   if (field === 'area') {
     editedParam.value[field].push(defaultAreaPoint());
     return;
   }
-  // 根据当前行动类型选择正确的默认点结构：air-recon 用侦察点，其他（auto-move 等）用普通航路点
+  // 根据当前行动类型选择正确的默认点结构：air-recon 用侦察点，formation-move 用编队点，其他（auto-move 等）用普通航路点
   if (normalizedActionType.value === 'air-recon') {
     editedParam.value[field].push(defaultAirReconPoint());
+  } else if (normalizedActionType.value === 'formation-move') {
+    editedParam.value[field].push(defaultFormationPoint());
   } else {
     editedParam.value[field].push(defaultPoint());
   }
@@ -1160,13 +1248,8 @@ function fillRouteFromSelection() {
   editedParam.value.route_id = id;
   const route = routeList.value.find((r) => r.resource_id === id);
   if (route && Array.isArray(route.points) && route.points.length > 0) {
-    editedParam.value.points = route.points.map((pt) => ({
-      lon: Number(pt?.lon ?? pt?.longitude ?? 0),
-      lat: Number(pt?.lat ?? pt?.latitude ?? 0),
-      alt: Number(pt?.alt ?? pt?.altitude ?? 0),
-      radius: Number(pt?.radius ?? -1),
-      type: Number(pt?.type ?? 1),
-    }));
+    const formation = normalizedActionType.value === 'formation-move';
+    editedParam.value.points = mapRoutePoints(route, formation, editedParam.value.points);
     hasAutoFilled.value = true;
   }
 }
@@ -1201,7 +1284,7 @@ function finalizeParam() {
       fillAreaFromSelection();
     }
   }
-  if (type === 'auto-move') {
+  if (type === 'auto-move' || type === 'formation-move') {
     if (!Array.isArray(editedParam.value.points) || editedParam.value.points.length === 0 || isAllZeroPoints(editedParam.value.points)) {
       fillRouteFromSelection();
     }

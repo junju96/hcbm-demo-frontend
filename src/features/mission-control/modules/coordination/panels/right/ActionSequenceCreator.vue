@@ -58,6 +58,23 @@
                 <span class="asc-task-name">{{ task.name }}</span>
               </div>
             </div>
+            <div class="asc-palette-section">
+              <div class="asc-palette-section-title">
+                <span class="asc-section-dot formation"></span>
+                <span>编队任务</span>
+                <span class="asc-section-count">{{ formationTasks.length }}</span>
+              </div>
+              <div
+                v-for="task in formationTasks"
+                :key="task.actionType"
+                class="asc-task-card formation"
+                draggable="true"
+                @dragstart="onDragStart($event, task, 'formation')"
+              >
+                <span class="asc-task-grip" aria-hidden="true"></span>
+                <span class="asc-task-name">{{ task.name }}</span>
+              </div>
+            </div>
             <div class="asc-palette-section" v-if="payloadTasks.length">
               <div class="asc-palette-section-title">
                 <span class="asc-section-dot payload"></span>
@@ -283,6 +300,11 @@ const chassisTasks = [
   { actionType: 'Pose-Adjust', name: '姿态调整', defaultParam: { pose: [9000, 0, 0], pose_deviation: [36100, 9100, 9100], limited_speed: 10, safe_mode: 0 } },
 ];
 
+// 编队任务（协议 sid=7，路径点含经纬高 + 相对头车的横/纵向偏移）
+const formationTasks = [
+  { actionType: 'Formation-Move', name: '编队机动', defaultParam: { points: [], limited_speed: 20, formation_mode: 0, safe_mode: 0 } },
+];
+
 function inferActionTypeFromId(actionId) {
   // 已废弃：类型判断统一使用 action_type，不再按 action_id 推断。
   // 保留函数仅用于非关键路径的日志/提示，不参与任何业务决策。
@@ -304,7 +326,7 @@ function inferActionTypeFromName(name) {
 function getActionDisplayName(actionType, actionId = '') {
   if (!actionType) return '';
   const normalized = String(actionType).toLowerCase().replace(/_/g, '-');
-  const allTasks = [...chassisTasks, ...Object.values(payloadTaskMap).flat()];
+  const allTasks = [...chassisTasks, ...formationTasks, ...Object.values(payloadTaskMap).flat()];
   let found = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/_/g, '-') === normalized);
   if (!found && actionId) {
     const inferred = inferActionTypeFromId(actionId);
@@ -343,7 +365,7 @@ const payloadTaskMap = {
   ],
   'Electronic-UGV': [
     { actionType: 'EM-Recon', name: '电磁侦察', defaultParam: { mode: 4, time: 300, num: 1, freqtype: 62, frequency: [], area: [] } },
-    { actionType: 'EM-Assault', name: '电磁突击', defaultParam: { mode: 4, time: 300, sort: 0, num: 1, freqtype: 62, frequency: [], area: [], protect: {} } },
+    { actionType: 'EM-Assault', name: '侦察干扰', defaultParam: { mode: 4, time: 300, sort: 0, num: 1, freqtype: 62, frequency: [], area: [], protect: {} } },
     { actionType: 'EM-Interference', name: '电磁干扰', defaultParam: { mode: 4, time: 300, sort: 1, num: 1, freqtype: 62, frequency: [], area: [], protect: {} } },
   ],
   'Air-Ground-UAV': [
@@ -439,7 +461,13 @@ function initEditMode() {
       id,
       actionType,
       name: displayName || a.name || '',
-      category: actionType && chassisTasks.some((t) => String(t.actionType).toLowerCase().replace(/-/g, '').replace(/_/g, '').replace(/\./g, '') === String(actionType).toLowerCase().replace(/-/g, '').replace(/_/g, '').replace(/\./g, '')) ? 'chassis' : 'payload',
+      category: (() => {
+        const compactType = String(actionType || '').toLowerCase().replace(/[-_.]/g, '');
+        const matches = (t) => String(t.actionType).toLowerCase().replace(/[-_.]/g, '') === compactType;
+        if (compactType && chassisTasks.some(matches)) return 'chassis';
+        if (compactType && formationTasks.some(matches)) return 'formation';
+        return 'payload';
+      })(),
       param: JSON.parse(JSON.stringify(a.param || {})),
       // 编辑模式保留原始依赖与 action_id，避免保存时丢失关联
       originalActionId: a.action_id || undefined,
@@ -824,17 +852,19 @@ function fillAreaFromFirst(param) {
   }));
 }
 
-function fillRouteFromFirst(param) {
+function fillRouteFromFirst(param, formation = false) {
   const first = routeList.value[0];
   if (!first || !Array.isArray(first.points) || first.points.length === 0) return;
   param.route_id = first.resource_id;
-  param.points = first.points.map((pt) => ({
-    lon: Number(pt?.lon ?? pt?.longitude ?? 0),
-    lat: Number(pt?.lat ?? pt?.latitude ?? 0),
-    alt: Number(pt?.alt ?? pt?.altitude ?? 0),
-    radius: Number(pt?.radius ?? -1),
-    type: Number(pt?.type ?? 1),
-  }));
+  param.points = first.points.map((pt) => {
+    const base = {
+      lon: Number(pt?.lon ?? pt?.longitude ?? 0),
+      lat: Number(pt?.lat ?? pt?.latitude ?? 0),
+      alt: Number(pt?.alt ?? pt?.altitude ?? 0),
+    };
+    // 编队机动路径点：经纬高 + 相对头车的横/纵向偏移（默认 0）
+    return formation ? { ...base, offsetX: 0, offsetY: 0 } : { ...base, radius: Number(pt?.radius ?? -1), type: Number(pt?.type ?? 1) };
+  });
 }
 
 function fillTargetFromFirst(param) {
@@ -880,9 +910,9 @@ function autoFillCoordinates(param, actionType) {
   if (areaTypes.includes(type)) {
     if (needsCoordinateFill(param.area)) fillAreaFromFirst(param);
   }
-  // 需要路线的底盘机动类
-  if (type === 'auto-move') {
-    if (needsCoordinateFill(param.points)) fillRouteFromFirst(param);
+  // 需要路线的底盘机动 / 编队机动类
+  if (type === 'auto-move' || type === 'formation-move') {
+    if (needsCoordinateFill(param.points)) fillRouteFromFirst(param, type === 'formation-move');
   }
   // 打击类：从目标资源取第一个点
   if (['30mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'].includes(type)) {
@@ -1481,6 +1511,11 @@ async function savePlan() {
   box-shadow: 0 0 6px rgba(255, 180, 84, 0.7);
 }
 
+.asc-section-dot.formation {
+  background: #b18cff;
+  box-shadow: 0 0 6px rgba(177, 140, 255, 0.7);
+}
+
 .asc-section-count {
   margin-left: auto;
   font-size: 0.7rem;
@@ -1516,6 +1551,12 @@ async function savePlan() {
   border-left-color: rgba(255, 180, 84, 0.6);
 }
 
+.asc-task-card.formation {
+  background: rgba(177, 140, 255, 0.08);
+  border-color: rgba(177, 140, 255, 0.22);
+  border-left-color: rgba(177, 140, 255, 0.6);
+}
+
 .asc-task-card:hover {
   background: rgba(0, 222, 200, 0.16);
   border-color: rgba(0, 222, 200, 0.4);
@@ -1527,6 +1568,12 @@ async function savePlan() {
   background: rgba(255, 180, 84, 0.16);
   border-color: rgba(255, 180, 84, 0.45);
   box-shadow: -2px 0 10px rgba(255, 180, 84, 0.12);
+}
+
+.asc-task-card.formation:hover {
+  background: rgba(177, 140, 255, 0.16);
+  border-color: rgba(177, 140, 255, 0.45);
+  box-shadow: -2px 0 10px rgba(177, 140, 255, 0.12);
 }
 
 .asc-task-card:active {
@@ -1650,6 +1697,15 @@ async function savePlan() {
   box-shadow: 0 0 8px rgba(255, 180, 84, 0.6);
 }
 
+.asc-node.cat-formation {
+  border-color: rgba(177, 140, 255, 0.32);
+}
+
+.asc-node.cat-formation::before {
+  background: #b18cff;
+  box-shadow: 0 0 8px rgba(177, 140, 255, 0.6);
+}
+
 .asc-node:hover {
   border-color: rgba(0, 222, 200, 0.55);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
@@ -1657,6 +1713,10 @@ async function savePlan() {
 
 .asc-node.cat-payload:hover {
   border-color: rgba(255, 180, 84, 0.55);
+}
+
+.asc-node.cat-formation:hover {
+  border-color: rgba(177, 140, 255, 0.55);
 }
 
 .asc-node.selected {
@@ -1667,6 +1727,11 @@ async function savePlan() {
 .asc-node.cat-payload.selected {
   border-color: #ffb454;
   box-shadow: 0 0 0 1px rgba(255, 180, 84, 0.4), 0 0 16px rgba(255, 180, 84, 0.3);
+}
+
+.asc-node.cat-formation.selected {
+  border-color: #b18cff;
+  box-shadow: 0 0 0 1px rgba(177, 140, 255, 0.4), 0 0 16px rgba(177, 140, 255, 0.3);
 }
 
 .asc-node-body {
@@ -1708,6 +1773,10 @@ async function savePlan() {
   border-color: rgba(255, 180, 84, 0.85);
 }
 
+.asc-node.cat-formation .asc-node-port {
+  border-color: rgba(177, 140, 255, 0.85);
+}
+
 .asc-node-port:hover {
   background: #00dec8;
   box-shadow: 0 0 8px rgba(0, 222, 200, 0.8);
@@ -1717,6 +1786,11 @@ async function savePlan() {
 .asc-node.cat-payload .asc-node-port:hover {
   background: #ffb454;
   box-shadow: 0 0 8px rgba(255, 180, 84, 0.8);
+}
+
+.asc-node.cat-formation .asc-node-port:hover {
+  background: #b18cff;
+  box-shadow: 0 0 8px rgba(177, 140, 255, 0.8);
 }
 
 /* 连线进行中：画布提示可落点，所有节点入口高亮呼吸 */
