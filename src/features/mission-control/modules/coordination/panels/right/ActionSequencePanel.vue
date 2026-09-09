@@ -92,7 +92,8 @@
               <button
                 class="as-btn primary"
                 type="button"
-                :disabled="controlLoading"
+                :disabled="controlLoading || planHasNoActions"
+                :title="planHasNoActions ? '暂无行动序列数据，不可下发' : ''"
                 @click="openDispatchSeatDialog"
               >
                 {{ controlLoading ? '处理中…' : '下发' }}
@@ -104,13 +105,16 @@
               <button
                 class="as-btn primary"
                 type="button"
-                :disabled="controlLoading"
+                :disabled="controlLoading || planHasNoActions"
+                :title="planHasNoActions ? '暂无行动序列数据，不可发布' : ''"
                 @click="onDispatchActive"
               >
-                {{ controlLoading ? '处理中…' : '发布为正式行动方案' }}
+                {{ controlLoading ? '处理中…' : (anyVehicleExecuting ? '重新发布行动方案' : '发布为正式行动方案') }}
               </button>
             </template>
           </div>
+          <!-- 发布状态提示（操控席）：发布后经 zenoh task_received_status 确认显示，任务结束后隐藏 -->
+          <div v-if="isControlMode && publishAckReceived" class="as-publish-ack">方案已收到</div>
         </div>
 
         <!-- 按车辆组织的行动序列 — 卡片串联式 -->
@@ -155,8 +159,8 @@
                       </template>
                     </template>
                   </template>
-                  <button v-if="canOperateVehicle(vehicle)" class="as-btn mini" type="button" @click="openCreatorForEdit(vehicle)">编辑</button>
-                  <button v-if="canOperateVehicle(vehicle)" class="as-btn mini danger" type="button" @click="confirmDeleteVehicleActions(vehicle)">删除</button>
+                  <button v-if="canOperateVehicle(vehicle)" class="as-btn mini" type="button" :disabled="isVehicleExecuting(vehicle)" :title="isVehicleExecuting(vehicle) ? '任务执行中，暂不可编辑' : ''" @click="openCreatorForEdit(vehicle)">编辑</button>
+                  <button v-if="canOperateVehicle(vehicle)" class="as-btn mini danger" type="button" :disabled="isVehicleExecuting(vehicle)" :title="isVehicleExecuting(vehicle) ? '任务执行中，暂不可删除' : ''" @click="confirmDeleteVehicleActions(vehicle)">删除</button>
                 </div>
               </div>
               <div class="as-action-cards" :class="{ 'as-action-cards-empty': !hasVehicleActions(vehicle) }" :data-vid="vehicle.vid">
@@ -674,14 +678,14 @@ const COOP_TARGET_TYPES = [
   { value: 2, label: '汽车' },
   { value: 4, label: '装甲车' },
   { value: 8, label: '工事' },
-  { value: 13, label: '武装人员' },
-  { value: 14, label: '工事火力点' },
-  { value: 15, label: '敌指挥节点' },
-  { value: 16, label: '通信枢纽' },
+  { value: 15, label: '武装人员' },
+  { value: 16, label: '工事火力点' },
+  { value: 17, label: '敌指挥节点' },
+  { value: 18, label: '通信枢纽' },
   { value: 7, label: '炮兵阵地' },
-  { value: 17, label: '地下空间' },
-  { value: 18, label: '火力阵地' },
-  { value: 19, label: '导弹发射基地' },
+  { value: 19, label: '地下空间' },
+  { value: 13, label: '火力阵地' },
+  { value: 14, label: '导弹发射基地' },
   { value: 20, label: '其他' },
 ];
 const showCoopDialog = ref(false);
@@ -690,6 +694,8 @@ const coopSending = ref(false);
 const coopTargetType = ref(null);
 const coopPriorities = ref([]);
 const coopSelectedVmfs = ref([]);
+// 最近一次下发授权成功的参数；解除授权需原样回传（缺字段会被 MissionService 丢弃）
+const coopGrantedArgs = ref(null);
 // 除本车外的在线车辆；vmf 缺失的车辆不可选（授权参数要 VMF 编号）
 const coopVehicleOptions = computed(() => {
   const self = String(connectedVehicleId.value || '').replace('equipment:', '');
@@ -725,17 +731,27 @@ const confirmCoopGrant = async () => {
   if (!canConfirmCoop.value || coopSending.value) return;
   coopSending.value = true;
   try {
+    // 协议格式：vehicles 为 [{vmf, vip}]，vip 取资源池车辆信息里的 ip
+    const vehicles = coopSelectedVmfs.value.map((vmf) => {
+      const vehicle = coopVehicleOptions.value.find((v) => v.vmf === vmf);
+      return { vmf, vip: vehicle?.ip || '' };
+    });
     const result = await setCooperativeAuthorization({
       vehicle_vid: connectedVehicleId.value,
       source: 1,
       command: 1,
-      vehicles: coopSelectedVmfs.value,
+      vehicles,
       target_type: coopTargetType.value,
       priorities: coopPriorities.value,
     });
     const envelope = result.data || {};
     if (result.ok && (envelope.code ?? 200) === 200) {
       coopAuthorized.value = true;
+      coopGrantedArgs.value = {
+        vehicles,
+        target_type: coopTargetType.value,
+        priorities: [...coopPriorities.value],
+      };
       showCoopDialog.value = false;
       appendSystemMessage(`协同授权已下发 | 车辆数=${coopSelectedVmfs.value.length} | target_type=${coopTargetType.value}`);
     } else {
@@ -752,14 +768,20 @@ const sendCoopRelease = async () => {
   if (coopSending.value) return;
   coopSending.value = true;
   try {
+    // 解除授权需回传下发时的同一组参数（MissionService 对缺字段的报文不响应）
+    const granted = coopGrantedArgs.value || {};
     const result = await setCooperativeAuthorization({
       vehicle_vid: connectedVehicleId.value,
       source: 1,
       command: 2,
+      vehicles: granted.vehicles || [],
+      target_type: granted.target_type ?? 0,
+      priorities: granted.priorities || [],
     });
     const envelope = result.data || {};
     if (result.ok && (envelope.code ?? 200) === 200) {
       coopAuthorized.value = false;
+      coopGrantedArgs.value = null;
       appendSystemMessage('协同授权已解除');
     } else {
       appendSystemMessage('解除授权失败: ' + (envelope.message || result.error || '未知错误'));
@@ -774,6 +796,7 @@ const sendCoopRelease = async () => {
 // 切换操控车辆后授权状态不可信，重置为未授权
 watch(connectedVehicleId, () => {
   coopAuthorized.value = false;
+  coopGrantedArgs.value = null;
 });
 
 
@@ -1498,6 +1521,42 @@ const getVehicleRuntimeState = (vehicle) => {
 
 // 车辆是否已有行动（新建空方案只关联了车辆骨架，stages 为空）
 const hasVehicleActions = (vehicle) => flattenActions(vehicle).length > 0;
+
+// 车辆是否处于执行中（已开始且行动未结束：ACTIVE/PAUSED）。执行中禁用编辑/删除，
+// 避免任务执行期间修改内容后又被"重新发布"推到车上。
+// 注意：必须用 action 状态推断（车辆反馈推进 DS 行动状态），不能用方案的
+// runtime_state——后者是后端内存态，点开始接口成功即翻转，不代表车辆真正开始执行
+// （2026-09-09 踩坑：车未真正启动时按钮文案/置灰被误触发）
+const isVehicleExecuting = (vehicle) => ['ACTIVE', 'PAUSED'].includes(getVehicleRuntimeState(vehicle));
+
+// 任一车辆执行中 → 发布按钮文案变为"重新发布行动方案"
+const anyVehicleExecuting = computed(() => vehicleActions.value.some((v) => isVehicleExecuting(v)));
+
+// 方案没有任何行动序列数据（无车辆或所有车辆都是空序列）→ 发布/下发按钮置灰
+const planHasNoActions = computed(() => !vehicleActions.value.some((v) => hasVehicleActions(v)));
+
+/* ---------- 发布状态提示（操控席）：发布后经 zenoh task_received_status 确认 ---------- */
+const publishAckTid = ref(null);       // 最近一次发布（send_mission）的 tid
+const publishAckReceived = ref(false); // 是否已收到该 tid 的任务接收确认
+let taskExecutedSinceAck = false;      // 收到确认后任务是否真正进入过执行态（用于"任务结束后隐藏"）
+
+// 任务真正结束（真实执行态从有到无）→ 隐藏发布状态
+watch(anyVehicleExecuting, (executing) => {
+  if (executing) {
+    taskExecutedSinceAck = true;
+  } else if (taskExecutedSinceAck && publishAckReceived.value) {
+    publishAckReceived.value = false;
+    publishAckTid.value = null;
+    taskExecutedSinceAck = false;
+  }
+});
+
+// 切换方案时重置发布状态提示
+watch(selectedPlanId, () => {
+  publishAckTid.value = null;
+  publishAckReceived.value = false;
+  taskExecutedSinceAck = false;
+});
 
 /* ---------- 行动参数弹窗 ---------- */
 const openParamDialog = (action, vehicle) => {
@@ -2274,6 +2333,12 @@ const _dispatchVehicle = async (vehicleVid) => {
   if (result.ok) {
     const data = result.data?.data || {};
     appendSystemMessage(`行动序列已下发 | vehicle=${data.vehicle_vid || vehicleVid} | topic=${data.topic || ''} | tid=${data.mission_tid || ''}`);
+    // 记录本次发布 tid，等待车辆 task_received_status 确认后显示"方案已收到"
+    if (data.mission_tid) {
+      publishAckTid.value = data.mission_tid;
+      publishAckReceived.value = false;
+      taskExecutedSinceAck = false;
+    }
   } else {
     appendSystemMessage('下发失败: ' + (result.data?.message || result.error || '未知错误'));
   }
@@ -2434,6 +2499,20 @@ const startPlanEventStream = () => {
       }
     } catch (err) {
       console.warn('[ActionSequencePanel] parse SSE plan.count_changed failed:', err);
+    }
+  });
+
+  // 车辆任务接收确认（zenoh task_received_status）：与最近发布的 tid 匹配则显示"方案已收到"
+  eventSource.addEventListener('action_sequence.task_received', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (publishAckTid.value != null && Number(data.tid) === Number(publishAckTid.value)) {
+        publishAckReceived.value = true;
+        taskExecutedSinceAck = false;
+        appendSystemMessage(`车辆已接收任务 | tid=${data.tid} | vehicle=${data.vehicle_id || ''}`);
+      }
+    } catch (err) {
+      console.warn('[ActionSequencePanel] parse SSE task_received failed:', err);
     }
   });
 
@@ -2794,6 +2873,7 @@ onUnmounted(() => {
 }
 
 .as-detail-header {
+  position: relative;
   border-radius: 12px;
   border: 1px solid var(--as-border-soft);
   background: linear-gradient(180deg, rgba(0, 222, 200, 0.05), rgba(0, 222, 200, 0.015)), rgba(0, 16, 22, 0.68);
@@ -2802,6 +2882,21 @@ onUnmounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.8rem;
+}
+
+/* 发布状态提示（右下角）：收到车辆 task_received_status 确认后显示 */
+.as-publish-ack {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2ee6a8;
+  border: 1px solid rgba(46, 230, 168, 0.45);
+  background: rgba(46, 230, 168, 0.12);
+  border-radius: 6px;
+  padding: 0.15rem 0.55rem;
+  pointer-events: none;
 }
 
 .as-detail-info {
