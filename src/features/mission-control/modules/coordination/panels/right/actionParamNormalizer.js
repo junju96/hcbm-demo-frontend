@@ -261,6 +261,16 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     delete p.points1;
     delete p.points2;
     delete p.points3;
+    // 侦察目标区域：wire 格式 location 用 longitude/latitude/altitude 键（协议 6.2 / 规划接口文档）；
+    // 存量 DS 数据可能是 lon/lat/alt 键（如 action-0235），归一化时统一转文档键名
+    p.target = p.target && typeof p.target === 'object' ? p.target : {};
+    p.target.target_id = p.target.target_id ?? '';
+    p.target.target_name = p.target.target_name ?? '';
+    p.target.location = (Array.isArray(p.target.location) ? p.target.location : []).map((pt) => ({
+      longitude: Number(pt?.longitude ?? pt?.lon ?? 0),
+      latitude: Number(pt?.latitude ?? pt?.lat ?? 0),
+      altitude: Number(pt?.altitude ?? pt?.alt ?? 0),
+    }));
     addCommonFields(p);
   } else if (type === 'lens-recon') {
     p.type = p.type ?? 2;

@@ -215,6 +215,28 @@
             <label class="apd-field"><span>任务时间 (s)</span><input v-model.number="editedParam.time" type="number" /></label>
           </div>
           <div class="apd-section">
+            <div class="apd-section-title">侦察目标区域</div>
+            <label class="apd-field">
+              <span>区域选择</span>
+              <select :value="editedParam.target?.target_id || ''" @change="onAirReconAreaChange">
+                <option value="">-- 请选择区域 --</option>
+                <option v-for="area in areaList" :key="area.resource_id" :value="area.resource_id">
+                  {{ area.title || area.resource_name || area.resource_id }}
+                </option>
+              </select>
+            </label>
+            <div v-if="airReconTargetLocations.length === 0" class="apd-empty">暂无侦察目标区域，可从态势池选择区域或手动添加</div>
+            <div v-for="(pt, idx) in airReconTargetLocations" :key="idx" class="apd-air-point">
+              <div class="apd-air-row">
+                <label class="apd-air-cell"><span>经度</span><input v-model.number="pt.longitude" type="number" step="0.000001" /></label>
+                <label class="apd-air-cell"><span>纬度</span><input v-model.number="pt.latitude" type="number" step="0.000001" /></label>
+                <label class="apd-air-cell"><span>高度</span><input v-model.number="pt.altitude" type="number" step="0.1" /></label>
+                <button class="as-btn mini danger" type="button" @click="removeAirReconTargetPoint(idx)">删除</button>
+              </div>
+            </div>
+            <button class="as-btn mini primary" type="button" @click="addAirReconTargetPoint">+ 添加区域点</button>
+          </div>
+          <div class="apd-section">
             <div class="apd-section-title">无人车航路点列表</div>
             <div v-for="(pt, idx) in editedParam.points" :key="idx" class="apd-air-point">
               <div class="apd-air-row">
@@ -1197,6 +1219,46 @@ const uavAirPoints = computed(() => {
 const fetchingAirPoints = ref(false);
 const airPointsHint = ref('');
 
+/* ---------- 空中侦察 · 侦察目标区域（param.target，location 用 longitude/latitude/altitude 键） ---------- */
+const airReconTargetLocations = computed(() => {
+  const t = editedParam.value?.target;
+  return t && Array.isArray(t.location) ? t.location : [];
+});
+
+function ensureAirReconTarget() {
+  if (!editedParam.value.target || typeof editedParam.value.target !== 'object') {
+    editedParam.value.target = { target_id: '', target_name: '', location: [] };
+  }
+  if (!Array.isArray(editedParam.value.target.location)) {
+    editedParam.value.target.location = [];
+  }
+  return editedParam.value.target;
+}
+
+function onAirReconAreaChange(event) {
+  const id = event.target.value;
+  const t = ensureAirReconTarget();
+  const area = areaList.value.find((a) => a.resource_id === id);
+  t.target_id = id;
+  t.target_name = area ? (area.title || area.resource_name || '') : '';
+  if (area && Array.isArray(area.points)) {
+    t.location = area.points.map((pt) => ({
+      longitude: Number(pt?.lon ?? 0),
+      latitude: Number(pt?.lat ?? 0),
+      altitude: Number(pt?.alt ?? 0),
+    }));
+  }
+}
+
+function addAirReconTargetPoint() {
+  ensureAirReconTarget().location.push({ longitude: 0, latitude: 0, altitude: 0 });
+}
+
+function removeAirReconTargetPoint(idx) {
+  const t = ensureAirReconTarget();
+  if (idx >= 0 && idx < t.location.length) t.location.splice(idx, 1);
+}
+
 /**
  * 获取无人机航路点（POST /air-recon/plan，《空地车空中侦察规划接口说明》）：
  * - position 取无人车航路点列表最后一个点；为空（无点或全 0）时提示用户先规划并中止
@@ -1243,7 +1305,7 @@ async function fetchUavAirPoints() {
     }
   }
   if (!targetArea) {
-    airPointsHint.value = '没有可用的侦察目标区域，请先在态势池添加区域目标';
+    airPointsHint.value = '没有可用的侦察目标区域，请在上方「侦察目标区域」中选择态势池区域或手动添加区域点';
     return;
   }
 
