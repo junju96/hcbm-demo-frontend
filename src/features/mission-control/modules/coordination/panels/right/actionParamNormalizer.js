@@ -46,7 +46,7 @@ function defaultAirReconPoint() {
  * 注意 service.air_points 不作航点来源——车端上报数据里它与侦察区域多边形重合，
  * 语义是区域/航迹而非航路点。
  */
-function normalizeAirReconPoints(p) {
+export function normalizeAirReconPoints(p) {
   if (Array.isArray(p.points) && p.points.length) return p.points;
   const servicePoints = [];
   if (p.service && typeof p.service === 'object') {

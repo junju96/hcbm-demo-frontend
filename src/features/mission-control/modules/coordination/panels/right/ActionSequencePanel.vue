@@ -608,6 +608,7 @@ import {
 import ActionParamDialog from './ActionParamDialog.vue';
 import ActionSequenceCreator from './ActionSequenceCreator.vue';
 import FormationPlanDialog from './FormationPlanDialog.vue';
+import { normalizeAirReconPoints } from './actionParamNormalizer';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
@@ -2320,6 +2321,64 @@ const onDispatchActive = async () => {
   await doDispatchActive(vid);
 };
 
+// 下发前元任务有效性校验：机动类需有有效航路点，打击类需有有效目标点或目标区域
+const MANEUVER_ACTION_TYPES = ['auto-move', 'formation-move'];
+const STRIKE_ACTION_TYPES = ['30mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'];
+
+const hasValidCoords = (list) =>
+  Array.isArray(list) && list.some((pt) =>
+    pt && typeof pt === 'object' &&
+    (Number(pt.lon ?? pt.longitude ?? 0) !== 0 || Number(pt.lat ?? pt.latitude ?? 0) !== 0)
+  );
+
+// 与 getActionDisplayName 同一套类型解析（name 优先，其次 action_type / action_id / param 推断）
+const resolveDispatchActionType = (action) => {
+  if (!action) return '';
+  const nameInferred = inferActionTypeFromName(action.name);
+  let raw = nameInferred || String(action.action_type || '').toLowerCase().replace(/_/g, '-');
+  if (!raw || raw === 'unknown' || raw === 'unknown-action') {
+    raw = inferActionTypeFromId(action.action_id) || inferActionTypeFromParam(action.param) || raw;
+  }
+  return raw;
+};
+
+// 从当前方案 vehicle_summary 取该车的全部行动（同名车辆合并，与 vehicleActions 口径一致）
+const findVehicleActionsByVid = (vehicleVid) => {
+  const cleanVid = String(vehicleVid || '').replace('equipment:', '');
+  return (selectedPlan.value?.vehicle_summary || [])
+    .filter((v) => String(v.vid || '').replace('equipment:', '') === cleanVid)
+    .flatMap((v) => flattenActions(v));
+};
+
+// 返回空串表示校验通过，否则为提示文案
+const validateDispatchParams = (vehicleVid) => {
+  for (const action of findVehicleActionsByVid(vehicleVid)) {
+    const type = resolveDispatchActionType(action);
+    const param = action.param || {};
+    const name = getActionDisplayName(action);
+    if (MANEUVER_ACTION_TYPES.includes(type) && !hasValidCoords(param.points)) {
+      return `机动类任务「${name}」缺少有效航路点信息，请补充后再下发`;
+    }
+    // 空中侦察：无人车航路点 + 无人机航路点都要有效
+    // 无人车航点需兼容 service.points1/2/3 嵌套格式（与弹窗同一来源 normalizeAirReconPoints）
+    if (type === 'air-recon') {
+      if (!hasValidCoords(normalizeAirReconPoints(param))) {
+        return `空中侦察任务「${name}」缺少有效航路点信息，请补充后再下发`;
+      }
+      if (!hasValidCoords(param.service?.air_points)) {
+        return `空中侦察任务「${name}」无人机航路点为空，请在参数弹窗点击「获取航路点」补充后再下发`;
+      }
+    }
+    if (STRIKE_ACTION_TYPES.includes(type) &&
+        !hasValidCoords(param.points) &&
+        !hasValidCoords(param.target?.location) &&
+        !hasValidCoords(param.area)) {
+      return `打击类任务「${name}」缺少有效目标点或目标区域信息，请补充后再下发`;
+    }
+  }
+  return '';
+};
+
 // 核心下发逻辑（不管理 loading，供单发/批量复用）
 const _dispatchVehicle = async (vehicleVid) => {
   if (!vehicleVid) {
@@ -2328,6 +2387,11 @@ const _dispatchVehicle = async (vehicleVid) => {
   }
   // 去掉 equipment: 前缀（如 equipment:XL01 → XL01）
   const cleanVid = String(vehicleVid).replace('equipment:', '');
+  const invalidMsg = validateDispatchParams(cleanVid);
+  if (invalidMsg) {
+    appendSystemMessage(`下发中止 | vehicle=${cleanVid} | ${invalidMsg}`);
+    return { ok: false };
+  }
   const payload = { vehicle_vid: cleanVid };
   const result = await dispatchOperatorPlan(selectedPlanId.value, payload);
   if (result.ok) {
