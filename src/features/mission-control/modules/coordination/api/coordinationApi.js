@@ -626,6 +626,30 @@ export const fetchFusionedTargets = async (limit = 200) => {
   return { ok: true, data: { items, total: items.length } };
 };
 
+/* ==================== 空地车空中侦察规划 API ==================== */
+
+import { AIR_RECON_PLAN_BASE_URL } from '../../../../../config/serverConfig.js';
+
+const joinAirReconUrl = (path) => {
+  if (import.meta.env.DEV) {
+    return path;
+  }
+  const base = AIR_RECON_PLAN_BASE_URL.replace(/\/+$/, '');
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  return `${base}/${normalizedPath}`;
+};
+
+/**
+ * 空地车空中侦察规划（POST /air-recon/plan）：
+ * 入参 { vehicles: [{ vehicle_id, position:{lon,lat,alt}, target_area:{target_id,target_name,location[]} }] }
+ * 返回 { action_sequence: [{ vehicle_id, actions: [{ param: { service: { air_points: [...] } } }] }] }
+ */
+export const fetchAirReconPlan = async (payload = {}) => {
+  const result = await postJson(joinAirReconUrl('/air-recon/plan'), payload);
+  if (!result.ok) return result;
+  return { ok: true, data: result.data || {} };
+};
+
 function adaptFusionedTarget(raw) {
   const locArr = Array.isArray(raw?.target_location) ? raw.target_location : [];
   const points = locArr

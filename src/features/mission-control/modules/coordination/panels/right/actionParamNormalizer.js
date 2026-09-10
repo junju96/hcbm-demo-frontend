@@ -39,6 +39,26 @@ function defaultAirReconPoint() {
   };
 }
 
+/**
+ * 空中侦察航路点来源：优先顶层 points；车端上报的数据航点按协议嵌套在
+ * service.points1/2/3...（参考 装备行动序列知识-0909.md 6.2 节），顶层为空时按序号
+ * 顺序展开兜底；都没有时给一个默认占位点。
+ * 注意 service.air_points 不作航点来源——车端上报数据里它与侦察区域多边形重合，
+ * 语义是区域/航迹而非航路点。
+ */
+function normalizeAirReconPoints(p) {
+  if (Array.isArray(p.points) && p.points.length) return p.points;
+  const servicePoints = [];
+  if (p.service && typeof p.service === 'object') {
+    for (let i = 1; ; i += 1) {
+      const pt = p.service[`points${i}`];
+      if (!pt || typeof pt !== 'object' || Array.isArray(pt) || Object.keys(pt).length === 0) break;
+      servicePoints.push({ ...defaultAirReconPoint(), ...pt });
+    }
+  }
+  return servicePoints.length ? servicePoints : [defaultAirReconPoint()];
+}
+
 function defaultStrikePoint() {
   return {
     lon: 0,
@@ -237,7 +257,7 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     p.type = p.type ?? 2;
     p.mode = p.mode ?? 1;
     p.time = p.time ?? 120;
-    p.points = Array.isArray(p.points) && p.points.length ? p.points : [defaultAirReconPoint()];
+    p.points = normalizeAirReconPoints(p);
     delete p.points1;
     delete p.points2;
     delete p.points3;

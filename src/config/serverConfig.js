@@ -16,6 +16,10 @@ export const COORDINATION_BASE_URL = 'http://25.11.1.222:28600';
 // 态势池服务
 export const SITUATION_POOL_BASE_URL = 'http://25.11.1.178:28802';
 
+// 空地车空中侦察规划服务（/air-recon/plan）
+// 按《空地车空中侦察规划接口说明》：部署在 25.11.1.178
+export const AIR_RECON_PLAN_BASE_URL = 'http://25.11.1.178:28505';
+
 // ========== 地图服务 ==========
 // 地图服务
 export const MAP_SERVICE_BASE_URL = 'http://25.11.1.178:28001';
@@ -34,5 +38,6 @@ export default {
   SITUATION_POOL_BASE_URL,
   MAP_SERVICE_BASE_URL,
   NOTIFICATION_BASE_URL,
+  AIR_RECON_PLAN_BASE_URL,
   API_BASE_URL,
 };

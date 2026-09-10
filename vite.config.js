@@ -17,6 +17,11 @@ export default defineConfig({
         target: 'http://25.11.1.178:28802',
         changeOrigin: true,
       },
+      // 空地车空中侦察规划接口代理（部署在 25.11.1.178）
+      '/air-recon': {
+        target: 'http://25.11.1.178:28505',
+        changeOrigin: true,
+      },
       // 用户服务代理（/user/current 等）
       '/user': {
         target: 'http://25.11.1.178:28009',

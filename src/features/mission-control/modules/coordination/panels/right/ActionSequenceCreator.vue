@@ -880,25 +880,6 @@ function fillTargetFromFirst(param) {
   param.num = param.points.length;
 }
 
-function fillAirReconFromFirst(param) {
-  const first = areaList.value[0];
-  if (!first || !Array.isArray(first.points) || first.points.length === 0) return;
-  param.points = first.points.map((pt) => ({
-    lon: Number(pt?.lon ?? pt?.longitude ?? 0),
-    lat: Number(pt?.lat ?? pt?.latitude ?? 0),
-    alt: Number(pt?.alt ?? pt?.altitude ?? 0),
-    type: 0,
-    speed: 0,
-    camera: 1,
-    gimpitch: 36100,
-    gimyaw: 36100,
-    action: 1,
-    playaw: 36100,
-    zoom: 0,
-    loiter: 0,
-  }));
-}
-
 /**
  * 保存前自动填充：如果 action 的坐标列表为空或全 0，
  * 默认使用态势池中第一个可用资源（区域/路线/目标）的坐标。
@@ -919,10 +900,7 @@ function autoFillCoordinates(param, actionType) {
     if (needsCoordinateFill(param.points)) fillTargetFromFirst(param);
     param.num = Array.isArray(param.points) ? param.points.length : 0;
   }
-  // 空中侦察：航路点默认用第一个区域
-  if (type === 'air-recon') {
-    if (needsCoordinateFill(param.points)) fillAirReconFromFirst(param);
-  }
+  // 空中侦察不自动填充航路点：新建默认为空，以用户手动编辑为准
 }
 
 function buildActionsForVid(vid, planBase = null) {
