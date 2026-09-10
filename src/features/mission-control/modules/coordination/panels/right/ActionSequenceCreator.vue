@@ -41,7 +41,7 @@
           <div class="asc-palette">
             <div class="asc-palette-title">可用元任务</div>
             <div class="asc-palette-hint">拖拽任务卡片到右侧画布</div>
-            <div class="asc-palette-section">
+            <div class="asc-palette-section" v-if="chassisTasks.length">
               <div class="asc-palette-section-title">
                 <span class="asc-section-dot chassis"></span>
                 <span>单车机动</span>
@@ -247,6 +247,9 @@ const vehicleTypeNameMap = {
   'Patrol-UGV': '巡逻车',
   'Electronic-UGV': '电磁车',
   'Air-Ground-UAV': '空地车',
+  // 操控车（CK车）：规范值 Remote-Control-Car，历史数据兼容 Control-UGV
+  'Remote-Control-Car': '操控车',
+  'Control-UGV': '操控车',
 };
 
 // 通用参数字段集合，用于从 param 推断 action_type 时排除
@@ -290,7 +293,7 @@ async function loadFusionedTargets() {
   }
 }
 
-const chassisTasks = [
+const allChassisTasks = [
   { actionType: 'Auto-Move', name: '自主机动', defaultParam: { points: [], limited_speed: 20, safe_mode: 0, loop_mode: 0 } },
   { actionType: 'Follow-Move', name: '跟随机动', defaultParam: { x: 960, y: 540, width: 1920, height: 1080, distance: 10, limited_speed: 15, safe_mode: 0, strategy: 0 } },
   { actionType: 'Silent-Guard', name: '静默值守', defaultParam: { time: 300 } },
@@ -299,6 +302,11 @@ const chassisTasks = [
   { actionType: 'Manual-Task', name: '人工任务', defaultParam: { type: 1 } },
   { actionType: 'Pose-Adjust', name: '姿态调整', defaultParam: { pose: [9000, 0, 0], pose_deviation: [36100, 9100, 9100], limited_speed: 10, safe_mode: 0 } },
 ];
+
+// 操控车（Remote-Control-Car / Control-UGV）只保留编队任务，不提供单车机动卡片
+const chassisTasks = computed(() =>
+  ['Remote-Control-Car', 'Control-UGV'].includes(selectedVehicleType.value) ? [] : allChassisTasks
+);
 
 // 编队任务（协议 sid=7，路径点含经纬高 + 相对头车的横/纵向偏移）
 const formationTasks = [
@@ -326,7 +334,7 @@ function inferActionTypeFromName(name) {
 function getActionDisplayName(actionType, actionId = '') {
   if (!actionType) return '';
   const normalized = String(actionType).toLowerCase().replace(/_/g, '-');
-  const allTasks = [...chassisTasks, ...formationTasks, ...Object.values(payloadTaskMap).flat()];
+  const allTasks = [...allChassisTasks, ...formationTasks, ...Object.values(payloadTaskMap).flat()];
   let found = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/_/g, '-') === normalized);
   if (!found && actionId) {
     const inferred = inferActionTypeFromId(actionId);
@@ -464,7 +472,7 @@ function initEditMode() {
       category: (() => {
         const compactType = String(actionType || '').toLowerCase().replace(/[-_.]/g, '');
         const matches = (t) => String(t.actionType).toLowerCase().replace(/[-_.]/g, '') === compactType;
-        if (compactType && chassisTasks.some(matches)) return 'chassis';
+        if (compactType && allChassisTasks.some(matches)) return 'chassis';
         if (compactType && formationTasks.some(matches)) return 'formation';
         return 'payload';
       })(),

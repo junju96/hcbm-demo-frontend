@@ -241,11 +241,11 @@
         <div v-else-if="selectedPlanId && !loadingDetail" class="as-empty-detail">
           <div>暂无行动序列数据</div>
           <button
-            v-if="supportedVehicleTypes.length > 0"
+            v-if="missingVehicleTypes.length > 0"
             class="as-btn mini primary as-empty-new-btn"
             type="button"
-            :disabled="supportedVehicleTypes.length === 0"
-            :title="supportedVehicleTypes.length === 0 ? '暂无可新建的车型（车辆可能未上线或已存在）' : ''"
+            :disabled="missingVehicleTypes.length === 0"
+            :title="missingVehicleTypes.length === 0 ? '暂无可新建的车型（车辆可能未上线或已存在）' : ''"
             @click="openMissingVehicleSelector"
           >
             + 新建行动序列
@@ -418,7 +418,7 @@
     <Teleport to="body">
       <FormationPlanDialog
         v-if="showFormationPlanDialog"
-        :vehicles="onlineVehicles"
+        :vehicles="formationDialogVehicles"
         :format-vehicle="getVehicleDisplayName"
         @close="showFormationPlanDialog = false"
         @confirm="confirmFormationPlan"
@@ -652,12 +652,14 @@ const showDispatchVehicleDialog = ref(false);
 const selectedDispatchVids = ref([]);
 
 /* ---------- 协同席下发席位选择弹窗 ---------- */
-// 席位 id 由后端 config.SEAT_TARGET_IPS 映射为目标数据服务器 IP（调期间全部 → 操控席 .56）
-// 数据服务器当前注册席位只有 1/2/3，传入未注册 id（如 4）会整批 400，请勿添加
+// 席位 id 由后端 config.SEAT_TARGET_IPS 映射为目标数据服务器 IP（调期间 1/2/3 → 操控席 .56）
+// 数据服务器当前注册席位只有 1/2/3，传入未注册 id（如 4）会整批 400；
+// "ck"（车长席）是前端/后端约定 id，后端映射为操控车 DS 裸 IP（25.11.1.3），不会原样发给 DS
 const SEAT_OPTIONS = [
   { id: '1', label: '席位1' },
   { id: '2', label: '席位2（操控席）' },
   { id: '3', label: '席位3' },
+  { id: 'ck', label: '车长席' },
 ];
 const showDispatchSeatDialog = ref(false);
 const selectedDispatchSeats = ref([]);
@@ -906,13 +908,51 @@ const supportedVehicleTypes = computed(() =>
   }))
 );
 
+// 操控车（CK车）写死选项：资源池默认过滤 CK车（需 include_ckc=true 才返回，
+// 见 resource_pool_CK车查询接口说明），且其上线状态不走接口判断，直接提供。
+// 仅协同席（非操控席）新建/追加车型列表里出现；支持 Auto-Move / Formation-Move（装备行动序列知识 第 7 节）
+const CONTROL_CAR_OPTION = {
+  type: 'Remote-Control-Car',
+  name: '操控车',
+  vid: 'CK01',
+  resource_name: '装备-操控01',
+  supported_action_types: ['Auto-Move', 'Formation-Move'],
+};
+
 const missingVehicleTypes = computed(() => {
   const existingVids = new Set((vehicleActions.value || []).map((v) => v.vid).filter(Boolean));
-  return supportedVehicleTypes.value.filter((v) => !existingVids.has(v.vid));
+  const list = supportedVehicleTypes.value.filter((v) => !existingVids.has(v.vid));
+  if (!isControlMode.value && !existingVids.has(CONTROL_CAR_OPTION.vid)) {
+    list.push(CONTROL_CAR_OPTION);
+  }
+  return list;
+});
+
+// 新建编队机动弹窗：写死追加操控车选项（不经资源池在线判断），
+// vid 带 equipment: 前缀，与在线车辆条目格式一致
+const formationDialogVehicles = computed(() => {
+  const exists = onlineVehicles.value.some(
+    (v) => String(v.vid || '').replace('equipment:', '') === CONTROL_CAR_OPTION.vid
+  );
+  if (exists) return onlineVehicles.value;
+  return [
+    ...onlineVehicles.value,
+    {
+      vid: 'equipment:CK01',
+      resource_type: 'Remote-Control-Car',
+      resource_name: '装备-操控01',
+      display_name: '操控车',
+    },
+  ];
 });
 
 // 非操控席模式：详情页新增行动序列时可用的车型（允许已存在的车型再次追加）
-const appendableVehicleTypes = computed(() => supportedVehicleTypes.value);
+const appendableVehicleTypes = computed(() => {
+  if (isControlMode.value) return supportedVehicleTypes.value;
+  return supportedVehicleTypes.value.some((v) => v.vid === CONTROL_CAR_OPTION.vid)
+    ? supportedVehicleTypes.value
+    : [...supportedVehicleTypes.value, CONTROL_CAR_OPTION];
+});
 
 const vehicleTypeNameMap = {
   'Fire-Support-UGV': '火力车',
@@ -920,6 +960,9 @@ const vehicleTypeNameMap = {
   'Patrol-UGV': '巡逻车',
   'Electronic-UGV': '电磁车',
   'Air-Ground-UAV': '空地车',
+  // 操控车（CK车）：resource_type 规范值 Remote-Control-Car，历史数据兼容 Control-UGV
+  'Remote-Control-Car': '操控车',
+  'Control-UGV': '操控车',
 };
 
 const getVehicleDisplayName = (vehicle) => {
@@ -2050,8 +2093,9 @@ const openFormationPlanDialog = async () => {
 const confirmFormationPlan = async ({ title, leaderVid, followerVids, param }) => {
   // 头车排在第一行：car_actions 与 teams.vehicles 均按 头车 -> 跟随车辆 顺序
   const orderedVids = [leaderVid, ...followerVids];
+  // 查找范围与弹窗列表一致（含写死追加的操控车选项）
   const vehicles = orderedVids
-    .map((vid) => onlineVehicles.value.find((v) => v.vid === vid))
+    .map((vid) => formationDialogVehicles.value.find((v) => v.vid === vid))
     .filter(Boolean);
   if (!vehicles.length) {
     appendSystemMessage('新建编队机动失败：未找到所选车辆');
@@ -2531,6 +2575,16 @@ watch([isControlMode, selectedPlanId], ([control, planId]) => {
 
 /* ---------- SSE 实时刷新（替代轮询） ---------- */
 let eventSource = null;
+// 一次 DS 导入/转发会触发多条 zenoh plan 变更通知（每个子资源一条），
+// 逐条刷新会放大成 N 次列表+详情请求，这里按尾沿防抖合并为一次
+let planRefreshDebounceTimer = null;
+const schedulePlanRefresh = () => {
+  if (planRefreshDebounceTimer) clearTimeout(planRefreshDebounceTimer);
+  planRefreshDebounceTimer = setTimeout(() => {
+    planRefreshDebounceTimer = null;
+    loadPlans(true);
+  }, 300);
+};
 const startPlanEventStream = () => {
   if (eventSource) return;
   eventSource = new EventSource('/api/v1/action-sequences/events');
@@ -2545,7 +2599,7 @@ const startPlanEventStream = () => {
       }
       console.log('[ActionSequencePanel] plan updated via SSE:', planId);
       // loadPlans 刷新列表后会对选中 plan 补一次详情刷新，这里不再重复 refreshDetail
-      loadPlans(true);
+      schedulePlanRefresh();
     } catch (err) {
       console.warn('[ActionSequencePanel] parse SSE plan.updated failed:', err);
     }
@@ -2556,7 +2610,7 @@ const startPlanEventStream = () => {
       const data = JSON.parse(e.data);
       console.log('[ActionSequencePanel] plan count changed via SSE:', data);
       // 新增/删除 plan 时刷新列表；如果删除的是当前选中 plan，清空选中
-      loadPlans(true);
+      schedulePlanRefresh();
       if (data.operation === 'delete' && selectedPlanId.value === data.plan_id) {
         selectedPlanId.value = null;
         selectedPlan.value = null;
@@ -2590,6 +2644,10 @@ const stopPlanEventStream = () => {
   if (eventSource) {
     eventSource.close();
     eventSource = null;
+  }
+  if (planRefreshDebounceTimer) {
+    clearTimeout(planRefreshDebounceTimer);
+    planRefreshDebounceTimer = null;
   }
 };
 
