@@ -29,7 +29,7 @@ export default defineConfig({
       },
       // 车辆信息服务代理（/vehicle/info/all 等）
       '/vehicle': {
-        target: 'http://25.11.1.147:28410',
+        target: 'http://25.11.1.3:28410',
         changeOrigin: true,
       },
       // API 请求代理，解决开发环境跨域问题

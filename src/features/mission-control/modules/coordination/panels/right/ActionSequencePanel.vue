@@ -2331,13 +2331,13 @@ const confirmDispatchSeatSelection = async () => {
     const envelope = result.data || {};
     if (result.ok && (envelope.code ?? 200) === 200) {
       appendSystemMessage(`行动方案已下发到席位 ${selectedDispatchSeats.value.join('、')}`);
-      // 方案含编队机动元任务时，后端会附加 Zenoh send_formation_mission，这里提示其结果
+      // 方案含编队机动元任务时，后端会附加 POST /formation/mission/send，这里提示其结果
       const fm = envelope.data?.formation_mission;
       if (fm?.sent) {
         appendSystemMessage(
           fm.ok
-            ? `编队机动任务已通过 Zenoh 下发（send_formation_mission，共 ${fm.vehicle_count} 车，头车 ${fm.leader_vid || '未知'} 排在首位）`
-            : `编队机动 Zenoh 下发失败: ${fm.error || '部分车辆发送失败'}`
+            ? `编队机动任务已下发（/formation/mission/send，共 ${fm.vehicle_count} 车，头车 ${fm.leader_vid || '未知'} 排在首位）`
+            : `编队机动任务下发失败: ${fm.error || ('HTTP ' + (fm.status_code || '未知'))}`
         );
       }
     } else {
