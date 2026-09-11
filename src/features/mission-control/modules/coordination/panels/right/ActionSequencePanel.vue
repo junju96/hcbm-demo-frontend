@@ -315,9 +315,9 @@
             </div>
           </div>
           <div class="as-coop-section">
-            <div class="as-coop-label">协同车辆（除本车外的在线车辆）</div>
+            <div class="as-coop-label">协同车辆（除本车外的在线车辆，仅限侦打/火力/空地车）</div>
             <div v-if="coopVehicleOptions.length === 0" class="as-dialog-empty">
-              没有其它车辆在线
+              没有可协同的侦打车/火力车/空地车在线
             </div>
             <label
               v-for="v in coopVehicleOptions"
@@ -700,10 +700,13 @@ const coopSelectedVmfs = ref([]);
 // 最近一次下发授权成功的参数；解除授权需原样回传（缺字段会被 MissionService 丢弃）
 const coopGrantedArgs = ref(null);
 // 除本车外的在线车辆；vmf 缺失的车辆不可选（授权参数要 VMF 编号）
+// 协同车辆仅限三类车型：侦打车 / 火力车 / 空地车
+const COOP_ALLOWED_VEHICLE_TYPES = ['Recon-Strike-UGV', 'Fire-Support-UGV', 'Air-Ground-UAV'];
 const coopVehicleOptions = computed(() => {
   const self = String(connectedVehicleId.value || '').replace('equipment:', '');
   return onlineVehicles.value.filter(
     (v) => String(v.vid || '').replace('equipment:', '') !== self
+      && COOP_ALLOWED_VEHICLE_TYPES.includes(v.resource_type)
   );
 });
 const canConfirmCoop = computed(() => (
