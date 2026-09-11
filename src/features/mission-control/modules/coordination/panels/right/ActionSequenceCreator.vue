@@ -53,6 +53,8 @@
                 class="asc-task-card chassis"
                 draggable="true"
                 @dragstart="onDragStart($event, task, 'chassis')"
+                @touchstart="onCardTouchStart($event, task, 'chassis')"
+                @contextmenu.prevent
               >
                 <span class="asc-task-grip" aria-hidden="true"></span>
                 <span class="asc-task-name">{{ task.name }}</span>
@@ -70,6 +72,8 @@
                 class="asc-task-card formation"
                 draggable="true"
                 @dragstart="onDragStart($event, task, 'formation')"
+                @touchstart="onCardTouchStart($event, task, 'formation')"
+                @contextmenu.prevent
               >
                 <span class="asc-task-grip" aria-hidden="true"></span>
                 <span class="asc-task-name">{{ task.name }}</span>
@@ -87,6 +91,8 @@
                 class="asc-task-card payload"
                 draggable="true"
                 @dragstart="onDragStart($event, task, 'payload')"
+                @touchstart="onCardTouchStart($event, task, 'payload')"
+                @contextmenu.prevent
               >
                 <span class="asc-task-grip" aria-hidden="true"></span>
                 <span class="asc-task-name">{{ task.name }}</span>
@@ -153,6 +159,7 @@
               :class="[{ selected: selectedNodeId === node.id }, `cat-${node.category || 'chassis'}`]"
               :style="{ left: node.x + 'px', top: node.y + 'px' }"
               @mousedown.stop="startDragNode($event, node)"
+              @contextmenu.prevent
               @click.stop="onNodeClick(node)"
             >
               <div class="asc-node-port in" title="连接到此" @click.stop="finishConnect($event, node, 'in')" />
@@ -171,6 +178,13 @@
           </div>
         </div>
       </template>
+
+      <!-- 触屏拖拽卡片的跟随影子（HTML5 DnD 不支持触摸，见 onCardTouchStart） -->
+      <div
+        v-if="touchDrag && touchDrag.active"
+        class="asc-touch-ghost"
+        :style="{ left: touchDrag.x + 'px', top: touchDrag.y + 'px' }"
+      >{{ touchDrag.task.name }}</div>
     </div>
   </div>
 </template>
@@ -513,14 +527,11 @@ function onDragStart(event, task, category = 'chassis') {
   event.dataTransfer.effectAllowed = 'copy';
 }
 
-function onDrop(event) {
-  event.preventDefault();
-  const data = event.dataTransfer.getData('application/json');
-  if (!data) return;
-  const task = JSON.parse(data);
+// 在画布指定屏幕坐标处新建任务节点（onDrop 与触屏拖拽共用）
+function addTaskNodeAt(task, clientX, clientY) {
   const rect = canvasRef.value.getBoundingClientRect();
-  const x = event.clientX - rect.left - 60;
-  const y = event.clientY - rect.top - 25;
+  const x = clientX - rect.left - 60;
+  const y = clientY - rect.top - 25;
   const actionType = normalizeActionType(task.actionType);
   // 新建卡片的通用参数默认值：任务时长 10 秒，默认勾选“设置开始时间”并取当前系统时间
   // （start_time 用 datetime-local 输入框要求的本地格式 YYYY-MM-DDTHH:MM）
@@ -543,6 +554,59 @@ function onDrop(event) {
   };
   nodes.value.push(node);
   selectedNodeId.value = node.id;
+}
+
+function onDrop(event) {
+  event.preventDefault();
+  const data = event.dataTransfer.getData('application/json');
+  if (!data) return;
+  addTaskNodeAt(JSON.parse(data), event.clientX, event.clientY);
+}
+
+// ---------- 触屏拖拽卡片到画布（HTML5 DnD 不支持触摸，触屏走此兜底） ----------
+// 手指按住卡片移动超过阈值即进入拖拽，跟随显示影子，松手落在画布内则建节点；
+// 卡片/节点 CSS 已设 touch-action: none + @contextmenu.prevent，避免长按弹菜单/滚动抢占手势
+const touchDrag = ref(null); // { task, startX, startY, x, y, active }
+const TOUCH_DRAG_THRESHOLD = 10;
+
+function onCardTouchStart(event, task, category) {
+  const t = event.touches[0];
+  touchDrag.value = {
+    task: { ...task, category },
+    startX: t.clientX,
+    startY: t.clientY,
+    x: t.clientX,
+    y: t.clientY,
+    active: false,
+  };
+  window.addEventListener('touchmove', onCardTouchMove, { passive: false });
+  window.addEventListener('touchend', onCardTouchEnd);
+  window.addEventListener('touchcancel', onCardTouchEnd);
+}
+
+function onCardTouchMove(event) {
+  const td = touchDrag.value;
+  if (!td) return;
+  const t = event.touches[0];
+  td.x = t.clientX;
+  td.y = t.clientY;
+  if (!td.active && Math.hypot(t.clientX - td.startX, t.clientY - td.startY) > TOUCH_DRAG_THRESHOLD) {
+    td.active = true;
+  }
+  if (td.active) event.preventDefault(); // 拖拽中阻止页面滚动
+}
+
+function onCardTouchEnd() {
+  const td = touchDrag.value;
+  window.removeEventListener('touchmove', onCardTouchMove);
+  window.removeEventListener('touchend', onCardTouchEnd);
+  window.removeEventListener('touchcancel', onCardTouchEnd);
+  touchDrag.value = null;
+  if (!td || !td.active || !canvasRef.value) return;
+  const rect = canvasRef.value.getBoundingClientRect();
+  if (td.x >= rect.left && td.x <= rect.right && td.y >= rect.top && td.y <= rect.bottom) {
+    addTaskNodeAt(td.task, td.x, td.y);
+  }
 }
 
 function onNodeClick(node) {
@@ -1227,6 +1291,9 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', onDrawingMove);
   window.removeEventListener('mousemove', onDragMove);
   window.removeEventListener('mouseup', onDragEnd);
+  window.removeEventListener('touchmove', onCardTouchMove);
+  window.removeEventListener('touchend', onCardTouchEnd);
+  window.removeEventListener('touchcancel', onCardTouchEnd);
 });
 
 const ALLOWED_PATCH_KEYS = new Set([
@@ -1528,6 +1595,9 @@ async function savePlan() {
   font-size: 0.86rem;
   cursor: grab;
   user-select: none;
+  /* 触屏：禁止浏览器把手势抢去做滚动/缩放，并禁止长按弹出上下文菜单后的默认行为 */
+  touch-action: none;
+  -webkit-touch-callout: none;
   transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1659,7 +1729,25 @@ async function savePlan() {
   align-items: center;
   gap: 0.45rem;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  /* 触屏：防止滚动抢占拖拽手势（mousedown 依赖触摸合成的 mouse 事件） */
+  touch-action: none;
+  -webkit-touch-callout: none;
   transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+/* 触屏拖拽卡片时的跟随影子 */
+.asc-touch-ghost {
+  position: fixed;
+  z-index: 4000;
+  transform: translate(-50%, -130%);
+  padding: 0.5rem 0.85rem;
+  background: rgba(0, 222, 200, 0.18);
+  border: 1px solid rgba(0, 222, 200, 0.55);
+  border-radius: 8px;
+  color: #f1feff;
+  font-size: 0.86rem;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .asc-node::before {
