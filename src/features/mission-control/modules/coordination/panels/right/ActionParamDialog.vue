@@ -349,7 +349,7 @@
         </template>
 
         <!-- 10. 侦察打击（非巡逻车） -->
-        <template v-else-if="['recon-strike', 'search-and-shoot'].includes(normalizedActionType) && !isPatrolVehicle">
+        <template v-else-if="normalizedActionType === 'recon-and-strike' && !isPatrolVehicle">
           <div class="apd-section">
             <div class="apd-section-title">侦察参数</div>
             <label class="apd-field"><span>任务时间 (s)</span><input v-model.number="editedParam.time" type="number" /></label>
@@ -402,7 +402,7 @@
         </template>
 
         <!-- 11.5 机枪打击（简化版） -->
-        <template v-else-if="normalizedActionType === 'gun-shot' || normalizedActionType === '7.62mm-gun-shot'">
+        <template v-else-if="normalizedActionType === 'machine-gun-strike'">
           <div class="apd-section">
             <div class="apd-section-title">
               打击参数
@@ -514,7 +514,7 @@
             <div class="apd-section-title">侦察/干扰区域</div>
             <AreaEditor v-model="editedParam.area" :area-list="areaList" v-model:area-id="editedParam.area_id" />
           </div>
-          <div v-if="normalizedActionType === 'em-interference' || normalizedActionType === 'electronic-jamming' || normalizedActionType === 'em-assault' || normalizedActionType === 'electronic-assault'" class="apd-section">
+          <div v-if="normalizedActionType === 'em-interference' || normalizedActionType === 'electronic-jamming' || normalizedActionType === 'recon-and-interfere'" class="apd-section">
             <div class="apd-section-title">保护频段</div>
             <div class="apd-protect-group">
               <div class="apd-protect-group-title">测控链频段</div>
@@ -593,13 +593,29 @@ const editedParam = ref({});
 const fusionedTargets = ref([]);
 const loadingFusioned = ref(false);
 
+// 旧 action_type 命名别名（装备行动序列知识-0912 MIGRATION）：
+// shoot/launch 统一为 strike，旧 key 仅作为读取别名归一到新规范名
+const LEGACY_ACTION_TYPE_ALIASES = {
+  'search-and-shoot': 'recon-and-strike',
+  'recon-strike': 'recon-and-strike',
+  '30mm-gun-launch': '30mm-gun-strike',
+  '40mm-gun-launch': '30mm-gun-strike',
+  'at-missile-launch': 'at-missile-strike',
+  'gun-shot': 'machine-gun-strike',
+  '7.62mm-gun-shot': 'machine-gun-strike',
+  'rocket-launch': 'rocket-strike',
+  'loitering-munition-launch': 'loitering-munition-strike',
+  'em-assault': 'recon-and-interfere',
+  'electronic-assault': 'recon-and-interfere',
+};
+
 const STANDARD_ACTION_TYPES = new Set([
   'auto-move', 'follow-move', 'silent-guard', 'set-return-point', 'return-to-base',
   'formation-move', 'manual-task', 'pose-adjust', 'air-recon', 'lens-recon',
-  'search-and-shoot', 'recon-strike', '30mm-gun-launch', 'at-missile-launch',
-  'gun-shot', '7.62mm-gun-shot', 'rocket-launch', 'loitering-munition-launch',
+  'recon-and-strike', '30mm-gun-strike', 'at-missile-strike',
+  'machine-gun-strike', 'rocket-strike', 'loitering-munition-strike',
   'laser-illumination', 'sound-expel', 'acoustic-deterrence', 'light-expel',
-  'light-deterrence', 'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault',
+  'light-deterrence', 'em-recon', 'electronic-recon', 'recon-and-interfere',
   'em-interference', 'electronic-jamming',
   // payload-silent 仅作旧数据兼容
   'payload-silent',
@@ -615,14 +631,21 @@ function inferActionTypeFromId(actionId) {
       'set-return-point': 'set-return-point', 'return-to-base': 'return-to-base',
       'manual-task': 'manual-task', 'pose-adjust': 'pose-adjust',
       'formation-move': 'formation-move',
-      'air-recon': 'air-recon', 'lens-recon': 'lens-recon', 'search-and-shoot': 'search-and-shoot',
-      'recon-strike': 'search-and-shoot', '30mm-gun-launch': '30mm-gun-launch',
-      'at-missile-launch': 'at-missile-launch', 'gun-shot': '7.62mm-gun-shot',
-      '7.62mm-gun-shot': '7.62mm-gun-shot', 'rocket-launch': 'rocket-launch',
-      'loitering-munition-launch': 'loitering-munition-launch', 'laser-illumination': 'laser-illumination',
+      'air-recon': 'air-recon', 'lens-recon': 'lens-recon',
+      // 旧命名别名（0912 MIGRATION 前）指向新规范名
+      'search-and-shoot': 'recon-and-strike', 'recon-strike': 'recon-and-strike',
+      'recon-and-strike': 'recon-and-strike',
+      '30mm-gun-launch': '30mm-gun-strike', '30mm-gun-strike': '30mm-gun-strike',
+      'at-missile-launch': 'at-missile-strike', 'at-missile-strike': 'at-missile-strike',
+      'gun-shot': 'machine-gun-strike',
+      '7.62mm-gun-shot': 'machine-gun-strike', 'machine-gun-strike': 'machine-gun-strike',
+      'rocket-launch': 'rocket-strike', 'rocket-strike': 'rocket-strike',
+      'loitering-munition-launch': 'loitering-munition-strike', 'loitering-munition-strike': 'loitering-munition-strike',
+      'laser-illumination': 'laser-illumination',
       'sound-expel': 'sound-expel', 'acoustic-deterrence': 'sound-expel', 'light-expel': 'light-expel',
       'light-deterrence': 'light-expel', 'em-recon': 'em-recon', 'electronic-recon': 'em-recon',
-      'em-assault': 'em-assault', 'electronic-assault': 'em-assault',
+      'em-assault': 'recon-and-interfere', 'electronic-assault': 'recon-and-interfere',
+      'recon-and-interfere': 'recon-and-interfere',
       'em-interference': 'em-interference', 'electronic-jamming': 'em-interference',
       // payload-silent 仅作旧数据兼容
       'payload-silent': 'payload-silent',
@@ -634,15 +657,15 @@ function inferActionTypeFromId(actionId) {
     'ch-set-return': 'set-return-point', 'ch-return': 'return-to-base',
     'ch-manual': 'manual-task', 'ch-pose': 'pose-adjust',
     'ch-formation': 'formation-move',
-    'fs-lens': 'lens-recon', 'fs-recon-strike': 'search-and-shoot', 'fs-gun': '7.62mm-gun-shot',
-    'fs-rocket': 'rocket-launch', 'fs-loiter': 'loitering-munition-launch',
-    'rs-lens': 'lens-recon', 'rs-recon-strike': 'search-and-shoot', 'rs-30mm': '30mm-gun-launch',
-    'rs-40mm': '30mm-gun-launch',
-    'rs-at': 'at-missile-launch', 'rs-gun': '7.62mm-gun-shot', 'rs-laser': 'laser-illumination',
-    'pt-lens': 'lens-recon', 'pt-recon-strike': 'search-and-shoot', 'pt-gun': '7.62mm-gun-shot',
+    'fs-lens': 'lens-recon', 'fs-recon-strike': 'recon-and-strike', 'fs-gun': 'machine-gun-strike',
+    'fs-rocket': 'rocket-strike', 'fs-loiter': 'loitering-munition-strike',
+    'rs-lens': 'lens-recon', 'rs-recon-strike': 'recon-and-strike', 'rs-30mm': '30mm-gun-strike',
+    'rs-40mm': '30mm-gun-strike',
+    'rs-at': 'at-missile-strike', 'rs-gun': 'machine-gun-strike', 'rs-laser': 'laser-illumination',
+    'pt-lens': 'lens-recon', 'pt-recon-strike': 'recon-and-strike', 'pt-gun': 'machine-gun-strike',
     'pt-acoustic': 'sound-expel', 'pt-light': 'light-expel',
     'ag-air-recon': 'air-recon', 'el-recon': 'em-recon',
-    'el-assault': 'em-assault', 'el-jam': 'em-interference',
+    'el-assault': 'recon-and-interfere', 'el-jam': 'em-interference',
     // el-silent 映射到载荷静默（旧数据兼容）
     'el-silent': 'payload-silent',
   };
@@ -657,11 +680,11 @@ function inferActionTypeFromName(name) {
     '设置返航点': 'set-return-point', '开启返航': 'return-to-base',
     '人工任务': 'manual-task', '姿态调整': 'pose-adjust', '空中侦察': 'air-recon',
     '编队机动': 'formation-move',
-    '光电侦察': 'lens-recon', '侦察打击': 'search-and-shoot', '巡逻车侦察打击': 'search-and-shoot',
-    '机枪打击': '7.62mm-gun-shot', '火箭弹打击': 'rocket-launch', '巡飞弹打击': 'loitering-munition-launch',
-    '30炮打击': '30mm-gun-launch', '40炮打击': '30mm-gun-launch', '红箭13导弹打击': 'at-missile-launch', '激光照射': 'laser-illumination',
+    '光电侦察': 'lens-recon', '侦察打击': 'recon-and-strike', '巡逻车侦察打击': 'recon-and-strike',
+    '机枪打击': 'machine-gun-strike', '火箭弹打击': 'rocket-strike', '巡飞弹打击': 'loitering-munition-strike',
+    '30炮打击': '30mm-gun-strike', '40炮打击': '30mm-gun-strike', '红箭13导弹打击': 'at-missile-strike', '激光照射': 'laser-illumination',
     '强声拒止': 'sound-expel', '强光拒止': 'light-expel',
-    '电磁侦察': 'em-recon', '电磁突击': 'em-assault', '侦察干扰': 'em-assault', '电磁干扰': 'em-interference',
+    '电磁侦察': 'em-recon', '电磁突击': 'recon-and-interfere', '侦察干扰': 'recon-and-interfere', '电磁干扰': 'em-interference',
     '载荷静默': 'payload-silent',
   };
   if (name in map) return map[name];
@@ -672,15 +695,20 @@ function inferActionTypeFromName(name) {
     'return': 'return-to-base', 'manualtask': 'manual-task',
     'manual': 'manual-task', 'poseadjust': 'pose-adjust', 'airrecon': 'air-recon',
     'formationmove': 'formation-move', 'formation': 'formation-move',
-    'lensrecon': 'lens-recon', 'searchandshoot': 'search-and-shoot', 'reconstrike': 'search-and-shoot',
-    '30mmgunlaunch': '30mm-gun-launch', '30mmgun': '30mm-gun-launch',
-    '40mmgunlaunch': '30mm-gun-launch', '40mmgun': '30mm-gun-launch', 'atmissilelaunch': 'at-missile-launch',
-    'atmissile': 'at-missile-launch', 'gunshot': '7.62mm-gun-shot', '762mmgunshot': '7.62mm-gun-shot',
-    '762mmgun': '7.62mm-gun-shot', 'rocketlaunch': 'rocket-launch', 'loiteringmunitionlaunch': 'loitering-munition-launch',
-    'loiteringmunition': 'loitering-munition-launch', 'laserillumination': 'laser-illumination',
+    'lensrecon': 'lens-recon', 'searchandshoot': 'recon-and-strike', 'reconstrike': 'recon-and-strike',
+    'reconandstrike': 'recon-and-strike',
+    '30mmgunlaunch': '30mm-gun-strike', '30mmgunstrike': '30mm-gun-strike', '30mmgun': '30mm-gun-strike',
+    '40mmgunlaunch': '30mm-gun-strike', '40mmgun': '30mm-gun-strike', 'atmissilelaunch': 'at-missile-strike',
+    'atmissilestrike': 'at-missile-strike', 'atmissile': 'at-missile-strike',
+    'gunshot': 'machine-gun-strike', '762mmgunshot': 'machine-gun-strike',
+    '762mmgun': 'machine-gun-strike', 'machinegunstrike': 'machine-gun-strike',
+    'rocketlaunch': 'rocket-strike', 'rocketstrike': 'rocket-strike',
+    'loiteringmunitionlaunch': 'loitering-munition-strike', 'loiteringmunitionstrike': 'loitering-munition-strike',
+    'loiteringmunition': 'loitering-munition-strike', 'laserillumination': 'laser-illumination',
     'laser': 'laser-illumination', 'soundexpel': 'sound-expel', 'acousticdeterrence': 'sound-expel',
     'lightexpel': 'light-expel', 'lightdeterrence': 'light-expel', 'emrecon': 'em-recon',
-    'electronicrecon': 'em-recon', 'emassault': 'em-assault', 'electronicassault': 'em-assault',
+    'electronicrecon': 'em-recon', 'emassault': 'recon-and-interfere', 'electronicassault': 'recon-and-interfere',
+    'reconandinterfere': 'recon-and-interfere',
     'eminterference': 'em-interference', 'electronicjamming': 'em-interference',
     'payloadsilent': 'payload-silent',
   };
@@ -706,11 +734,11 @@ function inferActionTypeFromParam(param) {
   // 光电侦察：area + direct
   if (businessHas('area') && businessHas('direct')) return 'lens-recon';
   // 侦察打击：有 area 但没 direct
-  if (businessHas('area') && !businessHas('direct')) return 'search-and-shoot';
+  if (businessHas('area') && !businessHas('direct')) return 'recon-and-strike';
   // 光电侦察：area + direct
   if (businessHas('area') && businessHas('direct')) return 'lens-recon';
   // 侦察打击：有 area 但没 direct
-  if (businessHas('area') && !businessHas('direct')) return 'search-and-shoot';
+  if (businessHas('area') && !businessHas('direct')) return 'recon-and-strike';
   // 静默值守：只有 time
   if (businessKeys.length === 1 && businessHas('time')) return 'silent-guard';
   // 编队机动：points + formation_mode，或路径点带 offsetX/offsetY
@@ -746,10 +774,12 @@ const loadingAreas = computed(() => loadingFusioned.value);
 const loadingTargets = computed(() => loadingFusioned.value);
 
 const normalizedActionType = computed(() => {
-  // 兼容下划线格式（如 SEARCH_AND_SHOOT、AUTO_MOVE）与中划线格式（如 search-and-shoot）
+  // 兼容下划线格式（如 RECON_AND_STRIKE、AUTO_MOVE）与中划线格式（如 recon-and-strike）
   let raw = String(props.action?.action_type || '').toLowerCase().replace(/_/g, '-');
   // DS 侧空中侦察的 action_type 为 UAV-Air-Recon，统一归一到 air-recon
   if (raw === 'uav-air-recon') raw = 'air-recon';
+  // 旧命名别名（shoot/launch）归一到新规范名
+  raw = LEGACY_ACTION_TYPE_ALIASES[raw] || raw;
   if (STANDARD_ACTION_TYPES.has(raw)) {
     console.log('[ActionParamDialog] standard action_type:', props.action?.action_type, 'normalized:', raw);
     return raw;
@@ -786,7 +816,7 @@ const isPatrolVehicle = computed(() => normalizedVehicleType.value === 'patrol')
 const isLensReconLike = computed(() => {
   if (normalizedActionType.value === 'lens-recon') return true;
   if (!isPatrolVehicle.value) return false;
-  return ['search-and-shoot', 'recon-strike', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence']
+  return ['recon-and-strike', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence']
     .includes(normalizedActionType.value);
 });
 
@@ -801,14 +831,12 @@ const actionTypeLabel = computed(() => {
     'pose-adjust': '姿态调整 / 车姿调整',
     'formation-move': '编队机动',
     'lens-recon': '光电侦察',
-    'search-and-shoot': isPatrolVehicle.value ? '巡逻车侦察打击' : '侦察打击',
-    'recon-strike': isPatrolVehicle.value ? '巡逻车侦察打击' : '侦察打击',
-    '30mm-gun-launch': '30炮打击',
-    'at-missile-launch': '红箭13导弹打击',
-    '7.62mm-gun-shot': '机枪打击',
-    'gun-shot': '机枪打击',
-    'rocket-launch': '火箭弹打击',
-    'loitering-munition-launch': '巡飞弹打击',
+    'recon-and-strike': isPatrolVehicle.value ? '巡逻车侦察打击' : '侦察打击',
+    '30mm-gun-strike': '30炮打击',
+    'at-missile-strike': '红箭13导弹打击',
+    'machine-gun-strike': '机枪打击',
+    'rocket-strike': '火箭弹打击',
+    'loitering-munition-strike': '巡飞弹打击',
     'laser-illumination': '激光照射',
     'sound-expel': '强声拒止',
     'acoustic-deterrence': '强声拒止',
@@ -816,8 +844,7 @@ const actionTypeLabel = computed(() => {
     'light-deterrence': '强光拒止',
     'em-recon': '电磁侦察',
     'electronic-recon': '电磁侦察',
-    'em-assault': '侦察干扰',
-    'electronic-assault': '侦察干扰',
+    'recon-and-interfere': '侦察干扰',
     'em-interference': '电磁干扰',
     'electronic-jamming': '电磁干扰',
     // payload-silent 仅作旧数据兼容
@@ -832,7 +859,7 @@ const vehicleName = computed(() =>
 );
 
 const isTargetListStrike = computed(() =>
-  ['30mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch']
+  ['30mm-gun-strike', 'at-missile-strike', 'rocket-strike', 'loitering-munition-strike']
     .includes(normalizedActionType.value)
 );
 
@@ -841,16 +868,16 @@ const isPatrolDeterrence = computed(() =>
 );
 
 const isElectronic = computed(() =>
-  ['em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)
+  ['em-recon', 'electronic-recon', 'recon-and-interfere', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)
 );
 
 const showCommonParams = computed(() =>
   ['auto-move', 'follow-move', 'silent-guard', 'manual-task', 'pose-adjust',
    'set-return-point', 'return-to-base', 'formation-move',
-   'lens-recon', 'recon-strike', 'search-and-shoot', '30mm-gun-launch', 'gun-shot', '7.62mm-gun-shot',
-   'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'laser-illumination',
+   'lens-recon', 'recon-and-strike', '30mm-gun-strike', 'machine-gun-strike',
+   'at-missile-strike', 'rocket-strike', 'loitering-munition-strike', 'laser-illumination',
    'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence',
-   'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming',
+   'em-recon', 'electronic-recon', 'recon-and-interfere', 'em-interference', 'electronic-jamming',
    // payload-silent 仅作旧数据兼容
    'payload-silent', 'air-recon']
     .includes(normalizedActionType.value)
@@ -1053,7 +1080,7 @@ function onAreaChange() {
 function initFromAreaSelection() {
   // 只有需要区域参数的元任务才从区域资源初始化 area
   const type = normalizedActionType.value;
-  const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
+  const needsArea = ['lens-recon', 'recon-and-strike', 'em-recon', 'electronic-recon', 'recon-and-interfere', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
   if (!needsArea.includes(type)) return;
   if (!areaList.value.length) return;
 
@@ -1105,7 +1132,7 @@ function initFromTargetSelection() {
   // 仅打击类元任务需要从目标资源回填 points（target_ref 语义）；
   // 空中侦察等其他带 points 的类型不做目标回填，避免默认坐标被误填
   const type = normalizedActionType.value;
-  const strikeTypes = ['30mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'];
+  const strikeTypes = ['30mm-gun-strike', 'at-missile-strike', 'rocket-strike', 'loitering-munition-strike', 'machine-gun-strike'];
   if (!strikeTypes.includes(type)) return;
   if (!Array.isArray(editedParam.value.points) || !targetList.value.length) return;
   editedParam.value.points.forEach((pt) => {
@@ -1390,8 +1417,8 @@ function onClose() {
     if (Array.isArray(cleaned.points)) {
       cleaned.points = cleaned.points.map(({ target_ref, ...rest }) => rest);
     }
-    // 电磁侦察/电磁突击/电磁干扰：固定为区域探测（mode=4），数量固定为 1
-    if (['em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)) {
+    // 电磁侦察/侦察干扰/电磁干扰：固定为区域探测（mode=4），数量固定为 1
+    if (['em-recon', 'electronic-recon', 'recon-and-interfere', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)) {
       cleaned.mode = 4;
       cleaned.num = 1;
     }
@@ -1468,7 +1495,7 @@ function finalizeParam() {
   // 保存前兜底：只要列表数据为空或全 0，就从已选资源回填，
   // 避免异步加载/竞争导致编辑态有值但实际保存的是默认值 0。
   const type = normalizedActionType.value;
-  const needsArea = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
+  const needsArea = ['lens-recon', 'recon-and-strike', 'em-recon', 'electronic-recon', 'recon-and-interfere', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
   if (needsArea.includes(type)) {
     if (!Array.isArray(editedParam.value.area) || editedParam.value.area.length === 0 || isAllZeroPoints(editedParam.value.area)) {
       fillAreaFromSelection();
@@ -1479,7 +1506,7 @@ function finalizeParam() {
       fillRouteFromSelection();
     }
   }
-  if (['30mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'].includes(type)) {
+  if (['30mm-gun-strike', 'at-missile-strike', 'rocket-strike', 'loitering-munition-strike', 'machine-gun-strike'].includes(type)) {
     fillStrikeTargets();
     if (Array.isArray(editedParam.value.points)) {
       editedParam.value.num = editedParam.value.points.length;
@@ -1495,13 +1522,13 @@ function onSave() {
   if (Array.isArray(cleaned.points)) {
     cleaned.points = cleaned.points.map(({ target_ref, ...rest }) => rest);
   }
-  // 电磁侦察/电磁突击/电磁干扰：固定为区域探测（mode=4），数量固定为 1
-  // 用 sort 区分电磁突击（0）和电磁干扰（1），电磁侦察不传 sort
-  if (['em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)) {
+  // 电磁侦察/侦察干扰/电磁干扰：固定为区域探测（mode=4），数量固定为 1
+  // 用 sort 区分侦察干扰（0）和电磁干扰（1），电磁侦察不传 sort
+  if (['em-recon', 'electronic-recon', 'recon-and-interfere', 'em-interference', 'electronic-jamming'].includes(normalizedActionType.value)) {
     cleaned.mode = 4;
     cleaned.num = 1;
   }
-  if (normalizedActionType.value === 'em-assault' || normalizedActionType.value === 'electronic-assault') {
+  if (normalizedActionType.value === 'recon-and-interfere') {
     cleaned.sort = 0;
   } else if (normalizedActionType.value === 'em-interference' || normalizedActionType.value === 'electronic-jamming') {
     cleaned.sort = 1;

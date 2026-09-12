@@ -181,8 +181,25 @@ function isPatrolVehicle(vehicleType) {
   return vt === 'patrol_ugv' || vt === 'patrol';
 }
 
+// 旧 action_type 命名别名（装备行动序列知识-0912 MIGRATION）：
+// shoot/launch 统一为 strike，旧 key 仅作为读取别名归一到新规范名
+const LEGACY_ACTION_TYPE_ALIASES = {
+  'search-and-shoot': 'recon-and-strike',
+  'recon-strike': 'recon-and-strike',
+  '30mm-gun-launch': '30mm-gun-strike',
+  '40mm-gun-launch': '30mm-gun-strike',
+  'at-missile-launch': 'at-missile-strike',
+  'gun-shot': 'machine-gun-strike',
+  '7.62mm-gun-shot': 'machine-gun-strike',
+  'rocket-launch': 'rocket-strike',
+  'loitering-munition-launch': 'loitering-munition-strike',
+  'em-assault': 'recon-and-interfere',
+  'electronic-assault': 'recon-and-interfere',
+};
+
 function normalizeActionType(actionType) {
-  return String(actionType || '').toLowerCase().replace(/_/g, '-');
+  const raw = String(actionType || '').toLowerCase().replace(/_/g, '-');
+  return LEGACY_ACTION_TYPE_ALIASES[raw] || raw;
 }
 
 function normalizeVehicleType(vehicleType) {
@@ -288,7 +305,7 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     p.area_id = p.area_id ?? '';
     p.direct = p.direct && typeof p.direct === 'object' ? p.direct : defaultDirect();
     addCommonFields(p);
-  } else if (type === 'search-and-shoot' || type === 'recon-strike') {
+  } else if (type === 'recon-and-strike') {
     if (vt === 'patrol') {
       // 巡逻车侦察打击与光电侦察数据格式保持一致
       p.type = p.type ?? 2;
@@ -304,14 +321,14 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
       p.area_id = p.area_id ?? '';
     }
     addCommonFields(p);
-  } else if (type === 'rocket-launch' || type === 'loitering-munition-launch' || type === '30mm-gun-launch' || type === 'at-missile-launch') {
+  } else if (type === 'rocket-strike' || type === 'loitering-munition-strike' || type === '30mm-gun-strike' || type === 'at-missile-strike') {
     p.points = Array.isArray(p.points) && p.points.length ? p.points.map((pt) => ({ ...pt, target_ref: pt.target_ref || '' })) : [defaultStrikePoint()];
     p.time = p.time ?? 60;
     p.sort = p.sort ?? 0;
     p.num = p.points.length;
-    if (type === 'rocket-launch') p.type = p.type ?? 1;
+    if (type === 'rocket-strike') p.type = p.type ?? 1;
     addCommonFields(p);
-  } else if (type === 'gun-shot' || type === '7.62mm-gun-shot') {
+  } else if (type === 'machine-gun-strike') {
     p.points = Array.isArray(p.points) && p.points.length ? p.points : [defaultGunShotPoint()];
     p.time = p.time ?? 60;
     p.sort = p.sort ?? 0;
@@ -366,7 +383,7 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     p.area = Array.isArray(p.area) && p.area.length ? p.area : [defaultAreaPoint(), defaultAreaPoint(), defaultAreaPoint(), defaultAreaPoint()];
     p.area_id = p.area_id ?? '';
     addCommonFields(p);
-  } else if (type === 'em-interference' || type === 'electronic-jamming' || type === 'em-assault' || type === 'electronic-assault') {
+  } else if (type === 'em-interference' || type === 'electronic-jamming' || type === 'recon-and-interfere') {
     p.mode = 4;
     p.time = p.time ?? 300;
     if (type === 'em-interference' || type === 'electronic-jamming') {

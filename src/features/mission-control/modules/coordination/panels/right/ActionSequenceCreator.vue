@@ -195,6 +195,22 @@ import VehicleIcon from './VehicleIcon.vue';
 import { createOperatorPlan, patchOperatorPlan, patchPlan, fetchFusionedTargets, fetchOperatorPlans, nextSequentialPlanId } from '../../api/coordinationApi.js';
 import { normalizeActionParam, serializeActionParam } from './actionParamNormalizer';
 
+// 旧 action_type 命名别名（装备行动序列知识-0912 MIGRATION）：
+// shoot/launch 统一为 strike，旧 key 仅作为读取别名归一到新规范名
+const LEGACY_ACTION_TYPE_ALIASES = {
+  'search-and-shoot': 'recon-and-strike',
+  'recon-strike': 'recon-and-strike',
+  '30mm-gun-launch': '30mm-gun-strike',
+  '40mm-gun-launch': '30mm-gun-strike',
+  'at-missile-launch': 'at-missile-strike',
+  'gun-shot': 'machine-gun-strike',
+  '7.62mm-gun-shot': 'machine-gun-strike',
+  'rocket-launch': 'rocket-strike',
+  'loitering-munition-launch': 'loitering-munition-strike',
+  'em-assault': 'recon-and-interfere',
+  'electronic-assault': 'recon-and-interfere',
+};
+
 function normalizeActionType(actionType) {
   return String(actionType || '').toLowerCase().replace(/_/g, '-');
 }
@@ -350,13 +366,15 @@ function getActionDisplayName(actionType, actionId = '') {
   let normalized = String(actionType).toLowerCase().replace(/_/g, '-');
   // DS 侧空中侦察的 action_type 为 UAV-Air-Recon，归一到内置任务表的 Air-Recon
   if (normalized === 'uav-air-recon') normalized = 'air-recon';
+  // 旧命名别名归一到新规范名（shoot/launch → strike）
+  normalized = LEGACY_ACTION_TYPE_ALIASES[normalized] || normalized;
   const allTasks = [...allChassisTasks, ...formationTasks, ...Object.values(payloadTaskMap).flat()];
   let found = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/_/g, '-') === normalized);
   if (!found && actionId) {
     const inferred = inferActionTypeFromId(actionId);
     found = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/_/g, '-') === inferred);
   }
-  // 兼容 PascalCase 的 action_type（如 Follow-Move / Search-And-Shoot）在 allTasks 中找不到的情况
+  // 兼容 PascalCase 的 action_type（如 Follow-Move / Recon-And-Strike）在 allTasks 中找不到的情况
   if (!found) {
     const compact = normalized.replace(/-/g, '').replace(/\./g, '');
     const lowerFound = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/-/g, '').replace(/\./g, '') === compact);
@@ -368,28 +386,28 @@ function getActionDisplayName(actionType, actionId = '') {
 const payloadTaskMap = {
   'Fire-Support-UGV': [
     { actionType: 'Lens-Recon', name: '光电侦察', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
-    { actionType: 'Search-And-Shoot', name: '侦察打击', defaultParam: { time: 180, area: [] } },
-    { actionType: '7.62mm-Gun-Shot', name: '机枪打击', defaultParam: { time: 30, sort: 1, num: 1, points: [] } },
-    { actionType: 'Rocket-Launch', name: '火箭弹打击', defaultParam: { type: 1, time: 60, sort: 1, num: 1, points: [] } },
-    { actionType: 'Loitering-Munition-Launch', name: '巡飞弹打击', defaultParam: { time: 60, sort: 1, num: 1, points: [] } },
+    { actionType: 'Recon-And-Strike', name: '侦察打击', defaultParam: { time: 180, area: [] } },
+    { actionType: 'Machine-Gun-Strike', name: '机枪打击', defaultParam: { time: 30, sort: 1, num: 1, points: [] } },
+    { actionType: 'Rocket-Strike', name: '火箭弹打击', defaultParam: { type: 1, time: 60, sort: 1, num: 1, points: [] } },
+    { actionType: 'Loitering-Munition-Strike', name: '巡飞弹打击', defaultParam: { time: 60, sort: 1, num: 1, points: [] } },
   ],
   'Recon-Strike-UGV': [
     { actionType: 'Lens-Recon', name: '光电侦察', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
-    { actionType: 'Search-And-Shoot', name: '侦察打击', defaultParam: { time: 180, area: [] } },
-    { actionType: '30mm-Gun-Launch', name: '30炮打击', defaultParam: { time: 45, sort: 1, num: 1, points: [] } },
-    { actionType: 'AT-Missile-Launch', name: '红箭13导弹打击', defaultParam: { time: 60, sort: 1, num: 1, points: [] } },
-    { actionType: '7.62mm-Gun-Shot', name: '机枪打击', defaultParam: { time: 30, sort: 1, num: 1, points: [] } },
+    { actionType: 'Recon-And-Strike', name: '侦察打击', defaultParam: { time: 180, area: [] } },
+    { actionType: '30mm-Gun-Strike', name: '30炮打击', defaultParam: { time: 45, sort: 1, num: 1, points: [] } },
+    { actionType: 'AT-Missile-Strike', name: '红箭13导弹打击', defaultParam: { time: 60, sort: 1, num: 1, points: [] } },
+    { actionType: 'Machine-Gun-Strike', name: '机枪打击', defaultParam: { time: 30, sort: 1, num: 1, points: [] } },
   ],
   'Patrol-UGV': [
     { actionType: 'Lens-Recon', name: '光电侦察', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
-    { actionType: 'Search-And-Shoot', name: '巡逻车侦察打击', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
-    { actionType: '7.62mm-Gun-Shot', name: '机枪打击', defaultParam: { time: 30, sort: 1, num: 1, points: [] } },
+    { actionType: 'Recon-And-Strike', name: '巡逻车侦察打击', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
+    { actionType: 'Machine-Gun-Strike', name: '机枪打击', defaultParam: { time: 30, sort: 1, num: 1, points: [] } },
     { actionType: 'Sound-Expel', name: '强声拒止', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
     { actionType: 'Light-Expel', name: '强光拒止', defaultParam: { type: 2, mode: 3, time: 120, area: [] } },
   ],
   'Electronic-UGV': [
     { actionType: 'EM-Recon', name: '电磁侦察', defaultParam: { mode: 4, time: 300, num: 1, freqtype: 62, frequency: [], area: [] } },
-    { actionType: 'EM-Assault', name: '侦察干扰', defaultParam: { mode: 4, time: 300, sort: 0, num: 1, freqtype: 62, frequency: [], area: [], protect: {} } },
+    { actionType: 'Recon-And-Interfere', name: '侦察干扰', defaultParam: { mode: 4, time: 300, sort: 0, num: 1, freqtype: 62, frequency: [], area: [], protect: {} } },
     { actionType: 'EM-Interference', name: '电磁干扰', defaultParam: { mode: 4, time: 300, sort: 1, num: 1, freqtype: 62, frequency: [], area: [], protect: {} } },
   ],
   'Air-Ground-UAV': [
@@ -480,6 +498,18 @@ function initEditMode() {
       // 仅在 action_type 缺失时尝试标准化别名（如 PascalCase），不推断
       actionType = normalizeActionType(actionType) || actionType;
     }
+    // 旧命名别名（shoot/launch）归一到新规范 wire 名，再次保存时即以新名写入 DS
+    const LEGACY_WIRE_NAMES = {
+      'recon-and-strike': 'Recon-And-Strike',
+      '30mm-gun-strike': '30mm-Gun-Strike',
+      'at-missile-strike': 'AT-Missile-Strike',
+      'machine-gun-strike': 'Machine-Gun-Strike',
+      'rocket-strike': 'Rocket-Strike',
+      'loitering-munition-strike': 'Loitering-Munition-Strike',
+      'recon-and-interfere': 'Recon-And-Interfere',
+    };
+    const canonical = LEGACY_ACTION_TYPE_ALIASES[normalizeActionType(actionType)];
+    if (canonical) actionType = LEGACY_WIRE_NAMES[canonical];
     const displayName = getActionDisplayName(actionType, a.action_id) || a.name || '';
     return {
       id,
@@ -959,9 +989,10 @@ function fillTargetFromFirst(param) {
  * 默认使用态势池中第一个可用资源（区域/路线/目标）的坐标。
  */
 function autoFillCoordinates(param, actionType) {
-  const type = String(actionType || '').toLowerCase().replace(/_/g, '-');
+  let type = String(actionType || '').toLowerCase().replace(/_/g, '-');
+  type = LEGACY_ACTION_TYPE_ALIASES[type] || type;
   // 需要区域的元任务
-  const areaTypes = ['lens-recon', 'search-and-shoot', 'recon-strike', 'em-recon', 'electronic-recon', 'em-assault', 'electronic-assault', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
+  const areaTypes = ['lens-recon', 'recon-and-strike', 'em-recon', 'electronic-recon', 'recon-and-interfere', 'em-interference', 'electronic-jamming', 'sound-expel', 'acoustic-deterrence', 'light-expel', 'light-deterrence'];
   if (areaTypes.includes(type)) {
     if (needsCoordinateFill(param.area)) fillAreaFromFirst(param);
   }
@@ -970,7 +1001,7 @@ function autoFillCoordinates(param, actionType) {
     if (needsCoordinateFill(param.points)) fillRouteFromFirst(param, type === 'formation-move');
   }
   // 打击类：从目标资源取第一个点
-  if (['30mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'].includes(type)) {
+  if (['30mm-gun-strike', 'at-missile-strike', 'rocket-strike', 'loitering-munition-strike', 'machine-gun-strike'].includes(type)) {
     if (needsCoordinateFill(param.points)) fillTargetFromFirst(param);
     param.num = Array.isArray(param.points) ? param.points.length : 0;
   }

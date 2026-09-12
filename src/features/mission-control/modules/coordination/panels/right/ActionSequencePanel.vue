@@ -982,6 +982,22 @@ const getVehicleDisplayName = (vehicle) => {
   return `${cnType}-${suffix}`;
 };
 
+// 旧 action_type 命名别名（装备行动序列知识-0912 MIGRATION）：
+// shoot/launch 统一为 strike，旧 key 仅作为读取别名归一到新规范名
+const LEGACY_ACTION_TYPE_ALIASES = {
+  'search-and-shoot': 'recon-and-strike',
+  'recon-strike': 'recon-and-strike',
+  '30mm-gun-launch': '30mm-gun-strike',
+  '40mm-gun-launch': '30mm-gun-strike',
+  'at-missile-launch': 'at-missile-strike',
+  'gun-shot': 'machine-gun-strike',
+  '7.62mm-gun-shot': 'machine-gun-strike',
+  'rocket-launch': 'rocket-strike',
+  'loitering-munition-launch': 'loitering-munition-strike',
+  'em-assault': 'recon-and-interfere',
+  'electronic-assault': 'recon-and-interfere',
+};
+
 const actionTypeDisplayMap = {
   'auto-move': '自主机动',
   'follow-move': '跟随机动',
@@ -995,14 +1011,12 @@ const actionTypeDisplayMap = {
   // DS 侧空中侦察的 action_type 为 UAV-Air-Recon
   'uav-air-recon': '空中侦察',
   'lens-recon': '光电侦察',
-  'search-and-shoot': '侦察打击',
-  'recon-strike': '侦察打击',
-  '30mm-gun-launch': '30炮打击',
-  'at-missile-launch': '红箭13导弹打击',
-  'gun-shot': '机枪打击',
-  '7.62mm-gun-shot': '机枪打击',
-  'rocket-launch': '火箭弹打击',
-  'loitering-munition-launch': '巡飞弹打击',
+  'recon-and-strike': '侦察打击',
+  '30mm-gun-strike': '30炮打击',
+  'at-missile-strike': '红箭13导弹打击',
+  'machine-gun-strike': '机枪打击',
+  'rocket-strike': '火箭弹打击',
+  'loitering-munition-strike': '巡飞弹打击',
   'laser-illumination': '激光照射',
   'sound-expel': '强声拒止',
   'acoustic-deterrence': '强声拒止',
@@ -1010,8 +1024,7 @@ const actionTypeDisplayMap = {
   'light-deterrence': '强光拒止',
   'em-recon': '电磁侦察',
   'electronic-recon': '电磁侦察',
-  'em-assault': '侦察干扰',
-  'electronic-assault': '侦察干扰',
+  'recon-and-interfere': '侦察干扰',
   'em-interference': '电磁干扰',
   'electronic-jamming': '电磁干扰',
 };
@@ -1046,15 +1059,15 @@ const inferActionTypeFromParam = (param) => {
   if (businessHas('area') && businessHas('attr') && businessHas('thr') && p.dam === 0) {
     return p.ammo === 0 ? 'sound-expel' : 'light-expel';
   }
-  if (businessHas('area')) return 'search-and-shoot';
+  if (businessHas('area')) return 'recon-and-strike';
   if (businessHas('points') && Array.isArray(p.points) && p.points.length > 0) {
     const first = p.points[0];
     if (first && typeof first === 'object') {
-      if (first.ammo_type === 2) return '30mm-gun-launch';
-      if (first.ammo_type === 1) return '7.62mm-gun-shot';
-      if ('ammo_type' in first) return 'at-missile-launch';
-      if ('r' in first || p.type === 2) return 'rocket-launch';
-      if ('loiter' in p || p.type === 3) return 'loitering-munition-launch';
+      if (first.ammo_type === 2) return '30mm-gun-strike';
+      if (first.ammo_type === 1) return 'machine-gun-strike';
+      if ('ammo_type' in first) return 'at-missile-strike';
+      if ('r' in first || p.type === 2) return 'rocket-strike';
+      if ('loiter' in p || p.type === 3) return 'loitering-munition-strike';
     }
     // 编队机动：points + formation_mode，或路径点带 offsetX/offsetY
     if (businessHas('formation_mode')) return 'formation-move';
@@ -1079,12 +1092,14 @@ const getActionDisplayName = (action) => {
   // name 是中文业务名称，最可靠；优先按 name 推断 action_type
   const nameInferred = inferActionTypeFromName(action.name);
   let raw = nameInferred || String(action.action_type || '').toLowerCase().replace(/_/g, '-');
+  // 旧命名别名（shoot/launch）归一到新规范名
+  raw = LEGACY_ACTION_TYPE_ALIASES[raw] || raw;
   if (!raw || raw === 'unknown' || raw === 'unknown-action') {
     const inferred = inferActionTypeFromId(action.action_id)
       || inferActionTypeFromParam(action.param);
     if (inferred) raw = inferred;
   }
-  // 兼容 PascalCase 命名（如 Follow-Move / Search-And-Shoot）：去掉连字符后再查一次
+  // 兼容 PascalCase 命名（如 Follow-Move / Recon-And-Strike）：去掉连字符后再查一次
   let display = actionTypeDisplayMap[raw];
   if (!display) {
     display = actionTypeDisplayMap[raw.replace(/-/g, '')];
@@ -1094,7 +1109,8 @@ const getActionDisplayName = (action) => {
 
 // 根据 action_type 推断 action.name，用于 name 为空时的兜底
 const inferActionName = (actionType) => {
-  const raw = String(actionType || '').toLowerCase().replace(/_/g, '-');
+  let raw = String(actionType || '').toLowerCase().replace(/_/g, '-');
+  raw = LEGACY_ACTION_TYPE_ALIASES[raw] || raw;
   return actionTypeDisplayMap[raw] || actionTypeDisplayMap[raw.replace(/-/g, '')] || actionType;
 };
 
@@ -1116,14 +1132,21 @@ const inferActionTypeFromId = (actionId) => {
       'formation-move': 'formation-move',
       'air-recon': 'air-recon',
       'lens-recon': 'lens-recon',
-      'search-and-shoot': 'search-and-shoot',
-      'recon-strike': 'search-and-shoot',
-      '30mm-gun-launch': '30mm-gun-launch',
-      'at-missile-launch': 'at-missile-launch',
-      'gun-shot': '7.62mm-gun-shot',
-      '7.62mm-gun-shot': '7.62mm-gun-shot',
-      'rocket-launch': 'rocket-launch',
-      'loitering-munition-launch': 'loitering-munition-launch',
+      // 旧命名别名（0912 MIGRATION 前）指向新规范名
+      'search-and-shoot': 'recon-and-strike',
+      'recon-strike': 'recon-and-strike',
+      'recon-and-strike': 'recon-and-strike',
+      '30mm-gun-launch': '30mm-gun-strike',
+      '30mm-gun-strike': '30mm-gun-strike',
+      'at-missile-launch': 'at-missile-strike',
+      'at-missile-strike': 'at-missile-strike',
+      'gun-shot': 'machine-gun-strike',
+      '7.62mm-gun-shot': 'machine-gun-strike',
+      'machine-gun-strike': 'machine-gun-strike',
+      'rocket-launch': 'rocket-strike',
+      'rocket-strike': 'rocket-strike',
+      'loitering-munition-launch': 'loitering-munition-strike',
+      'loitering-munition-strike': 'loitering-munition-strike',
       'laser-illumination': 'laser-illumination',
       'sound-expel': 'sound-expel',
       'acoustic-deterrence': 'sound-expel',
@@ -1131,8 +1154,9 @@ const inferActionTypeFromId = (actionId) => {
       'light-deterrence': 'light-expel',
       'em-recon': 'em-recon',
       'electronic-recon': 'em-recon',
-      'em-assault': 'em-assault',
-      'electronic-assault': 'em-assault',
+      'em-assault': 'recon-and-interfere',
+      'electronic-assault': 'recon-and-interfere',
+      'recon-and-interfere': 'recon-and-interfere',
       'em-interference': 'em-interference',
       'electronic-jamming': 'em-interference',
     };
@@ -1151,28 +1175,28 @@ const inferActionTypeFromId = (actionId) => {
     'ch-formation': 'formation-move',
     // 火力车
     'fs-lens': 'lens-recon',
-    'fs-recon-strike': 'search-and-shoot',
-    'fs-gun': '7.62mm-gun-shot',
-    'fs-rocket': 'rocket-launch',
-    'fs-loiter': 'loitering-munition-launch',
+    'fs-recon-strike': 'recon-and-strike',
+    'fs-gun': 'machine-gun-strike',
+    'fs-rocket': 'rocket-strike',
+    'fs-loiter': 'loitering-munition-strike',
     // 侦打车
     'rs-lens': 'lens-recon',
-    'rs-recon-strike': 'search-and-shoot',
-    'rs-30mm': '30mm-gun-launch',
-    'rs-40mm': '30mm-gun-launch',
-    'rs-at': 'at-missile-launch',
-    'rs-gun': '7.62mm-gun-shot',
+    'rs-recon-strike': 'recon-and-strike',
+    'rs-30mm': '30mm-gun-strike',
+    'rs-40mm': '30mm-gun-strike',
+    'rs-at': 'at-missile-strike',
+    'rs-gun': 'machine-gun-strike',
     'rs-laser': 'laser-illumination',
     // 巡逻车
     'pt-lens': 'lens-recon',
-    'pt-recon-strike': 'search-and-shoot',
-    'pt-gun': '7.62mm-gun-shot',
+    'pt-recon-strike': 'recon-and-strike',
+    'pt-gun': 'machine-gun-strike',
     'pt-acoustic': 'sound-expel',
     'pt-light': 'light-expel',
     // 空地车 / 电磁车
     'ag-air-recon': 'air-recon',
     'el-recon': 'em-recon',
-    'el-assault': 'em-assault',
+    'el-assault': 'recon-and-interfere',
     'el-jam': 'em-interference',
   };
   if (aid in projectMapping) return projectMapping[aid];
@@ -1193,20 +1217,20 @@ const inferActionTypeFromName = (name) => {
     '编队机动': 'formation-move',
     '空中侦察': 'air-recon',
     '光电侦察': 'lens-recon',
-    '侦察打击': 'search-and-shoot',
-    '巡逻车侦察打击': 'search-and-shoot',
-    '机枪打击': '7.62mm-gun-shot',
-    '火箭弹打击': 'rocket-launch',
-    '巡飞弹打击': 'loitering-munition-launch',
-    '30炮打击': '30mm-gun-launch',
-    '40炮打击': '30mm-gun-launch',
-    '红箭13导弹打击': 'at-missile-launch',
+    '侦察打击': 'recon-and-strike',
+    '巡逻车侦察打击': 'recon-and-strike',
+    '机枪打击': 'machine-gun-strike',
+    '火箭弹打击': 'rocket-strike',
+    '巡飞弹打击': 'loitering-munition-strike',
+    '30炮打击': '30mm-gun-strike',
+    '40炮打击': '30mm-gun-strike',
+    '红箭13导弹打击': 'at-missile-strike',
     '激光照射': 'laser-illumination',
     '强声拒止': 'sound-expel',
     '强光拒止': 'light-expel',
     '电磁侦察': 'em-recon',
-    '电磁突击': 'em-assault',
-    '侦察干扰': 'em-assault',
+    '电磁突击': 'recon-and-interfere',
+    '侦察干扰': 'recon-and-interfere',
     '电磁干扰': 'em-interference',
   };
   if (n in map) return map[n];
@@ -1227,20 +1251,26 @@ const inferActionTypeFromName = (name) => {
     'formation': 'formation-move',
     'airrecon': 'air-recon',
     'lensrecon': 'lens-recon',
-    'searchandshoot': 'search-and-shoot',
-    'reconstrike': 'search-and-shoot',
-    '30mmgunlaunch': '30mm-gun-launch',
-    '30mmgun': '30mm-gun-launch',
-    '40mmgunlaunch': '30mm-gun-launch',
-    '40mmgun': '30mm-gun-launch',
-    'atmissilelaunch': 'at-missile-launch',
-    'atmissile': 'at-missile-launch',
-    'gunshot': '7.62mm-gun-shot',
-    '762mmgunshot': '7.62mm-gun-shot',
-    '762mmgun': '7.62mm-gun-shot',
-    'rocketlaunch': 'rocket-launch',
-    'loiteringmunitionlaunch': 'loitering-munition-launch',
-    'loiteringmunition': 'loitering-munition-launch',
+    'searchandshoot': 'recon-and-strike',
+    'reconstrike': 'recon-and-strike',
+    'reconandstrike': 'recon-and-strike',
+    '30mmgunlaunch': '30mm-gun-strike',
+    '30mmgunstrike': '30mm-gun-strike',
+    '30mmgun': '30mm-gun-strike',
+    '40mmgunlaunch': '30mm-gun-strike',
+    '40mmgun': '30mm-gun-strike',
+    'atmissilelaunch': 'at-missile-strike',
+    'atmissilestrike': 'at-missile-strike',
+    'atmissile': 'at-missile-strike',
+    'gunshot': 'machine-gun-strike',
+    '762mmgunshot': 'machine-gun-strike',
+    '762mmgun': 'machine-gun-strike',
+    'machinegunstrike': 'machine-gun-strike',
+    'rocketlaunch': 'rocket-strike',
+    'rocketstrike': 'rocket-strike',
+    'loiteringmunitionlaunch': 'loitering-munition-strike',
+    'loiteringmunitionstrike': 'loitering-munition-strike',
+    'loiteringmunition': 'loitering-munition-strike',
     'laserillumination': 'laser-illumination',
     'laser': 'laser-illumination',
     'soundexpel': 'sound-expel',
@@ -1249,8 +1279,9 @@ const inferActionTypeFromName = (name) => {
     'lightdeterrence': 'light-expel',
     'emrecon': 'em-recon',
     'electronicrecon': 'em-recon',
-    'emassault': 'em-assault',
-    'electronicassault': 'em-assault',
+    'emassault': 'recon-and-interfere',
+    'electronicassault': 'recon-and-interfere',
+    'reconandinterfere': 'recon-and-interfere',
     'eminterference': 'em-interference',
     'electronicjamming': 'em-interference',
   };
@@ -2376,7 +2407,7 @@ const onDispatchActive = async () => {
 
 // 下发前元任务有效性校验：机动类需有有效航路点，打击类需有有效目标点或目标区域
 const MANEUVER_ACTION_TYPES = ['auto-move', 'formation-move'];
-const STRIKE_ACTION_TYPES = ['30mm-gun-launch', 'at-missile-launch', 'rocket-launch', 'loitering-munition-launch', 'gun-shot', '7.62mm-gun-shot'];
+const STRIKE_ACTION_TYPES = ['30mm-gun-strike', 'at-missile-strike', 'rocket-strike', 'loitering-munition-strike', 'machine-gun-strike'];
 
 const hasValidCoords = (list) =>
   Array.isArray(list) && list.some((pt) =>
@@ -2391,6 +2422,8 @@ const resolveDispatchActionType = (action) => {
   let raw = nameInferred || String(action.action_type || '').toLowerCase().replace(/_/g, '-');
   // DS 侧空中侦察的 action_type 为 UAV-Air-Recon，统一归一到 air-recon
   if (raw === 'uav-air-recon') raw = 'air-recon';
+  // 旧命名别名（shoot/launch）归一到新规范名
+  raw = LEGACY_ACTION_TYPE_ALIASES[raw] || raw;
   if (!raw || raw === 'unknown' || raw === 'unknown-action') {
     raw = inferActionTypeFromId(action.action_id) || inferActionTypeFromParam(action.param) || raw;
   }
