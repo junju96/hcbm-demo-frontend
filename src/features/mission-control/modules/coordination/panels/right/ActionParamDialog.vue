@@ -237,8 +237,19 @@
             <button class="as-btn mini primary" type="button" @click="addAirReconTargetPoint">+ 添加区域点</button>
           </div>
           <div class="apd-section">
-            <div class="apd-section-title">无人车航路点列表</div>
-            <div v-for="(pt, idx) in editedParam.points" :key="idx" class="apd-air-point">
+            <div class="apd-section-title">无人机起飞位置</div>
+            <!-- param.recon_position（侦察动作位置），规划接口的 position 取该值 -->
+            <div class="apd-air-row">
+              <label class="apd-air-cell"><span>经度</span><input v-model.number="editedParam.recon_position.lon" type="number" step="0.000001" /></label>
+              <label class="apd-air-cell"><span>纬度</span><input v-model.number="editedParam.recon_position.lat" type="number" step="0.000001" /></label>
+              <label class="apd-air-cell"><span>高度</span><input v-model.number="editedParam.recon_position.alt" type="number" step="0.1" /></label>
+            </div>
+          </div>
+          <!-- 三架无人机各自的航迹点数组（service.points1/2/3，wire 键名见 装备行动序列知识-0911 §6.2） -->
+          <div v-for="g in uavGroups" :key="g.key" class="apd-section">
+            <div class="apd-section-title">{{ g.label }}</div>
+            <div v-if="uavGroupPoints(g.key).length === 0" class="apd-empty">暂无航路点</div>
+            <div v-for="(pt, idx) in uavGroupPoints(g.key)" :key="idx" class="apd-air-point">
               <div class="apd-air-row">
                 <label class="apd-air-cell"><span>经度</span><input v-model.number="pt.lon" type="number" step="0.000001" /></label>
                 <label class="apd-air-cell"><span>纬度</span><input v-model.number="pt.lat" type="number" step="0.000001" /></label>
@@ -275,56 +286,13 @@
                 <label class="apd-air-cell"><span>朝向</span><input v-model.number="pt.playaw" type="number" /></label>
                 <label class="apd-air-cell"><span>倍率</span><input v-model.number="pt.zoom" type="number" /></label>
                 <label class="apd-air-cell"><span>悬停</span><input v-model.number="pt.loiter" type="number" /></label>
-                <button class="as-btn mini danger" type="button" :disabled="editedParam.points.length <= 1" @click="removePoint('points', idx)">删除</button>
+                <button class="as-btn mini danger" type="button" @click="removeUavPoint(g.key, idx)">删除</button>
               </div>
             </div>
-            <button class="as-btn mini primary" type="button" @click="addPoint('points')">+ 添加航路点</button>
+            <button class="as-btn mini primary" type="button" @click="addUavPoint(g.key)">+ 添加航路点</button>
           </div>
           <div class="apd-section">
-            <div class="apd-section-title">无人机航路点列表</div>
-            <!-- 对应 param.service.air_points（航迹规划展开结果），为空时原样显示空，不给默认点 -->
             <div v-if="airPointsHint" class="apd-hint">{{ airPointsHint }}</div>
-            <div v-if="uavAirPoints.length === 0" class="apd-empty">暂无无人机航路点</div>
-            <div v-for="(pt, idx) in uavAirPoints" :key="idx" class="apd-air-point">
-              <div class="apd-air-row">
-                <label class="apd-air-cell"><span>经度</span><input v-model.number="pt.lon" type="number" step="0.000001" /></label>
-                <label class="apd-air-cell"><span>纬度</span><input v-model.number="pt.lat" type="number" step="0.000001" /></label>
-                <label class="apd-air-cell"><span>高度</span><input v-model.number="pt.alt" type="number" step="0.1" /></label>
-                <label class="apd-air-cell"><span>航点类型</span>
-                  <select v-model.number="pt.type">
-                    <option :value="0">普通</option>
-                    <option :value="1">起飞</option>
-                    <option :value="2">降落</option>
-                    <option :value="5">返航</option>
-                  </select>
-                </label>
-                <label class="apd-air-cell"><span>速度</span><input v-model.number="pt.speed" type="number" /></label>
-                <label class="apd-air-cell"><span>相机</span>
-                  <select v-model.number="pt.camera">
-                    <option :value="1">无</option>
-                    <option :value="2">拍照</option>
-                    <option :value="4">开始录像</option>
-                    <option :value="5">停止录像</option>
-                    <option :value="6">识别上报</option>
-                    <option :value="7">识别上报并追踪</option>
-                  </select>
-                </label>
-              </div>
-              <div class="apd-air-row">
-                <label class="apd-air-cell"><span>俯仰</span><input v-model.number="pt.gimbal_pitch" type="number" /></label>
-                <label class="apd-air-cell"><span>偏航</span><input v-model.number="pt.gimbal_yaw" type="number" /></label>
-                <label class="apd-air-cell"><span>动作</span>
-                  <select v-model.number="pt.action">
-                    <option :value="0">短停</option>
-                    <option :value="1">通过</option>
-                  </select>
-                </label>
-                <label class="apd-air-cell"><span>朝向</span><input v-model.number="pt.plane_yaw" type="number" /></label>
-                <label class="apd-air-cell"><span>倍率</span><input v-model.number="pt.zoom" type="number" /></label>
-                <label class="apd-air-cell"><span>悬停</span><input v-model.number="pt.loiter" type="number" /></label>
-                <button class="as-btn mini danger" type="button" @click="removeAirPoint(idx)">删除</button>
-              </div>
-            </div>
             <button class="as-btn mini primary" type="button" :disabled="fetchingAirPoints" @click="fetchUavAirPoints">
               {{ fetchingAirPoints ? '获取中…' : '获取航路点' }}
             </button>
@@ -779,7 +747,9 @@ const loadingTargets = computed(() => loadingFusioned.value);
 
 const normalizedActionType = computed(() => {
   // 兼容下划线格式（如 SEARCH_AND_SHOOT、AUTO_MOVE）与中划线格式（如 search-and-shoot）
-  const raw = String(props.action?.action_type || '').toLowerCase().replace(/_/g, '-');
+  let raw = String(props.action?.action_type || '').toLowerCase().replace(/_/g, '-');
+  // DS 侧空中侦察的 action_type 为 UAV-Air-Recon，统一归一到 air-recon
+  if (raw === 'uav-air-recon') raw = 'air-recon';
   if (STANDARD_ACTION_TYPES.has(raw)) {
     console.log('[ActionParamDialog] standard action_type:', props.action?.action_type, 'normalized:', raw);
     return raw;
@@ -1195,10 +1165,8 @@ function addPoint(field) {
     editedParam.value[field].push(defaultAreaPoint());
     return;
   }
-  // 根据当前行动类型选择正确的默认点结构：air-recon 用侦察点，formation-move 用编队点，其他（auto-move 等）用普通航路点
-  if (normalizedActionType.value === 'air-recon') {
-    editedParam.value[field].push(defaultAirReconPoint());
-  } else if (normalizedActionType.value === 'formation-move') {
+  // 根据当前行动类型选择正确的默认点结构：formation-move 用编队点，其他（auto-move 等）用普通航路点
+  if (normalizedActionType.value === 'formation-move') {
     editedParam.value[field].push(defaultFormationPoint());
   } else {
     editedParam.value[field].push(defaultPoint());
@@ -1209,12 +1177,36 @@ function removePoint(field, idx) {
   if (editedParam.value[field].length > 1) editedParam.value[field].splice(idx, 1);
 }
 
-// 无人机航路点（param.service.air_points，航迹规划展开结果；字段命名与无人车航点不同：
-// gimbal_pitch/gimbal_yaw/plane_yaw）。为空时原样显示空，不给默认点。
-const uavAirPoints = computed(() => {
-  const svc = editedParam.value?.service;
-  return svc && Array.isArray(svc.air_points) ? svc.air_points : [];
-});
+// 三架无人机航路点列表（service.points1/2/3，wire 键名 gimpitch/gimyaw/playaw；
+// 归一化层已保证三组数组存在）。为空时原样显示空，不给默认点。
+const uavGroups = [
+  { key: 'points1', label: '无人机1航路点列表' },
+  { key: 'points2', label: '无人机2航路点列表' },
+  { key: 'points3', label: '无人机3航路点列表' },
+];
+
+function ensureAirReconService() {
+  if (!editedParam.value.service || typeof editedParam.value.service !== 'object') {
+    editedParam.value.service = { sid: 71 };
+  }
+  return editedParam.value.service;
+}
+
+function uavGroupPoints(key) {
+  const arr = editedParam.value?.service?.[key];
+  return Array.isArray(arr) ? arr : [];
+}
+
+function addUavPoint(key) {
+  const svc = ensureAirReconService();
+  if (!Array.isArray(svc[key])) svc[key] = [];
+  svc[key].push(defaultAirReconPoint());
+}
+
+function removeUavPoint(key, idx) {
+  const arr = editedParam.value?.service?.[key];
+  if (Array.isArray(arr)) arr.splice(idx, 1);
+}
 
 const fetchingAirPoints = ref(false);
 const airPointsHint = ref('');
@@ -1261,16 +1253,16 @@ function removeAirReconTargetPoint(idx) {
 
 /**
  * 获取无人机航路点（POST /air-recon/plan，《空地车空中侦察规划接口说明》）：
- * - position 取无人车航路点列表最后一个点；为空（无点或全 0）时提示用户先规划并中止
+ * - position 取无人机起飞位置 param.recon_position；为空（全 0）时提示先填写并中止
  * - target_area 优先 param.target（≥3 顶点），否则态势池第一个区域；都没有则提示并中止
- * 成功后把返回的 service.air_points 填入弹窗（响应未携带的字段不编造，原样保留）
+ * 成功后把返回的 service.points1/2/3（三架无人机航迹点数组）填入弹窗
+ * （响应未携带的字段不编造，原样保留）
  */
 async function fetchUavAirPoints() {
   airPointsHint.value = '';
-  const pts = Array.isArray(editedParam.value.points) ? editedParam.value.points : [];
-  const last = pts[pts.length - 1];
-  if (!last || (Number(last.lon) === 0 && Number(last.lat) === 0)) {
-    airPointsHint.value = '请先规划无人车航路点信息';
+  const rp = editedParam.value.recon_position || {};
+  if (!Number(rp.lon) && !Number(rp.lat)) {
+    airPointsHint.value = '请先填写无人机起飞位置';
     return;
   }
 
@@ -1278,43 +1270,32 @@ async function fetchUavAirPoints() {
   // target_id 服务端必填：优先 param.target 自带，其次态势池区域 resource_id，最后按车辆生成
   const fallbackTargetId = areaList.value[0]?.resource_id || `target_${vid || 'unknown'}`;
 
-  let targetArea = null;
+  // 侦察目标区域必须显式填写（param.target.location ≥3 个有效顶点），不再静默兜底态势池区域
   const t = editedParam.value.target;
-  if (t && Array.isArray(t.location) && t.location.length >= 3) {
-    targetArea = {
-      target_id: t.target_id || fallbackTargetId,
-      target_name: t.target_name || '',
-      location: t.location.map((pt) => ({
-        longitude: Number(pt?.lon ?? pt?.longitude ?? 0),
-        latitude: Number(pt?.lat ?? pt?.latitude ?? 0),
-        altitude: Number(pt?.alt ?? pt?.altitude ?? 0),
-      })),
-    };
-  } else {
-    const first = areaList.value[0];
-    if (first && Array.isArray(first.points) && first.points.length >= 3) {
-      targetArea = {
-        target_id: first.resource_id || fallbackTargetId,
-        target_name: first.resource_name || '',
-        location: first.points.map((pt) => ({
-          longitude: Number(pt?.lon ?? 0),
-          latitude: Number(pt?.lat ?? 0),
-          altitude: Number(pt?.alt ?? 0),
-        })),
-      };
-    }
-  }
-  if (!targetArea) {
-    airPointsHint.value = '没有可用的侦察目标区域，请在上方「侦察目标区域」中选择态势池区域或手动添加区域点';
+  const locs = t && Array.isArray(t.location) ? t.location : [];
+  const validLocs = locs.filter(
+    (pt) => Number(pt?.longitude ?? pt?.lon ?? 0) !== 0 || Number(pt?.latitude ?? pt?.lat ?? 0) !== 0
+  );
+  if (validLocs.length < 3) {
+    airPointsHint.value = '请先在上方「侦察目标区域」中选择态势池区域或手动添加至少 3 个有效区域点';
     return;
   }
+  const targetArea = {
+    target_id: t.target_id || fallbackTargetId,
+    target_name: t.target_name || '',
+    location: locs.map((pt) => ({
+      longitude: Number(pt?.lon ?? pt?.longitude ?? 0),
+      latitude: Number(pt?.lat ?? pt?.latitude ?? 0),
+      altitude: Number(pt?.alt ?? pt?.altitude ?? 0),
+    })),
+  };
 
   fetchingAirPoints.value = true;
   try {
     const result = await fetchAirReconPlan({
       vehicles: [{
         vehicle_id: vid,
-        position: { lon: Number(last.lon), lat: Number(last.lat), alt: Number(last.alt ?? 0) },
+        position: { lon: Number(rp.lon), lat: Number(rp.lat), alt: Number(rp.alt ?? 0) },
         target_area: targetArea,
       }],
     });
@@ -1324,25 +1305,22 @@ async function fetchUavAirPoints() {
     }
     const seq = result.data?.action_sequence || [];
     const entry = seq.find((item) => String(item.vehicle_id) === vid) || seq[0];
-    const airPoints = entry?.actions?.[0]?.param?.service?.air_points;
-    if (!Array.isArray(airPoints) || airPoints.length === 0) {
+    const svc = entry?.actions?.[0]?.param?.service || {};
+    // 规划服务直接返回 points1/2/3 三组无人机航迹点数组，原样填回界面
+    const returned = uavGroups.filter((g) => Array.isArray(svc[g.key]) && svc[g.key].length > 0);
+    if (returned.length === 0) {
       airPointsHint.value = '规划服务未返回无人机航路点';
       return;
     }
-    if (!editedParam.value.service || typeof editedParam.value.service !== 'object') {
-      editedParam.value.service = {};
+    const target = ensureAirReconService();
+    for (const g of returned) {
+      target[g.key] = svc[g.key].map((pt) => ({ ...defaultAirReconPoint(), ...pt }));
     }
-    editedParam.value.service.air_points = airPoints;
   } catch (err) {
     airPointsHint.value = '获取航路点异常: ' + (err?.message || '未知错误');
   } finally {
     fetchingAirPoints.value = false;
   }
-}
-
-function removeAirPoint(idx) {
-  const svc = editedParam.value?.service;
-  if (svc && Array.isArray(svc.air_points)) svc.air_points.splice(idx, 1);
 }
 
 function addTarget() {
@@ -1744,7 +1722,7 @@ function onSave() {
 
 .apd-air-row {
   display: grid;
-  grid-template-columns: repeat(6, 1fr) auto;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
   gap: 0.4rem;
   align-items: end;
 }

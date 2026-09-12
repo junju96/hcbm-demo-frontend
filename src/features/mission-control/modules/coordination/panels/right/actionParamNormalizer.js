@@ -40,23 +40,19 @@ function defaultAirReconPoint() {
 }
 
 /**
- * 空中侦察航路点来源：优先顶层 points；车端上报的数据航点按协议嵌套在
- * service.points1/2/3...（参考 装备行动序列知识-0909.md 6.2 节），顶层为空时按序号
- * 顺序展开兜底；都没有时给一个默认占位点。
- * 注意 service.air_points 不作航点来源——车端上报数据里它与侦察区域多边形重合，
- * 语义是区域/航迹而非航路点。
+ * 空中侦察（air-recon）无人机航迹点：service.points1/2/3 分别为三架无人机
+ * 各自的航迹点数组（见 装备行动序列知识-0911 §6.2，数组元素为协议航点对象）。
  */
-export function normalizeAirReconPoints(p) {
-  if (Array.isArray(p.points) && p.points.length) return p.points;
-  const servicePoints = [];
-  if (p.service && typeof p.service === 'object') {
-    for (let i = 1; ; i += 1) {
-      const pt = p.service[`points${i}`];
-      if (!pt || typeof pt !== 'object' || Array.isArray(pt) || Object.keys(pt).length === 0) break;
-      servicePoints.push({ ...defaultAirReconPoint(), ...pt });
-    }
+export const AIR_RECON_UAV_GROUPS = ['points1', 'points2', 'points3'];
+
+export function normalizeAirReconUavGroups(service) {
+  const svc = service && typeof service === 'object' ? service : {};
+  const result = {};
+  for (const key of AIR_RECON_UAV_GROUPS) {
+    const arr = Array.isArray(svc[key]) ? svc[key] : [];
+    result[key] = arr.map((pt) => ({ ...defaultAirReconPoint(), ...pt }));
   }
-  return servicePoints.length ? servicePoints : [defaultAirReconPoint()];
+  return result;
 }
 
 function defaultStrikePoint() {
@@ -257,7 +253,19 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
     p.type = p.type ?? 2;
     p.mode = p.mode ?? 1;
     p.time = p.time ?? 120;
-    p.points = normalizeAirReconPoints(p);
+    // 无人机起飞位置（侦察动作位置），规划接口的 position 取该值
+    const rp = p.recon_position && typeof p.recon_position === 'object' ? p.recon_position : {};
+    p.recon_position = {
+      lon: Number(rp.lon ?? 0),
+      lat: Number(rp.lat ?? 0),
+      alt: Number(rp.alt ?? 0),
+    };
+    // 三架无人机航迹点数组存于 service.points1/2/3（wire 键名，装备行动序列知识-0911 §6.2）
+    const svc = p.service && typeof p.service === 'object' ? p.service : {};
+    p.service = { ...svc, sid: svc.sid ?? 71, ...normalizeAirReconUavGroups(svc) };
+    delete p.service.air_points; // air_points 已废弃（原规划服务返回格式，服务端改回 points1/2/3）
+    // 空中侦察不再有无人车航路点列表
+    delete p.points;
     delete p.points1;
     delete p.points2;
     delete p.points3;

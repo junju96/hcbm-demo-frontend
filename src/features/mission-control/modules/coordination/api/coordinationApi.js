@@ -642,7 +642,9 @@ const joinAirReconUrl = (path) => {
 /**
  * 空地车空中侦察规划（POST /air-recon/plan）：
  * 入参 { vehicles: [{ vehicle_id, position:{lon,lat,alt}, target_area:{target_id,target_name,location[]} }] }
- * 返回 { action_sequence: [{ vehicle_id, actions: [{ param: { service: { air_points: [...] } } }] }] }
+ * （position 为无人机起飞位置 recon_position）
+ * 返回 { action_sequence: [{ vehicle_id, actions: [{ param: { service: { points1: [...], points2: [...], points3: [...] } } }] }] }
+ * （points1/2/3 为三架无人机各自的航迹点数组）
  */
 export const fetchAirReconPlan = async (payload = {}) => {
   const result = await postJson(joinAirReconUrl('/air-recon/plan'), payload);

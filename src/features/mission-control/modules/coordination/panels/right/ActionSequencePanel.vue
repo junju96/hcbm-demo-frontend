@@ -226,6 +226,10 @@
                         <span v-else-if="action.param?.points?.length" class="as-card-waypoints" :title="`${action.param.points.length} 个航路点`">
                           <span class="marquee-text">{{ action.param.points.length }} 个航路点</span>
                         </span>
+                        <!-- 空中侦察：航点在 param.service.points1/2/3（三组无人机），不在顶层 points -->
+                        <span v-else-if="resolveDispatchActionType(action) === 'air-recon'" class="as-card-waypoints" :title="airReconCardLabel(action)">
+                          <span class="marquee-text">{{ airReconCardLabel(action) }}</span>
+                        </span>
                         <span v-else-if="action.description" class="as-card-desc" :title="action.description">
                           <span class="marquee-text">{{ action.description }}</span>
                         </span>
@@ -608,7 +612,7 @@ import {
 import ActionParamDialog from './ActionParamDialog.vue';
 import ActionSequenceCreator from './ActionSequenceCreator.vue';
 import FormationPlanDialog from './FormationPlanDialog.vue';
-import { normalizeAirReconPoints } from './actionParamNormalizer';
+import { AIR_RECON_UAV_GROUPS } from './actionParamNormalizer';
 
 const props = defineProps({
   moduleApi: { type: Object, required: true },
@@ -988,6 +992,8 @@ const actionTypeDisplayMap = {
   'pose-adjust': '姿态调整',
   'formation-move': '编队机动',
   'air-recon': '空中侦察',
+  // DS 侧空中侦察的 action_type 为 UAV-Air-Recon
+  'uav-air-recon': '空中侦察',
   'lens-recon': '光电侦察',
   'search-and-shoot': '侦察打击',
   'recon-strike': '侦察打击',
@@ -2383,10 +2389,22 @@ const resolveDispatchActionType = (action) => {
   if (!action) return '';
   const nameInferred = inferActionTypeFromName(action.name);
   let raw = nameInferred || String(action.action_type || '').toLowerCase().replace(/_/g, '-');
+  // DS 侧空中侦察的 action_type 为 UAV-Air-Recon，统一归一到 air-recon
+  if (raw === 'uav-air-recon') raw = 'air-recon';
   if (!raw || raw === 'unknown' || raw === 'unknown-action') {
     raw = inferActionTypeFromId(action.action_id) || inferActionTypeFromParam(action.param) || raw;
   }
   return raw;
+};
+
+// 空中侦察卡片摘要：统计三组无人机航路点（service.points1/2/3）总数
+const airReconCardLabel = (action) => {
+  const svc = action?.param?.service || {};
+  const total = AIR_RECON_UAV_GROUPS.reduce(
+    (sum, k) => sum + (Array.isArray(svc[k]) ? svc[k].length : 0),
+    0
+  );
+  return total > 0 ? `${total} 个无人机航路点` : '暂无无人机航路点';
 };
 
 // 从当前方案 vehicle_summary 取该车的全部行动（同名车辆合并，与 vehicleActions 口径一致）
@@ -2406,13 +2424,11 @@ const validateDispatchParams = (vehicleVid) => {
     if (MANEUVER_ACTION_TYPES.includes(type) && !hasValidCoords(param.points)) {
       return `机动类任务「${name}」缺少有效航路点信息，请补充后再下发`;
     }
-    // 空中侦察：无人车航路点 + 无人机航路点都要有效
-    // 无人车航点需兼容 service.points1/2/3 嵌套格式（与弹窗同一来源 normalizeAirReconPoints）
+    // 空中侦察：三架无人机航迹点数组（service.points1/2/3）至少一组有效
     if (type === 'air-recon') {
-      if (!hasValidCoords(normalizeAirReconPoints(param))) {
-        return `空中侦察任务「${name}」缺少有效航路点信息，请补充后再下发`;
-      }
-      if (!hasValidCoords(param.service?.air_points)) {
+      const svc = param.service || {};
+      const hasDronePoints = AIR_RECON_UAV_GROUPS.some((k) => hasValidCoords(svc[k]));
+      if (!hasDronePoints) {
         return `空中侦察任务「${name}」无人机航路点为空，请在参数弹窗点击「获取航路点」补充后再下发`;
       }
     }

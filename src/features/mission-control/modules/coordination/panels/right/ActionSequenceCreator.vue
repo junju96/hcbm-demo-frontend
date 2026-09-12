@@ -347,7 +347,9 @@ function inferActionTypeFromName(name) {
 
 function getActionDisplayName(actionType, actionId = '') {
   if (!actionType) return '';
-  const normalized = String(actionType).toLowerCase().replace(/_/g, '-');
+  let normalized = String(actionType).toLowerCase().replace(/_/g, '-');
+  // DS 侧空中侦察的 action_type 为 UAV-Air-Recon，归一到内置任务表的 Air-Recon
+  if (normalized === 'uav-air-recon') normalized = 'air-recon';
   const allTasks = [...allChassisTasks, ...formationTasks, ...Object.values(payloadTaskMap).flat()];
   let found = allTasks.find((t) => String(t.actionType).toLowerCase().replace(/_/g, '-') === normalized);
   if (!found && actionId) {
