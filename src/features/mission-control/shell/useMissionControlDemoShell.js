@@ -8,6 +8,7 @@ import { missionModuleManifests, resolveMissionModuleId, resolveMissionModuleMan
 import { useMissionActionRegistry } from './useMissionActionRegistry';
 import { useMissionAutomationBridge } from './useMissionAutomationBridge';
 import { useMissionInteractionRegistry } from './useMissionInteractionRegistry';
+import { logEvent } from '../../../utils/debugLogger';
 
 const SHARED_MAP_PANEL_ID = 'shared-map-ops';
 const COORDINATION_BRIEF_PANEL_ID = 'coord-brief';
@@ -370,6 +371,11 @@ export function useMissionControlDemoShell({ screenMode = 'single', routeRole = 
   };
 
   const appendSystemMessage = (text) => {
+    try {
+      logEvent('system', String(text ?? ''));
+    } catch {
+      // 日志模块异常不影响业务
+    }
     appendRecord('system', text);
   };
 

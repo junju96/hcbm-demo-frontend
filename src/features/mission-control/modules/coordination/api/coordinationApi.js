@@ -2,8 +2,9 @@
 // 职责：统一 HTTP 请求 + 后端数据 → 前端数据模型适配
 
 import { COORDINATION_BASE_URL } from '../../../../../config/serverConfig.js';
+import { logEvent } from '../../../../../utils/debugLogger.js';
 
-const joinApiUrl = (path) => {
+export const joinApiUrl = (path) => {
   // 开发环境通过 Vite proxy 走相对路径，避免跨域
   if (import.meta.env.DEV) {
     return path;
@@ -17,19 +18,33 @@ export const safeFetch = async (url, options) => {
   // 默认 8 秒超时，避免地图服务等不可达时界面一直等待
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), options?.timeout || 8000);
+  const method = options?.method || 'GET';
+  const startedAt = Date.now();
+  // 打点全部 try/catch 包裹，日志模块异常绝不影响业务请求
+  const logApi = (resultText, level = 'info') => {
+    try {
+      logEvent('api', `${method} ${url} -> ${resultText} (${Date.now() - startedAt}ms)`, level);
+    } catch {
+      // ignore
+    }
+  };
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timeoutId);
     if (!response.ok) {
+      logApi(`HTTP ${response.status}`, 'error');
       return { ok: false, error: `HTTP ${response.status}`, data: null };
     }
     const data = await response.json();
+    logApi(`HTTP ${response.status}`);
     return { ok: true, error: null, data };
   } catch (error) {
     clearTimeout(timeoutId);
     if (error?.name === 'AbortError') {
+      logApi('请求超时', 'error');
       return { ok: false, error: '请求超时', data: null };
     }
+    logApi(error?.message || 'Network error', 'error');
     return { ok: false, error: error?.message || 'Network error', data: null };
   }
 };
@@ -731,3 +746,17 @@ export const buildUpdateResponse = ({ operation, requestId = nowId(), result = '
   responseID: requestId,
   data: { operation, result },
 });
+
+/* ==================== 后端调试配置 API（/api/v1/debug） ==================== */
+
+/** 拉取后端服务地址配置表 */
+export const fetchDebugConfig = async () =>
+  getJson(joinApiUrl('/api/v1/debug/config'));
+
+/** 保存后端服务地址覆盖（overrides: {KEY: value}，空串表示恢复默认） */
+export const saveDebugConfig = async (overrides = {}) =>
+  postJson(joinApiUrl('/api/v1/debug/config'), { overrides });
+
+/** 请求后端原地重启 */
+export const restartBackend = async () =>
+  postJson(joinApiUrl('/api/v1/debug/restart'), {});

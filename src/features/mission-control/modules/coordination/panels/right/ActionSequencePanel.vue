@@ -46,6 +46,10 @@
         >
           {{ coopAuthorized ? '解除授权' : '下发授权' }}
         </button>
+        <!-- 调试：日志导出 / 前后端服务地址设置（两种模式均显示） -->
+        <button class="as-btn" type="button" @click="showDebugDialog = true">
+          调试
+        </button>
       </div>
     </div>
 
@@ -541,6 +545,9 @@
       </div>
     </div>
 
+    <!-- 调试设置弹窗 -->
+    <DebugSettingsDialog v-if="showDebugDialog" @close="showDebugDialog = false" />
+
     <!-- 行动参数编辑弹窗：teleport 到 body，避免被右侧面板裁切 -->
     <Teleport to="body">
       <ActionParamDialog
@@ -612,6 +619,7 @@ import {
 import ActionParamDialog from './ActionParamDialog.vue';
 import ActionSequenceCreator from './ActionSequenceCreator.vue';
 import FormationPlanDialog from './FormationPlanDialog.vue';
+import DebugSettingsDialog from './DebugSettingsDialog.vue';
 import { AIR_RECON_UAV_GROUPS } from './actionParamNormalizer';
 
 const props = defineProps({
@@ -644,6 +652,9 @@ const onlineVehicles = ref([]);
 const showCreatePlanDialog = ref(false);
 const newPlanTitle = ref('');
 const creatingPlan = ref(false);
+
+/* ---------- 调试设置弹窗 ---------- */
+const showDebugDialog = ref(false);
 
 
 /* ---------- 多车控制弹窗 ---------- */
