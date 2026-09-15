@@ -3118,6 +3118,7 @@ onUnmounted(() => {
   overflow: auto;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 0.6rem;
 }
 
@@ -3151,6 +3152,9 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
+  /* 行动序列按依赖分层横向排（多列），需随内容撑开，外层 .as-vehicle-sequences 提供横向滚动 */
+  width: max-content;
+  min-width: 100%;
 }
 
 .as-vehicle-card {
@@ -3158,6 +3162,9 @@ onUnmounted(() => {
   border: 1px solid rgba(0, 222, 200, 0.15);
   background: rgba(6, 20, 26, 0.7);
   padding: 0.7rem 0.85rem;
+  /* 车辆卡片宽度随行动序列内容撑开（多列 DAG 时超出视口宽由外层滚动兜底） */
+  width: max-content;
+  min-width: 100%;
 }
 
 .as-vehicle-header {

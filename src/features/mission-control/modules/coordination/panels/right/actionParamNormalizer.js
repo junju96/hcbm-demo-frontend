@@ -277,6 +277,8 @@ export function normalizeActionParam(param, actionType, vehicleType = '') {
       lat: Number(rp.lat ?? 0),
       alt: Number(rp.alt ?? 0),
     };
+    // 航点绝对高度 alt_abs（协议必填，米/海拔），规划接口按此生成航点高度
+    p.alt_abs = p.alt_abs ?? 0;
     // 三架无人机航迹点数组存于 service.points1/2/3（wire 键名，装备行动序列知识-0911 §6.2）
     const svc = p.service && typeof p.service === 'object' ? p.service : {};
     p.service = { ...svc, sid: svc.sid ?? 71, ...normalizeAirReconUavGroups(svc) };

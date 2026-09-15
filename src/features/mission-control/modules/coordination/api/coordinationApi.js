@@ -640,11 +640,16 @@ const joinAirReconUrl = (path) => {
 };
 
 /**
- * 空地车空中侦察规划（POST /air-recon/plan）：
- * 入参 { vehicles: [{ vehicle_id, position:{lon,lat,alt}, target_area:{target_id,target_name,location[]} }] }
- * （position 为无人机起飞位置 recon_position）
- * 返回 { action_sequence: [{ vehicle_id, actions: [{ param: { service: { points1: [...], points2: [...], points3: [...] } } }] }] }
- * （points1/2/3 为三架无人机各自的航迹点数组）
+ * 空地车空中侦察规划（POST /air-recon/plan，《空地车空中侦察协议.md 2026-09-11》）：
+ * 请求体为协议扁平结构：
+ *   {
+ *     position: { lon, lat, alt },              // 车位置（取 param.recon_position）
+ *     target_area: { target_id, target_name, location: [{longitude, latitude, altitude}] }, // ≥4 顶点
+ *     alt_abs: number,                          // 航点绝对高度（米/海拔），或 alt_rel 二选一
+ *     aircraft_number: 3                        // 无人机数量，默认 3
+ *   }
+ * 返回顶层固定 points1/points2/points3 三个键，分别对应第 1/2/3 架无人机的航迹点数组：
+ *   { points1: [...], points2: [...], points3: [...] }
  */
 export const fetchAirReconPlan = async (payload = {}) => {
   const result = await postJson(joinAirReconUrl('/air-recon/plan'), payload);

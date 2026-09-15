@@ -243,6 +243,7 @@
               <label class="apd-air-cell"><span>经度</span><input v-model.number="editedParam.recon_position.lon" type="number" step="0.000001" /></label>
               <label class="apd-air-cell"><span>纬度</span><input v-model.number="editedParam.recon_position.lat" type="number" step="0.000001" /></label>
               <label class="apd-air-cell"><span>高度</span><input v-model.number="editedParam.recon_position.alt" type="number" step="0.1" /></label>
+              <label class="apd-air-cell"><span>绝对高度 (m)</span><input v-model.number="editedParam.alt_abs" type="number" step="0.1" /></label>
             </div>
           </div>
           <!-- 三架无人机各自的航迹点数组（service.points1/2/3，wire 键名见 装备行动序列知识-0911 §6.2） -->
@@ -1279,10 +1280,13 @@ function removeAirReconTargetPoint(idx) {
 }
 
 /**
- * 获取无人机航路点（POST /air-recon/plan，《空地车空中侦察规划接口说明》）：
+ * 获取无人机航路点（POST /air-recon/plan，《空地车空中侦察协议.md 2026-09-11》）：
+ * 请求体为协议扁平结构：{ position, target_area, alt_abs, aircraft_number }
  * - position 取无人机起飞位置 param.recon_position；为空（全 0）时提示先填写并中止
- * - target_area 优先 param.target（≥3 顶点），否则态势池第一个区域；都没有则提示并中止
- * 成功后把返回的 service.points1/2/3（三架无人机航迹点数组）填入弹窗
+ * - target_area 来自 param.target（location 使用 longitude/latitude/altitude 键，≥4 个有效顶点），
+ *   不再静默兜底态势池区域，缺少顶点数直接提示并中止
+ * - alt_abs 取弹窗「绝对高度」(param.alt_abs)，协议必填（或 alt_rel 二选一），缺省走服务端默认
+ * 成功后把响应顶层 points1/2/3（三架无人机航迹点数组）填入弹窗
  * （响应未携带的字段不编造，原样保留）
  */
 async function fetchUavAirPoints() {
@@ -1293,22 +1297,18 @@ async function fetchUavAirPoints() {
     return;
   }
 
-  const vid = String(props.vehicleVid || '').replace('equipment:', '');
-  // target_id 服务端必填：优先 param.target 自带，其次态势池区域 resource_id，最后按车辆生成
-  const fallbackTargetId = areaList.value[0]?.resource_id || `target_${vid || 'unknown'}`;
-
-  // 侦察目标区域必须显式填写（param.target.location ≥3 个有效顶点），不再静默兜底态势池区域
+  // 侦察目标区域必须显式填写（param.target.location ≥4 个有效顶点），不再静默兜底态势池区域
   const t = editedParam.value.target;
   const locs = t && Array.isArray(t.location) ? t.location : [];
   const validLocs = locs.filter(
     (pt) => Number(pt?.longitude ?? pt?.lon ?? 0) !== 0 || Number(pt?.latitude ?? pt?.lat ?? 0) !== 0
   );
-  if (validLocs.length < 3) {
-    airPointsHint.value = '请先在上方「侦察目标区域」中选择态势池区域或手动添加至少 3 个有效区域点';
+  if (validLocs.length < 4) {
+    airPointsHint.value = '请先在上方「侦察目标区域」中选择态势池区域或手动添加至少 4 个有效区域点';
     return;
   }
   const targetArea = {
-    target_id: t.target_id || fallbackTargetId,
+    target_id: t.target_id || '',
     target_name: t.target_name || '',
     location: locs.map((pt) => ({
       longitude: Number(pt?.lon ?? pt?.longitude ?? 0),
@@ -1317,29 +1317,35 @@ async function fetchUavAirPoints() {
     })),
   };
 
+  // 协议请求体：顶层扁平结构（不含 vehicles 包装）。alt_abs 为航点绝对高度（必填，>0）。
+  const altAbs = Number(editedParam.value.alt_abs ?? 0);
+  const body = {
+    position: { lon: Number(rp.lon), lat: Number(rp.lat), alt: Number(rp.alt ?? 0) },
+    target_area: targetArea,
+    aircraft_number: 3,
+  };
+  if (altAbs > 0) {
+    body.alt_abs = altAbs;
+  } else {
+    airPointsHint.value = '请先填写无人机起飞位置下的「绝对高度 (m)」，用于确定航点高度';
+    return;
+  }
+
   fetchingAirPoints.value = true;
   try {
-    const result = await fetchAirReconPlan({
-      vehicles: [{
-        vehicle_id: vid,
-        position: { lon: Number(rp.lon), lat: Number(rp.lat), alt: Number(rp.alt ?? 0) },
-        target_area: targetArea,
-      }],
-    });
+    const result = await fetchAirReconPlan(body);
     if (!result.ok) {
       airPointsHint.value = '获取航路点失败: ' + (result.error || '未知错误');
       return;
     }
-    const seq = result.data?.action_sequence || [];
-    const entry = seq.find((item) => String(item.vehicle_id) === vid) || seq[0];
-    const svc = entry?.actions?.[0]?.param?.service || {};
-    // 规划服务直接返回 points1/2/3 三组无人机航迹点数组，原样填回界面
+    // 协议响应：顶层固定 points1/2/3 三个键（架数不足时多余键为空数组）
+    const svc = result.data || {};
+    const target = ensureAirReconService();
     const returned = uavGroups.filter((g) => Array.isArray(svc[g.key]) && svc[g.key].length > 0);
     if (returned.length === 0) {
       airPointsHint.value = '规划服务未返回无人机航路点';
       return;
     }
-    const target = ensureAirReconService();
     for (const g of returned) {
       target[g.key] = svc[g.key].map((pt) => ({ ...defaultAirReconPoint(), ...pt }));
     }
