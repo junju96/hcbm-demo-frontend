@@ -313,7 +313,7 @@ const showAuxAiDock = computed(() => props.screenMode === 'aux');
 const rightPanelDefinition = computed(() => activeModuleManifest.value?.rightPanel || null);
 const resolvedAuxModuleTitle = computed(() => {
   if (coordinationCommandActive.value) {
-    return moduleApi.coordination?.activeSubviewTitle || '任务理解';
+    return moduleApi.coordination?.activeSubviewTitle || '行动序列';
   }
   return activeModuleManifest.value?.rightPanel?.title || activeModuleManifest.value?.label || activeModuleId.value;
 });

@@ -22,11 +22,7 @@ const loadServerOverrides = () => {
 const serverOverrides = loadServerOverrides();
 
 // ========== 后端服务 ==========
-// 本地后端服务（开发环境）
-const DEFAULT_BACKEND_BASE_URL = 'http://localhost:28600';
-export const BACKEND_BASE_URL = serverOverrides.BACKEND_BASE_URL || DEFAULT_BACKEND_BASE_URL;
-
-// 协同席数据服务（生产环境）
+// 后端服务（生产环境；协同席/操控席/调试接口共用）
 const DEFAULT_COORDINATION_BASE_URL = 'http://25.11.1.222:28600';
 export const COORDINATION_BASE_URL = serverOverrides.COORDINATION_BASE_URL || DEFAULT_COORDINATION_BASE_URL;
 
@@ -56,7 +52,6 @@ const DEFAULT_API_BASE_URL = 'http://25.11.1.178:28600';
 export const API_BASE_URL = serverOverrides.API_BASE_URL || DEFAULT_API_BASE_URL;
 
 const DEFAULT_VALUES = Object.freeze({
-  BACKEND_BASE_URL: DEFAULT_BACKEND_BASE_URL,
   COORDINATION_BASE_URL: DEFAULT_COORDINATION_BASE_URL,
   SITUATION_POOL_BASE_URL: DEFAULT_SITUATION_POOL_BASE_URL,
   AIR_RECON_PLAN_BASE_URL: DEFAULT_AIR_RECON_PLAN_BASE_URL,
@@ -66,7 +61,6 @@ const DEFAULT_VALUES = Object.freeze({
 });
 
 const EFFECTIVE_VALUES = {
-  BACKEND_BASE_URL,
   COORDINATION_BASE_URL,
   SITUATION_POOL_BASE_URL,
   AIR_RECON_PLAN_BASE_URL,
@@ -77,12 +71,12 @@ const EFFECTIVE_VALUES = {
 
 /** 调试弹窗可编辑的前端服务地址表 */
 export const SERVER_CONFIG_SCHEMA = Object.freeze([
-  { key: 'COORDINATION_BASE_URL', label: '协同席后端 API' },
+  // COORDINATION_BASE_URL 实际是全业务后端服务地址（协同席/操控席/调试接口共用），标签保持中性
+  { key: 'COORDINATION_BASE_URL', label: '后端服务 API' },
   { key: 'NOTIFICATION_BASE_URL', label: '通知中心' },
   { key: 'SITUATION_POOL_BASE_URL', label: '态势池' },
   { key: 'AIR_RECON_PLAN_BASE_URL', label: '空中侦察规划' },
   { key: 'MAP_SERVICE_BASE_URL', label: '地图服务' },
-  { key: 'BACKEND_BASE_URL', label: '本地后端' },
 ]);
 
 /**
@@ -142,7 +136,6 @@ export const clearServerOverrides = () => {
 };
 
 export default {
-  BACKEND_BASE_URL,
   COORDINATION_BASE_URL,
   SITUATION_POOL_BASE_URL,
   MAP_SERVICE_BASE_URL,

@@ -14,12 +14,25 @@ const SHARED_MAP_PANEL_ID = 'shared-map-ops';
 const COORDINATION_BRIEF_PANEL_ID = 'coord-brief';
 
 const COORDINATION_SUBVIEWS = Object.freeze([
-  { id: 'task-understanding', title: '任务理解' },
-  { id: 'plan-design', title: '方案规划' },
-  { id: 'resource-list', title: '资源清单' },
+  // hidden: true 的子视图仅在左侧菜单隐藏，面板代码保留（2026-09-18 按需求隐藏任务理解/方案规划/资源清单）
+  { id: 'task-understanding', title: '任务理解', hidden: true },
+  { id: 'plan-design', title: '方案规划', hidden: true },
+  { id: 'resource-list', title: '资源清单', hidden: true },
   { id: 'action-sequence', title: '行动序列' },
   { id: 'action-sequence-control', title: '操控席行动序列' },
+  // 操控席行动序列 2/3/4：占位入口，与操控席行动序列共用同一面板和数据源，
+  // 后续可通过调试按钮分别配置各自的数据服务器
+  { id: 'action-sequence-control-2', title: '操控席行动序列2' },
+  { id: 'action-sequence-control-3', title: '操控席行动序列3' },
+  { id: 'action-sequence-control-4', title: '操控席行动序列4' },
 ]);
+
+// 左侧菜单只展示未隐藏的子视图
+const VISIBLE_COORDINATION_SUBVIEWS = Object.freeze(
+  COORDINATION_SUBVIEWS.filter((item) => !item.hidden)
+);
+// 默认/兜底子视图取第一个可见项
+const DEFAULT_COORDINATION_SUBVIEW = VISIBLE_COORDINATION_SUBVIEWS[0];
 
 const ROUTE_ROLE_BY_PATH = {
   '/mission-control': 'single',
@@ -183,7 +196,7 @@ export function useMissionControlDemoShell({ screenMode = 'single', routeRole = 
       progressTone: 'danger',
     }),
   ]);
-  const activeCoordinationSubviewId = ref(COORDINATION_SUBVIEWS[0].id);
+  const activeCoordinationSubviewId = ref(DEFAULT_COORDINATION_SUBVIEW.id);
   const coordinationRefreshToken = ref(0);
   const coordinationCommandActive = ref(false);
 
@@ -274,7 +287,7 @@ export function useMissionControlDemoShell({ screenMode = 'single', routeRole = 
   const leftPanelHint = computed(() => activeLeftPanel.value?.hint || '');
   const activeCoordinationSubview = computed(() => (
     COORDINATION_SUBVIEWS.find((item) => item.id === activeCoordinationSubviewId.value)
-    || COORDINATION_SUBVIEWS[0]
+    || DEFAULT_COORDINATION_SUBVIEW
   ));
 
   const scrollToBottom = () => {
@@ -432,7 +445,7 @@ export function useMissionControlDemoShell({ screenMode = 'single', routeRole = 
 
   const selectCoordinationSubview = (subviewId) => {
     const nextSubview = COORDINATION_SUBVIEWS.find((item) => item.id === String(subviewId || '').trim())
-      || COORDINATION_SUBVIEWS[0];
+      || DEFAULT_COORDINATION_SUBVIEW;
     activeCoordinationSubviewId.value = nextSubview.id;
     coordinationRefreshToken.value += 1;
   };
@@ -850,7 +863,7 @@ export function useMissionControlDemoShell({ screenMode = 'single', routeRole = 
       lastCommandResult: automationBridge.lastCommandResult,
     },
     coordination: {
-      subviews: COORDINATION_SUBVIEWS,
+      subviews: VISIBLE_COORDINATION_SUBVIEWS,
       commandActive: coordinationCommandActive,
       activeSubviewId: activeCoordinationSubviewId,
       activeSubview: activeCoordinationSubview,

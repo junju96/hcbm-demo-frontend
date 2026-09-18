@@ -52,8 +52,8 @@
       />
 
       <ActionSequencePanel
-        v-else-if="activeSubviewId === 'action-sequence-control'"
-        key="action-sequence-control"
+        v-else-if="isControlSeatSubview"
+        :key="activeSubviewId"
         :module-api="moduleApi"
         :module-manifest="moduleManifest"
         :panel-definition="panelDefinition"
@@ -92,6 +92,9 @@ const props = defineProps({
 
 const activeSubviewId = computed(() => props.moduleApi.coordination?.activeSubviewId || 'task-understanding');
 const activeSubviewTitle = computed(() => props.moduleApi.coordination?.activeSubviewTitle || '任务理解');
+
+// 操控席行动序列（含 2/3/4 占位入口）共用同一 ActionSequencePanel（操控席模式）
+const isControlSeatSubview = computed(() => activeSubviewId.value.startsWith('action-sequence-control'));
 
 const planDesignTabs = [
   { id: 'task-planning', label: '任务规划' },

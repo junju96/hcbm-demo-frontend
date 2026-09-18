@@ -634,7 +634,8 @@ const appendSystemMessage = (text) => {
 
 /* ---------- 模式判断 ---------- */
 const subviewId = computed(() => props.moduleApi?.coordination?.activeSubviewId || '');
-const isControlMode = computed(() => subviewId.value === 'action-sequence-control');
+// 操控席行动序列 2/3/4 占位入口与操控席行动序列同属操控席模式
+const isControlMode = computed(() => subviewId.value.startsWith('action-sequence-control'));
 
 /* ---------- 状态 ---------- */
 const plans = ref([]);
