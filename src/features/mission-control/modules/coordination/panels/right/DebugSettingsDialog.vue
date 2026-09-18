@@ -1,6 +1,8 @@
 <template>
-  <div class="as-dialog-overlay" @click.self="emit('close')">
-    <div class="as-dialog as-debug-dialog">
+  <!-- Teleport 到 body，避免祖先容器的 transform/overflow 影响 fixed 定位与高度计算 -->
+  <Teleport to="body">
+    <div class="as-dialog-overlay" @click.self="emit('close')">
+      <div class="as-dialog as-debug-dialog">
       <div class="as-dialog-header">调试设置</div>
       <div class="as-dialog-body as-debug-body">
         <!-- ==================== 日志 ==================== -->
@@ -85,7 +87,8 @@
         <button class="as-btn primary" type="button" @click="emit('close')">关闭</button>
       </div>
     </div>
-  </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -302,6 +305,11 @@ onMounted(() => {
 .as-debug-dialog {
   max-width: 720px;
   width: 720px;
+  /* 整个弹窗（含头尾）不超过视口高度，body 内部滚动 */
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .as-dialog-header {
@@ -320,7 +328,8 @@ onMounted(() => {
 }
 
 .as-debug-body {
-  max-height: 70vh;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   gap: 1rem;
 }
