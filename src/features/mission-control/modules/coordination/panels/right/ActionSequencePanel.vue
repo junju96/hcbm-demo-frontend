@@ -668,13 +668,13 @@ const showDispatchVehicleDialog = ref(false);
 const selectedDispatchVids = ref([]);
 
 /* ---------- 协同席下发席位选择弹窗 ---------- */
-// 席位 id 由后端 config.SEAT_TARGET_IPS 映射为目标数据服务器 IP（调期间 1/2/3 → 操控席 .56）
-// 数据服务器当前注册席位只有 1/2/3，传入未注册 id（如 4）会整批 400；
+// 席位 id 由后端 config.SEAT_TARGET_IPS 映射为目标数据服务器 IP（调试期间 1/2/3/4 → 操控席 .56）
 // "ck"（车长席）是前端/后端约定 id，后端映射为操控车 DS 裸 IP（25.11.1.3），不会原样发给 DS
 const SEAT_OPTIONS = [
   { id: '1', label: '席位1' },
   { id: '2', label: '席位2（操控席）' },
   { id: '3', label: '席位3' },
+  { id: '4', label: '席位4' },
   { id: 'ck', label: '车长席' },
 ];
 const showDispatchSeatDialog = ref(false);
