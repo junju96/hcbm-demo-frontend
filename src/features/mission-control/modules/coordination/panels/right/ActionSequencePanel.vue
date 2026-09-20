@@ -2412,16 +2412,20 @@ const confirmDispatchSeatSelection = async () => {
 
 const onDispatchActive = async () => {
   // 操控端行动序列模块：走 zenoh send_mission（操控端接口）
-  const vehicles = getAllVehicles();
-  if (vehicles.length > 1) {
-    // 多车时弹出复选框，支持批量下发
-    selectedDispatchVids.value = [];
-    showDispatchVehicleDialog.value = true;
+  // 操控席进入时已选择操控车，发布时直接对当前连接车辆下发，不再弹车辆选择窗
+  if (!isVehicleConnected.value || !connectedVehicleId.value) {
+    appendSystemMessage('发布失败：请先连接操控车辆');
     return;
   }
-  // 单车直接下发
-  const vid = vehicles[0]?.vid || '';
-  await doDispatchActive(vid);
+  const connectedVidClean = String(connectedVehicleId.value).replace('equipment:', '');
+  const hasConnectedVehicle = getAllVehicles().some(
+    (v) => String(v.vid || '').replace('equipment:', '') === connectedVidClean
+  );
+  if (!hasConnectedVehicle) {
+    appendSystemMessage('发布失败：当前方案不包含已连接的操控车辆');
+    return;
+  }
+  await doDispatchActive(connectedVehicleId.value);
 };
 
 // 下发前元任务有效性校验：机动类需有有效航路点，打击类需有有效目标点或目标区域
