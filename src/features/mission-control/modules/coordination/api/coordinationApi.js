@@ -549,6 +549,13 @@ export const nextSequentialPlanId = (plans = []) => {
   return `plan-${String(max + 1).padStart(6, '0')}`;
 };
 
+/** 操控端 — 规划 */
+export const planOperatorPlan = async (planId, vehicleVid = null) => {
+  const qs = vehicleVid ? `?vehicle_vid=${encodeURIComponent(vehicleVid)}` : '';
+  const result = await postJson(joinApiUrl(`/api/v1/action-sequences/operator/plans/${planId}/planning${qs}`), {});
+  return result;
+};
+
 /** 操控端 — 开始执行 */
 export const startOperatorPlan = async (planId, vehicleVid = null) => {
   const qs = vehicleVid ? `?vehicle_vid=${encodeURIComponent(vehicleVid)}` : '';

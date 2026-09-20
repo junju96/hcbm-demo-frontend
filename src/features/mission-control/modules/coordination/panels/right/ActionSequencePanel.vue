@@ -147,6 +147,7 @@
                   <template v-if="isControlMode">
                     <template v-if="canOperateVehicle(vehicle)">
                       <template v-if="getVehicleRuntimeState(vehicle) === 'SCHEDULED'">
+                        <button v-if="hasVehicleActions(vehicle)" class="as-btn mini" type="button" :disabled="controlLoading" @click="executeControl('plan', [vehicle.vid])">规划</button>
                         <button v-if="hasVehicleActions(vehicle)" class="as-btn mini primary" type="button" :disabled="controlLoading" @click="executeControl('start', [vehicle.vid])">开始</button>
                       </template>
                       <template v-if="getVehicleRuntimeState(vehicle) === 'ACTIVE'">
@@ -600,6 +601,7 @@ import {
   fetchOperatorConnectedVehicles,
   selectOperatorVehicle,
   startOperatorPlan,
+  planOperatorPlan,
   pauseOperatorPlan,
   resumeOperatorPlan,
   stopOperatorPlan,
@@ -2281,6 +2283,11 @@ const executeControl = async (actionType, vids) => {
     let successState;
     let successMsg;
     switch (actionType) {
+      case 'plan':
+        apiFn = planOperatorPlan;
+        successState = 'SCHEDULED';
+        successMsg = '规划指令已下发';
+        break;
       case 'start':
         apiFn = isControlMode.value ? startOperatorPlan : startActionSequence;
         successState = 'ACTIVE';
