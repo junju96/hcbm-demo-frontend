@@ -674,7 +674,7 @@ const selectedDispatchVids = ref([]);
 // "ck"（车长席）是前端/后端约定 id，后端映射为操控车 DS 裸 IP（25.11.1.3），不会原样发给 DS
 const SEAT_OPTIONS = [
   { id: '1', label: '席位1' },
-  { id: '2', label: '席位2（操控席）' },
+  { id: '2', label: '席位2' },
   { id: '3', label: '席位3' },
   { id: '4', label: '席位4' },
   { id: 'ck', label: '车长席' },
