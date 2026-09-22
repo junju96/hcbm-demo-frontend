@@ -100,80 +100,92 @@
             </div>
           </div>
 
-          <!-- 右侧编辑画布 -->
-          <div
-            ref="canvasRef"
-            class="asc-canvas"
-            :class="{ 'is-connecting': drawingLine }"
-            @drop="onDrop"
-            @dragover.prevent
-            @click="onCanvasClick"
-          >
-            <svg class="asc-lines">
-              <defs>
-                <marker
-                  id="as-arrow"
-                  viewBox="0 0 14 14"
-                  refX="12"
-                  refY="7"
-                  markerWidth="13"
-                  markerHeight="13"
-                  markerUnits="userSpaceOnUse"
-                  orient="auto"
-                >
-                  <path d="M2 2 L12 7 L2 12 L5 7 Z" fill="#16e6cf" />
-                </marker>
-                <marker
-                  id="as-arrow-hover"
-                  viewBox="0 0 14 14"
-                  refX="12"
-                  refY="7"
-                  markerWidth="13"
-                  markerHeight="13"
-                  markerUnits="userSpaceOnUse"
-                  orient="auto"
-                >
-                  <path d="M2 2 L12 7 L2 12 L5 7 Z" fill="#ff7676" />
-                </marker>
-              </defs>
-              <path
-                v-for="(line, idx) in lines"
-                :key="idx"
-                :d="line.path"
-                class="asc-line"
-                :class="{ active: drawingLine && drawingLine.to === line.to && drawingLine.from === line.from }"
-                marker-end="url(#as-arrow)"
-                @click.stop="removeLine(line)"
-              />
-              <path
-                v-if="tempLine"
-                :d="tempLine.path"
-                class="asc-line temp"
-              />
-            </svg>
-
+          <!-- 右侧编辑画布（滚动容器） -->
+          <div class="asc-canvas-scroll">
             <div
-              v-for="node in nodes"
-              :key="node.id"
-              class="asc-node"
-              :class="[{ selected: selectedNodeId === node.id }, `cat-${node.category || 'chassis'}`]"
-              :style="{ left: node.x + 'px', top: node.y + 'px' }"
-              @mousedown.stop="startDragNode($event, node)"
-              @contextmenu.prevent
-              @click.stop="onNodeClick(node)"
+              ref="canvasRef"
+              class="asc-canvas"
+              :class="{ 'is-connecting': drawingLine }"
+              :style="{
+                minWidth: canvasContentSize.width ? canvasContentSize.width + 'px' : '100%',
+                minHeight: canvasContentSize.height ? canvasContentSize.height + 'px' : '100%'
+              }"
+              @drop="onDrop"
+              @dragover.prevent
+              @click="onCanvasClick"
             >
-              <div class="asc-node-port in" title="连接到此" @click.stop="finishConnect($event, node, 'in')" />
-              <div class="asc-node-body">
-                <div class="asc-node-name">{{ node.name }}</div>
-                <div class="asc-node-type">{{ node.actionType }}</div>
-              </div>
-              <div class="asc-node-port out" :title="drawingLine ? '连接到此' : '点击开始连线'" @click.stop="onPortClick($event, node, 'out')" />
-              <button class="asc-node-remove" type="button" title="删除节点" @click.stop="removeNode(node)">×</button>
-            </div>
+              <svg
+                class="asc-lines"
+                :style="{
+                  width: canvasContentSize.width ? canvasContentSize.width + 'px' : '100%',
+                  height: canvasContentSize.height ? canvasContentSize.height + 'px' : '100%'
+                }"
+              >
+                <defs>
+                  <marker
+                    id="as-arrow"
+                    viewBox="0 0 14 14"
+                    refX="12"
+                    refY="7"
+                    markerWidth="13"
+                    markerHeight="13"
+                    markerUnits="userSpaceOnUse"
+                    orient="auto"
+                  >
+                    <path d="M2 2 L12 7 L2 12 L5 7 Z" fill="#16e6cf" />
+                  </marker>
+                  <marker
+                    id="as-arrow-hover"
+                    viewBox="0 0 14 14"
+                    refX="12"
+                    refY="7"
+                    markerWidth="13"
+                    markerHeight="13"
+                    markerUnits="userSpaceOnUse"
+                    orient="auto"
+                  >
+                    <path d="M2 2 L12 7 L2 12 L5 7 Z" fill="#ff7676" />
+                  </marker>
+                </defs>
+                <path
+                  v-for="(line, idx) in lines"
+                  :key="idx"
+                  :d="line.path"
+                  class="asc-line"
+                  :class="{ active: drawingLine && drawingLine.to === line.to && drawingLine.from === line.from }"
+                  marker-end="url(#as-arrow)"
+                  @click.stop="removeLine(line)"
+                />
+                <path
+                  v-if="tempLine"
+                  :d="tempLine.path"
+                  class="asc-line temp"
+                />
+              </svg>
 
-            <div v-if="nodes.length === 0" class="asc-canvas-empty">
-              <div class="asc-canvas-empty-icon">⊹</div>
-              <div>从左侧拖拽元任务到此处开始编排</div>
+              <div
+                v-for="node in nodes"
+                :key="node.id"
+                class="asc-node"
+                :class="[{ selected: selectedNodeId === node.id }, `cat-${node.category || 'chassis'}`]"
+                :style="{ left: node.x + 'px', top: node.y + 'px' }"
+                @mousedown.stop="startDragNode($event, node)"
+                @contextmenu.prevent
+                @click.stop="onNodeClick(node)"
+              >
+                <div class="asc-node-port in" title="连接到此" @click.stop="finishConnect($event, node, 'in')" />
+                <div class="asc-node-body">
+                  <div class="asc-node-name">{{ node.name }}</div>
+                  <div class="asc-node-type">{{ node.actionType }}</div>
+                </div>
+                <div class="asc-node-port out" :title="drawingLine ? '连接到此' : '点击开始连线'" @click.stop="onPortClick($event, node, 'out')" />
+                <button class="asc-node-remove" type="button" title="删除节点" @click.stop="removeNode(node)">×</button>
+              </div>
+
+              <div v-if="nodes.length === 0" class="asc-canvas-empty">
+                <div class="asc-canvas-empty-icon">⊹</div>
+                <div>从左侧拖拽元任务到此处开始编排</div>
+              </div>
             </div>
           </div>
         </div>
@@ -261,6 +273,21 @@ const routeList = computed(() =>
 const targetList = computed(() =>
   fusionedTargets.value.filter((t) => t.target_shape === 'point' && t.points.length > 0)
 );
+
+// 画布内容尺寸：用于出现横向滚动条时让 canvas 和 SVG 覆盖全部节点
+const canvasContentSize = computed(() => {
+  if (!nodes.value.length) return { width: 0, height: 0 };
+  const NODE_W = 140;
+  const NODE_H = 56;
+  const PAD_X = 40;
+  const PAD_Y = 24;
+  const maxX = Math.max(...nodes.value.map((n) => n.x));
+  const maxY = Math.max(...nodes.value.map((n) => n.y));
+  return {
+    width: maxX + NODE_W + PAD_X,
+    height: maxY + NODE_H + PAD_Y,
+  };
+});
 
 // 默认车辆选项（资源池不可达时的兜底）
 const defaultVehicleOptions = [
@@ -1687,14 +1714,21 @@ async function savePlan() {
   text-overflow: ellipsis;
 }
 
-.asc-canvas {
+.asc-canvas-scroll {
   flex: 1;
   position: relative;
+  overflow: auto;
+}
+
+.asc-canvas {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
   background:
     radial-gradient(circle at 1px 1px, rgba(0, 222, 200, 0.08) 1px, transparent 0),
     radial-gradient(120% 120% at 50% 0%, rgba(0, 60, 66, 0.25), transparent 60%);
   background-size: 24px 24px, 100% 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .asc-canvas-empty {
