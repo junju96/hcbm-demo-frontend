@@ -50,6 +50,11 @@
         <button class="as-btn" type="button" @click="showDebugDialog = true">
           调试
         </button>
+        <!-- 后端服务状态指示器 -->
+        <div class="as-backend-status" :class="`status-${backendStatus}`" :title="backendStatus === 'online' ? '后端服务在线' : backendStatus === 'offline' ? '后端服务离线' : '检查后端服务状态中'">
+          <span class="as-backend-status-dot"></span>
+          <span class="as-backend-status-text">后端</span>
+        </div>
       </div>
     </div>
 
@@ -650,6 +655,11 @@ const loadingDetail = ref(false);
 const controlLoading = ref(false);
 // 当前已连接（online）的无人车列表，从资源池接口获取
 const onlineVehicles = ref([]);
+
+/* ---------- 后端服务状态 ---------- */
+// online=在线，offline=离线，checking=检查中
+const backendStatus = ref('checking');
+let backendStatusTimer = null;
 
 /* ---------- 新建空方案弹窗（操控席） ---------- */
 const showCreatePlanDialog = ref(false);
@@ -2776,12 +2786,43 @@ const initConnectedVehicle = async () => {
   }
 };
 
+/* ---------- 后端服务状态检查 ---------- */
+async function checkBackendStatus() {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch('/health', { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (response.ok) {
+      const data = await response.json();
+      backendStatus.value = data.status === 'ok' ? 'online' : 'offline';
+    } else {
+      backendStatus.value = 'offline';
+    }
+  } catch {
+    backendStatus.value = 'offline';
+  }
+}
+
+function startBackendStatusCheck() {
+  checkBackendStatus();
+  backendStatusTimer = setInterval(checkBackendStatus, 30000);
+}
+
+function stopBackendStatusCheck() {
+  if (backendStatusTimer) {
+    clearInterval(backendStatusTimer);
+    backendStatusTimer = null;
+  }
+}
+
 onMounted(async () => {
   await initConnectedVehicle();
   loadOnlineVehicles();
   loadPlans();
   updateMarqueeStates();
   startPlanEventStream();
+  startBackendStatusCheck();
   window.addEventListener('resize', onWindowResize);
   // 操控端行动序列视图：进入时强制弹出车辆选择框
   if (isControlMode.value) {
@@ -2844,6 +2885,7 @@ const onCancelSelectVehicle = () => {
 
 onUnmounted(() => {
   stopAutoRefresh();
+  stopBackendStatusCheck();
   window.removeEventListener('resize', onWindowResize);
   if (cardsResizeObserver) cardsResizeObserver.disconnect();
 });
@@ -2966,6 +3008,56 @@ onUnmounted(() => {
   background: rgba(34, 197, 94, 0.18);
   color: #86efac;
   border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+/* 后端服务状态指示器 */
+.as-backend-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  border: 1px solid transparent;
+  user-select: none;
+}
+.as-backend-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.as-backend-status.status-online {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #86efac;
+}
+.as-backend-status.status-online .as-backend-status-dot {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+.as-backend-status.status-offline {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+.as-backend-status.status-offline .as-backend-status-dot {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+}
+.as-backend-status.status-checking {
+  background: rgba(234, 179, 8, 0.15);
+  border-color: rgba(234, 179, 8, 0.3);
+  color: #fde047;
+}
+.as-backend-status.status-checking .as-backend-status-dot {
+  background: #eab308;
+  box-shadow: 0 0 6px rgba(234, 179, 8, 0.6);
+  animation: as-backend-status-pulse 1.2s ease-in-out infinite;
+}
+@keyframes as-backend-status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* 主内容布局 */
